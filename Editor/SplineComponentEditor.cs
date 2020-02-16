@@ -118,7 +118,7 @@ namespace FantasticSplines
                 || (editMode == SplineEditMode.AddPoint && guiEvent.button == 0)
                 || (guiEvent.shift && ( guiEvent.type == EventType.Layout || guiEvent.type == EventType.Repaint ) ) )
             {
-                if( Handles.Button( handlePosition, Quaternion.identity, 0, handleSize, Handles.DotHandleCap ) )
+                if( Handles.Button( handlePosition, Camera.current.transform.rotation, 0, handleSize, Handles.DotHandleCap ) )
                 {
                     guiEvent.Use();
                 }
@@ -597,29 +597,35 @@ namespace FantasticSplines
                     Ray mouseRay = MousePositionToRay( Camera.current, guiEvent.mousePosition );
                     Vector3 mouseWorldPosition = MathHelper.LinePlaneIntersection( mouseRay, transform.position + planeOffset, transform.up );
 
+                    bool physicsHit = false;
                     if( guiEvent.command )
                     {
                         // snap to physics
                         RaycastHit hit;
                         if( Physics.Raycast( mouseRay, out hit ) )
                         {
+                            physicsHit = true;
                             newPoint = hit.point;
                         }
                     }
-                    else if( guiEvent.shift )
+
+                    if( !physicsHit )
                     {
-                        // move along up axis
-                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( point ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
-                        Ray projectionRay = Camera.current.ScreenPointToRay( screenPoint );
-                        Vector3 verticalPlaneNormal = Vector3.Cross( transform.up, Vector3.Cross( transform.up, projectionRay.direction ) );
-                        Vector3 screenWorldPosition = MathHelper.LinePlaneIntersection( projectionRay, planePosition, verticalPlaneNormal );
-                        newPoint = point + transform.up * Vector3.Dot( transform.up, screenWorldPosition - point );
-                    }
-                    else
-                    {
-                        // relative pointer tracking
-                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( point ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
-                        newPoint = MathHelper.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), transform.position + planeOffset, transform.up );
+                        if( guiEvent.shift )
+                        {
+                            // move along up axis
+                            Vector3 screenPoint = Camera.current.WorldToScreenPoint( point ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
+                            Ray projectionRay = Camera.current.ScreenPointToRay( screenPoint );
+                            Vector3 verticalPlaneNormal = Vector3.Cross( transform.up, Vector3.Cross( transform.up, projectionRay.direction ) );
+                            Vector3 screenWorldPosition = MathHelper.LinePlaneIntersection( projectionRay, planePosition, verticalPlaneNormal );
+                            newPoint = point + transform.up * Vector3.Dot( transform.up, screenWorldPosition - point );
+                        }
+                        else
+                        {
+                            // relative pointer tracking
+                            Vector3 screenPoint = Camera.current.WorldToScreenPoint( point ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
+                            newPoint = MathHelper.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), transform.position + planeOffset, transform.up );
+                        }
                     }
 
                     planePosition = GetPointOnPlaneY( transform, point );
@@ -651,6 +657,16 @@ namespace FantasticSplines
             {
                 useEvent = true;
             }
+        }
+
+        // stop points disappearing into infinity!
+        bool IsSafeToProjectFromPlane( Camera camera, Transform transform )
+        {
+            return Vector3.Dot(camera.transform.forward, transform.up) < 0.95f;
+        }
+        bool TwoDimentionalMode( Camera camera, Transform transform )
+        {
+            return Vector3.Dot(camera.transform.up, transform.up) < 0.95f;
         }
 
         Vector3 GetPointOnPlaneY(Transform transform, Vector3 point)
