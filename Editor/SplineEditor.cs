@@ -17,8 +17,8 @@ namespace FantasticSplines
         Insert
     }
 
-    [CustomEditor( typeof( SplineComponent ) )]
-    public class SplineComponentEditor : Editor
+    [CustomEditor( typeof( Spline ) )]
+    public class SplineEditor : Editor
     {
         SplineEditMode editMode = SplineEditMode.None;
         SplineAddPointMode addPointMode = SplineAddPointMode.Append;
@@ -34,14 +34,28 @@ namespace FantasticSplines
 
         public override void OnInspectorGUI()
         {
-            if( GUILayout.Button( "Append Point" ) )
+            if( editMode == SplineEditMode.AddPoint && addPointMode == SplineAddPointMode.Append )
+            {
+                if( GUILayout.Button( "Cancel Append Point" ) )
+                {
+                    ResetEditMode();
+                }
+            }
+            else if( GUILayout.Button( "Append Point" ) )
             {
                 ResetEditMode();
                 editMode = SplineEditMode.AddPoint;
                 addPointMode = SplineAddPointMode.Append;
             }
 
-            if( GUILayout.Button( "Insert Point" ) )
+            if( editMode == SplineEditMode.AddPoint && addPointMode == SplineAddPointMode.Insert )
+            {
+                if( GUILayout.Button( "Cancel Insert Point" ) )
+                {
+                    ResetEditMode();
+                }
+            }
+            else if( GUILayout.Button( "Insert Point" ) )
             {
                 ResetEditMode();
                 editMode = SplineEditMode.AddPoint;
@@ -58,7 +72,7 @@ namespace FantasticSplines
         {
             useEvent = false;
             Event guiEvent = Event.current;
-            SplineComponent spline = target as SplineComponent;
+            Spline spline = target as Spline;
 
             if( editMode != SplineEditMode.None
                 && guiEvent.type == EventType.KeyDown
@@ -150,7 +164,7 @@ namespace FantasticSplines
             planeOffset = Vector3.zero;
         }
 
-        void DrawSplinePoints(SplineComponent spline)
+        void DrawSplinePoints(Spline spline)
         {
             for( int i = 0; i < spline.PointCount; ++i )
             {
@@ -169,7 +183,7 @@ namespace FantasticSplines
             Handles.color = Color.white;
         }
 
-        void DrawSplinePlaneProjectionLines(SplineComponent spline)
+        void DrawSplinePlaneProjectionLines(Spline spline)
         {
             for( int i = 0; i < spline.PointCount; ++i )
             {
@@ -179,7 +193,7 @@ namespace FantasticSplines
             }
         }
 
-        void DrawSplineSplineLines(SplineComponent spline)
+        void DrawSplineSplineLines(Spline spline)
         {
             for( int i = 0; i < spline.PointCount; ++i )
             {
@@ -193,7 +207,7 @@ namespace FantasticSplines
             }
         }
 
-        void DrawSplinePlaneProjectedSplineLines(SplineComponent spline)
+        void DrawSplinePlaneProjectedSplineLines(Spline spline)
         {
             for( int i = 0; i < spline.PointCount; ++i )
             {
@@ -208,7 +222,7 @@ namespace FantasticSplines
             }
         }
 
-        void DrawSplineSelectionDisks( SplineComponent spline)
+        void DrawSplineSelectionDisks( Spline spline)
         {
             ValidatePointSelection( spline );
             Transform transform = spline.transform;
@@ -231,7 +245,7 @@ namespace FantasticSplines
             }
         }
 
-        void DrawSpline(SplineComponent spline)
+        void DrawSpline(Spline spline)
         {
             DrawSplinePoints( spline );
             DrawSplineSplineLines( spline );
@@ -241,7 +255,7 @@ namespace FantasticSplines
         }
 
         List<int> pointSelection = new List<int>();
-        void SelectionAddPoint(SplineComponent spline, int index)
+        void SelectionAddPoint(Spline spline, int index)
         {
             ValidatePointSelection( spline );
             if( !spline.IsIndexInRange( index ) )
@@ -256,7 +270,7 @@ namespace FantasticSplines
             pointSelection.Add( index );
         }
 
-        void ValidatePointSelection(SplineComponent spline)
+        void ValidatePointSelection(Spline spline)
         {
             for( int i = pointSelection.Count - 1; i >= 0; i-- )
             {
@@ -273,7 +287,7 @@ namespace FantasticSplines
             editMode = SplineEditMode.None;
         }
 
-        bool DoClickSelection(SplineComponent spline, Event guiEvent)
+        bool DoClickSelection(Spline spline, Event guiEvent)
         {
             bool clearSelection = !guiEvent.shift && !guiEvent.command;
             bool hasSelection = pointSelection.Count > 0;
@@ -327,7 +341,7 @@ namespace FantasticSplines
 
         Vector2 mouseDragSelectionStart;
         bool dragSelectActive = false;
-        bool DoDragSelection(SplineComponent spline, Event guiEvent)
+        bool DoDragSelection(Spline spline, Event guiEvent)
         {
             bool clearSelection = false;
             if( spline.PointCount > 0 && !dragSelectActive && guiEvent.type == EventType.MouseDown && guiEvent.button == 0 && guiEvent.shift )
@@ -412,7 +426,7 @@ namespace FantasticSplines
             return clearSelection;
         }
 
-        void DoPointSelection(SplineComponent spline, Event guiEvent)
+        void DoPointSelection(Spline spline, Event guiEvent)
         {
             bool clearClick = DoClickSelection( spline, guiEvent );
             bool clearDrag = DoDragSelection( spline, guiEvent );
@@ -424,7 +438,7 @@ namespace FantasticSplines
             }
         }
 
-        void DoAppendPoint(SplineComponent spline, Event guiEvent)
+        void DoAppendPoint(Spline spline, Event guiEvent)
         {
             Selection.activeGameObject = spline.gameObject;
             Transform handleTransform = spline.transform;
@@ -488,7 +502,7 @@ namespace FantasticSplines
             }
         }
 
-        void DoInsertPoint(SplineComponent spline, Event guiEvent)
+        void DoInsertPoint(Spline spline, Event guiEvent)
         {
             Selection.activeGameObject = spline.gameObject;
 
@@ -559,7 +573,7 @@ namespace FantasticSplines
 
         bool moving { get { return movementControlPointIndex != -1; } }
         int movementControlPointIndex = -1;
-        void DoMovePoint(SplineComponent spline, Event guiEvent)
+        void DoMovePoint(Spline spline, Event guiEvent)
         {
             Transform transform = spline.transform;
             
@@ -676,7 +690,7 @@ namespace FantasticSplines
 
         float DepthScale(Vector3 point, Vector3 cameraPosition)
         {
-            SplineComponent spline = target as SplineComponent;
+            Spline spline = target as Spline;
             return Vector3.Distance( spline.transform.position, cameraPosition ) / Vector3.Distance( point, cameraPosition );
         }
 

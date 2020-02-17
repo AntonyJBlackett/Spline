@@ -6,21 +6,21 @@ using UnityEditor;
 namespace FantasticSplines
 {
     [System.Serializable]
-    public struct SplinePoint
+    public struct CurvePoint
     {
         public Vector3 position;
     }
 
     [System.Serializable]
-    public class Spline
+    public class Curve
     {
-        public List<SplinePoint> points = new List<SplinePoint>();
+        public List<CurvePoint> points = new List<CurvePoint>();
 
         public int PointCount { get { return points.Count; } }
 
         public void AddPoint(Vector3 position)
         {
-            points.Add( new SplinePoint { position = position } );
+            points.Add( new CurvePoint { position = position } );
         }
 
         public void RemovePoint(int index)
@@ -38,7 +38,7 @@ namespace FantasticSplines
             {
                 return;
             }
-            points.Insert( index, new SplinePoint { position = position } );
+            points.Insert( index, new CurvePoint { position = position } );
         }
 
         public Vector3 GetPointPosition( int index)
@@ -56,15 +56,15 @@ namespace FantasticSplines
             {
                 return;
             }
-            SplinePoint point = points[index];
+            CurvePoint point = points[index];
             point.position = position;
             points[index] = point;
         }
     }
 
-    public class SplineComponent : MonoBehaviour
+    public class Spline : MonoBehaviour
     {
-        public Spline spline;
+        public Curve spline;
 
         public List<Vector3> GetPoints()
         {
