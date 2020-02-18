@@ -88,6 +88,8 @@ namespace FantasticSplines
         [SerializeField]
         Vector3 control2;
 
+        int lastChangedControl;
+
         [SerializeField]
         PointType pointType;
 
@@ -119,12 +121,9 @@ namespace FantasticSplines
             }
             set
             {
-                if( pointType == PointType.Point )
-                {
-                    Debug.Log( "check" );
-                }
                 control1 = value;
                 control2 = ConstrainControlPoint( control1, control2, pointType );
+                lastChangedControl = 1;
             }
         }
 
@@ -141,12 +140,9 @@ namespace FantasticSplines
             }
             set
             {
-                if( pointType == PointType.Point )
-                {
-                    Debug.Log( "check" );
-                }
                 control2 = value;
                 control1 = ConstrainControlPoint( control2, control1, pointType );
+                lastChangedControl = 2;
             }
         }
 
@@ -161,7 +157,16 @@ namespace FantasticSplines
         public void SetPointType(PointType type)
         {
             pointType = type;
-            control2 = ConstrainControlPoint( control1, control2, type );
+
+            if( pointType == PointType.Mirrored 
+                && lastChangedControl == 2 )
+            {
+                control1 = ConstrainControlPoint( control2, control1, type );
+            }
+            else
+            {
+                control2 = ConstrainControlPoint( control1, control2, type );
+            }
         }
 
         public CurvePoint(Vector3 position)
@@ -169,6 +174,7 @@ namespace FantasticSplines
             pointType = PointType.Point;
             this.position = position;
             control1 = control2 = Vector3.zero;
+            lastChangedControl = 0;
         }
 
         public CurvePoint(Vector3 position, Vector3 control1, Vector3 control2, PointType type)
@@ -177,6 +183,7 @@ namespace FantasticSplines
             this.control1 = control1;
             this.control2 = control2;
             pointType = type;
+            lastChangedControl = 0;
         }
 
         public CurvePoint(CurvePoint other)
@@ -185,6 +192,7 @@ namespace FantasticSplines
             control1 = other.control1;
             control2 = other.control2;
             pointType = other.pointType;
+            lastChangedControl = other.lastChangedControl;
         }
 
         public CurvePoint Transform(Transform transform)
