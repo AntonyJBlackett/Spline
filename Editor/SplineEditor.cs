@@ -112,27 +112,12 @@ namespace FantasticSplines
                 int afterIndex = (index + 1) % spline.PointCount;
                 after = spline.GetPoint( afterIndex );
 
-                Vector3 direction = (after.position - before.position).normalized;
-                float beforeT = HandleUtility.PointOnLineParameter( before.position, point.position, direction );
-                float afterT = HandleUtility.PointOnLineParameter( after.position, point.position, direction );
-                
-                point.SetPointType( PointType.Aligned );
-                if( beforeT > 0 == afterT > 0 )
-                {
-                    Vector3 center = (before.position + after.position) * 0.5f;
-                    Vector3 centerDir = (center - point.position).normalized;
+                Vector3 direction = after.position - before.position;
+                float dist1 = Mathf.Min( (point.position - before.position).magnitude, direction.magnitude );
+                float dist2 = Mathf.Min( (point.position - after.position).magnitude, direction.magnitude );
 
-                    Vector3 tangent = Vector3.Cross( spline.transform.up, centerDir );
-
-                    point.Control1 = -tangent * Vector3.Distance( point.position, before.position ) * 0.5f;
-                    point.Control2 = tangent * Vector3.Distance( point.position, after.position ) * 0.5f;
-                }
-                else
-                {
-                    point.Control1 = direction * beforeT * 0.5f;
-                    point.Control2 = direction * afterT * 0.5f;
-                }
-                
+                point.Control1 = -direction.normalized * dist1 * 0.4f;
+                point.Control2 = direction.normalized * dist2 * 0.4f;
 
                 if( !spline.Loop )
                 {
@@ -1087,8 +1072,6 @@ namespace FantasticSplines
                         }
                     }
 
-                    Debug.Log( "newSegmentLength " + newSegmentLength );
-                    Debug.Log( "segmentLength " + segmentLength );
                     t = newSegmentLength / segmentLength;
                 }
 
