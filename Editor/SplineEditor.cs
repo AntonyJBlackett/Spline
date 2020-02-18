@@ -134,7 +134,8 @@ namespace FantasticSplines
                 Vector3 direction = after.position - before.position;
                 float dist1 = Mathf.Min( (point.position - before.position).magnitude, direction.magnitude );
                 float dist2 = Mathf.Min( (point.position - after.position).magnitude, direction.magnitude );
-
+                
+                point.SetPointType( PointType.Aligned );
                 point.Control1 = -direction.normalized * dist1 * 0.4f;
                 point.Control2 = direction.normalized * dist2 * 0.4f;
 
