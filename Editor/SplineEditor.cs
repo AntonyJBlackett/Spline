@@ -31,6 +31,7 @@ namespace FantasticSplines
 
         void OnEnable()
         {
+            lastTool = Tools.current;
             ResetEditMode();
         }
 
@@ -74,17 +75,19 @@ namespace FantasticSplines
         float rightClickStart;
         float rightClickTime = 0.2f;
         bool useEvent = false;
-        void OnSceneGUI()
+
+        Tool lastTool = Tool.Move;
+        void SetTool( Tool newTool )
         {
-            useEvent = false;
-            Event guiEvent = Event.current;
-            Spline spline = target as Spline;
-
-            if( guiEvent.type == EventType.MouseEnterWindow )
+            lastTool = newTool;
+            if( pointSelection.Count == 0 )
             {
-                SceneView.currentDrawingSceneView.Focus();
+                Tools.current = lastTool;
             }
+        }
 
+        void RightClickCancel( Event guiEvent )
+        {
             if( guiEvent.button == 1 && guiEvent.type == EventType.MouseDown )
             {
                 rightClickStart = Time.unscaledTime;
@@ -101,13 +104,30 @@ namespace FantasticSplines
                     ResetEditMode();
                 }
             }
+        }
 
+        void KeyboardInputs( Spline spline, Event guiEvent )
+        {
             if( editMode != SplineEditMode.None
-                && guiEvent.type == EventType.KeyDown
-                && guiEvent.keyCode == KeyCode.Escape )
+                && guiEvent.type == EventType.KeyDown )
             {
-                guiEvent.Use();
-                ResetEditMode();
+                if( guiEvent.keyCode == KeyCode.W )
+                {
+                    SetTool( Tool.Move );
+                }
+                if( guiEvent.keyCode == KeyCode.E )
+                {
+                    SetTool( Tool.Rotate );
+                }
+                if( guiEvent.keyCode == KeyCode.R )
+                {
+                    SetTool( Tool.Scale );
+                }
+                if( guiEvent.keyCode == KeyCode.Escape )
+                {
+                    guiEvent.Use();
+                    ResetEditMode();
+                }
             }
             
             if( pointSelection.Count > 0
@@ -122,11 +142,39 @@ namespace FantasticSplines
                 ClearPointSelection();
                 EditorUtility.SetDirty( target );
             }
+        }
+
+        void SceneViewEventSetup( Event guiEvent )
+        {
+            useEvent = false;
+
+            if( guiEvent.type == EventType.MouseEnterWindow )
+            {
+                SceneView.currentDrawingSceneView.Focus();
+            }
 
             if( pointSelection.Count > 0 )
             {
+                lastTool = Tools.current;
+                Tools.current = Tool.Custom;
                 editMode = SplineEditMode.MovePoint;
             }
+            else
+            {
+                Tools.current = lastTool;
+            }
+        }
+
+        void OnSceneGUI()
+        {
+            Event guiEvent = Event.current;
+            Spline spline = target as Spline;
+
+            SceneViewEventSetup( guiEvent );
+
+            RightClickCancel( guiEvent );
+
+            KeyboardInputs( spline, guiEvent );
 
             switch( editMode )
             {
@@ -155,13 +203,14 @@ namespace FantasticSplines
                     break;
             }
 
+            // draw things
             DrawSpline( spline );
             if( guiEvent.isMouse )
             {
                 SceneView.currentDrawingSceneView.Repaint();
             }
             
-            // intercept unity object drag select
+            // hacks: intercept unity object drag select
             Vector3 handlePosition = Camera.current.transform.position + Camera.current.transform.forward * 10;
             float handleSize = HandleUtility.GetHandleSize( handlePosition ) * 15;
             if( useEvent 
