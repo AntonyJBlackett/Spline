@@ -110,6 +110,10 @@ namespace FantasticSplines
             }
             set
             {
+                if( pointType == PointType.Point )
+                {
+                    Debug.Log( "check" );
+                }
                 control1 = value;
                 control2 = ConstrainControlPoint( control1, control2, pointType );
             }
@@ -128,6 +132,10 @@ namespace FantasticSplines
             }
             set
             {
+                if( pointType == PointType.Point )
+                {
+                    Debug.Log( "check" );
+                }
                 control2 = value;
                 control1 = ConstrainControlPoint( control2, control1, pointType );
             }
@@ -160,6 +168,32 @@ namespace FantasticSplines
             this.control1 = control1;
             this.control2 = control2;
             pointType = type;
+        }
+
+        public CurvePoint(CurvePoint other)
+        {
+            position = other.position;
+            control1 = other.control1;
+            control2 = other.control2;
+            pointType = other.pointType;
+        }
+
+        public CurvePoint Transform(Transform transform)
+        {
+            CurvePoint result = this;
+            result.position = transform.TransformPoint( result.position );
+            result.control1 = transform.TransformVector( result.control1 );
+            result.control2 = transform.TransformVector( result.control2 );
+            return result;
+        }
+
+        public CurvePoint InverseTransform(Transform transform)
+        {
+            CurvePoint result = this;
+            result.position = transform.InverseTransformPoint( result.position );
+            result.control1 = transform.InverseTransformVector( result.control1 );
+            result.control2 = transform.InverseTransformVector( result.control2 );
+            return result;
         }
     }
 
@@ -348,25 +382,9 @@ namespace FantasticSplines
             return point;
         }
 
-        CurvePoint InverseTransformPoint( CurvePoint point )
-        {
-            point.position = transform.InverseTransformPoint( point.position );
-            point.Control1 = transform.InverseTransformVector( point.Control1 );
-            point.Control2 = transform.InverseTransformVector( point.Control2 );
-            return point;
-        }
-
         Vector3 TransformPoint( Vector3 point )
         {
             point = transform.TransformPoint( point );
-            return point;
-        }
-
-        CurvePoint TransformPoint( CurvePoint point )
-        {
-            point.position = transform.TransformPoint( point.position );
-            point.Control1 = transform.TransformVector( point.Control1 );
-            point.Control2 = transform.TransformVector( point.Control2 );
             return point;
         }
 
@@ -387,7 +405,7 @@ namespace FantasticSplines
 
         public void AddPoint(CurvePoint point)
         {
-            curve.AddPoint( InverseTransformPoint( point ) );
+            curve.AddPoint( point.InverseTransform( transform ) );
         }
 
         public void RemovePoint(int index)
@@ -402,7 +420,7 @@ namespace FantasticSplines
 
         public CurvePoint GetPoint( int index )
         {
-            return TransformPoint( curve.points[index] );
+            return curve.points[index].Transform( transform );
         }
 
         public void SetPointPosition( int index, Vector3 point )
@@ -412,7 +430,7 @@ namespace FantasticSplines
 
         public void SetPoint(int index, CurvePoint point)
         {
-            curve.SetPoint( index, InverseTransformPoint( point ) );
+            curve.SetPoint( index, point.InverseTransform( transform ) );
         }
 
         public int PointCount { get { return curve.PointCount; } }

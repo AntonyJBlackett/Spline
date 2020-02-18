@@ -35,8 +35,24 @@ namespace FantasticSplines
             ResetEditMode();
         }
 
+        void SetSelectionPointType( Spline spline, PointType type)
+        {
+            Undo.RecordObject( target, "Set Point Type" );
+            for( int i = 0; i < pointSelection.Count; ++i )
+            {
+                int index = pointSelection[i];
+                CurvePoint point = spline.GetPoint( index );
+                point.SetPointType( type );
+                spline.SetPoint( index, point );
+            }
+            EditorUtility.SetDirty( target );
+        }
+
         public override void OnInspectorGUI()
         {
+            Spline spline = target as Spline;
+
+            GUILayout.Label( "Edit Modes" );
             if( editMode == SplineEditMode.AddPoint && addPointMode == SplineAddPointMode.Append )
             {
                 if( GUILayout.Button( "Cancel Append Point" ) )
@@ -64,7 +80,28 @@ namespace FantasticSplines
                 editMode = SplineEditMode.AddPoint;
                 addPointMode = SplineAddPointMode.Insert;
             }
+            EditorGUI.BeginChangeCheck();
+            bool loop = GUILayout.Toggle( spline.Loop, "Loop" );
+            if( EditorGUI.EndChangeCheck() )
+            {
+                Undo.RecordObject( target, "Loop Toggle" );
+                spline.Loop = loop;
+                EditorUtility.SetDirty( target );
+            }
 
+            GUILayout.Space( 10 );
+            GUILayout.Label( "Tools" );
+            if( GUILayout.Button( "Smooth Selection" ) )
+            {
+                SetSelectionPointType( spline, PointType.Mirrored );
+            }
+            if( GUILayout.Button( "Linear Point Type" ) )
+            {
+                SetSelectionPointType( spline, PointType.Point );
+            }
+
+            GUILayout.Space( 10 );
+            GUILayout.Label( "Debug" );
             GUILayout.Label( "Edit Mode: " + editMode.ToString() );
             GUILayout.Label( "Add Point Mode: " + addPointMode.ToString() );
             GUILayout.Label( "Moving Point: " + moving.ToString() );
