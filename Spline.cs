@@ -37,6 +37,35 @@ namespace FantasticSplines
                 6f * oneMinusT * t * (p2 - p1) +
                 3f * t * t * (p3 - p2);
         }
+
+        /// <summary>
+        /// Splits the curve at given position (t : 0..1).
+        /// </summary>
+        /// <param name="t">A number from 0 to 1.</param>
+        /// <returns>Two curves.</returns>
+        /// <remarks>
+        /// (De Casteljau's algorithm, see: http://caffeineowl.com/graphics/2d/vectorial/bezierintro.html)
+        /// </remarks>
+        public static CurvePoint SplitAt(ref CurvePoint point1, ref CurvePoint point2, float t)
+        {
+            Vector3 A = point1.position;
+            Vector3 B = point1.position + point1.Control2;
+            Vector3 C = point2.position + point2.Control1;
+            Vector3 D = point2.position;
+
+            Vector3 a = Vector3.Lerp( A, B, t );
+            Vector3 b = Vector3.Lerp( B, C, t );
+            Vector3 c = Vector3.Lerp( C, D, t );
+            Vector3 m = Vector3.Lerp( a, b, t );
+            Vector3 n = Vector3.Lerp( b, c, t );
+            Vector3 p = GetPoint( A, B, C, D, t );
+
+            point1.Control2 = a - point1.position;
+            point2.Control1 = c - point2.position;
+
+            CurvePoint newCurvePoint = new CurvePoint( p, m - p, n - p, PointType.Free );
+            return newCurvePoint;
+        }
     }
 
     [System.Serializable]
@@ -112,24 +141,32 @@ namespace FantasticSplines
             }
         }
 
-        public void SetPointType( PointType type )
+        public void SetPointType(PointType type)
         {
             pointType = type;
             control2 = ConstrainControlPoint( control1, control2, type );
         }
 
-        public CurvePoint( Vector3 position )
+        public CurvePoint(Vector3 position)
         {
             pointType = PointType.Point;
             this.position = position;
             control1 = control2 = Vector3.zero;
         }
 
-        public CurvePoint( Vector3 position, Vector3 direction, PointType type )
+        public CurvePoint(Vector3 position, Vector3 direction, PointType type)
         {
             this.position = position;
             control1 = -direction;
             control2 = direction;
+            pointType = type;
+        }
+
+        public CurvePoint(Vector3 position, Vector3 control1, Vector3 control2, PointType type)
+        {
+            this.position = position;
+            this.control1 = control1;
+            this.control2 = control2;
             pointType = type;
         }
     }
@@ -142,12 +179,12 @@ namespace FantasticSplines
 
         public int PointCount { get { return points.Count; } }
 
-        public void AddPoint( Vector3 position )
+        public void AddPoint(Vector3 position)
         {
             points.Add( new CurvePoint( position ) );
         }
 
-        public void AddPoint( CurvePoint point )
+        public void AddPoint(CurvePoint point)
         {
             points.Add( point );
         }
@@ -161,14 +198,26 @@ namespace FantasticSplines
             points.RemoveAt( index );
         }
 
-        public void InsertPoint(int index, Vector3 position )
+        public void InsertPoint(int segement, float t)
         {
-            if( index < 0 || index > PointCount )
+            if( segement < 0 || segement > PointCount - 1 )
             {
                 return;
             }
 
-            points.Insert( index, new CurvePoint( position ) );
+            CurvePoint point1 = points[segement];
+            CurvePoint point2 = points[segement + 1];
+
+            CurvePoint split = BezierCalculator.SplitAt(ref point1, ref point2, t);
+            points[segement] = point1;
+            points[segement + 1] = point2;
+    
+            if(point1.PointType == PointType.Point && point2.PointType == PointType.Point )
+            {
+                split.SetPointType( PointType.Point );
+            }
+
+            points.Insert( segement+1, split );
         }
 
         public Vector3 GetPointPosition( int index )
@@ -178,6 +227,21 @@ namespace FantasticSplines
                 return Vector3.zero;
             }
             return points[index].position;
+        }
+
+        public Vector3 GetPointPosition(int segment, float t)
+        {
+            int index1 = segment;
+            int index2 = segment+1;
+
+            index2 %= PointCount;
+
+            return BezierCalculator.GetPoint( 
+                points[index1].position, 
+                points[index1].position + points[index1].Control2, 
+                points[index2].position + points[index2].Control1, 
+                points[index2].position, 
+                t );
         }
 
         public void SetPointPosition( int index, Vector3 position )
@@ -201,54 +265,111 @@ namespace FantasticSplines
     {
         public Curve curve;
         public bool Loop { get { return curve.loop; } set { curve.loop = value; } }
-
+        
+        const int resolution = 10; 
         public List<Vector3> GetPoints()
         {
             List<Vector3> points = new List<Vector3>();
-            for( int i = 0; i < PointCount; ++i )
+            if( PointCount < 2 )
             {
-                points.Add( GetPointPosition( i ) );
+                return points;
+            }
+
+            int curveSegments = PointCount;
+            if( Loop )
+            {
+                curveSegments += 1;
+            }
+            for( int i = 1; i < curveSegments; ++i )
+            {
+                float step = 1.0f / (float)resolution;
+                float t = 0;
+
+                int index1 = (i - 1);
+                int index2 = i % PointCount;
+
+                CurvePoint point1 = GetPoint(index1);
+                CurvePoint point2 = GetPoint(index2);
+
+                if( point1.PointType == PointType.Point && point2.PointType == PointType.Point )
+                {
+                    points.Add( point1.position );
+                    if( i == curveSegments - 1 )
+                    {
+                        points.Add( point2.position );
+                    }
+                    continue;
+                }
+
+                for( int s = 0; s < resolution+1; ++s )
+                {
+                    points.Add( TransformPoint( curve.GetPointPosition( index1, t ) ) );
+                    t += step;
+                }
             }
             return points;
         }
 
-        Vector3 InverseTransformPoint( Vector3 point, Space space )
+        public List<int> GetSegmentsForPoints()
         {
-            if( space == Space.World )
+            List<int> segments = new List<int>();
+
+            int curveSegments = PointCount;
+            if( Loop )
             {
-                point = transform.InverseTransformPoint( point );
+                curveSegments += 1;
             }
+            for( int i = 1; i < curveSegments; ++i )
+            {
+                int index1 = (i - 1);
+                int index2 = i % PointCount;
+
+                CurvePoint point1 = GetPoint(index1);
+                CurvePoint point2 = GetPoint(index2);
+
+                if( point1.PointType == PointType.Point && point2.PointType == PointType.Point )
+                {
+                    segments.Add( index1 );
+                    if( i == curveSegments - 1 )
+                    {
+                        segments.Add( index1 );
+                    }
+                    continue;
+                }
+
+                for( int s = 0; s < resolution+1; ++s )
+                {
+                    segments.Add( index1 );
+                }
+            }
+            return segments;
+        }
+
+        Vector3 InverseTransformPoint( Vector3 point )
+        {
+            point = transform.InverseTransformPoint( point );
             return point;
         }
 
-        CurvePoint InverseTransformPoint( CurvePoint point, Space space )
+        CurvePoint InverseTransformPoint( CurvePoint point )
         {
-            if( space == Space.World )
-            {
-                point.position = transform.InverseTransformPoint( point.position );
-                point.Control1 = transform.InverseTransformVector( point.Control1 );
-                point.Control2 = transform.InverseTransformVector( point.Control2 );
-            }
+            point.position = transform.InverseTransformPoint( point.position );
+            point.Control1 = transform.InverseTransformVector( point.Control1 );
+            point.Control2 = transform.InverseTransformVector( point.Control2 );
             return point;
         }
 
-        Vector3 TransformPoint( Vector3 point, Space space )
+        Vector3 TransformPoint( Vector3 point )
         {
-            if( space == Space.World )
-            {
-                point = transform.TransformPoint( point );
-            }
+            point = transform.TransformPoint( point );
             return point;
         }
 
-        CurvePoint TransformPoint( CurvePoint point, Space space )
+        CurvePoint TransformPoint( CurvePoint point )
         {
-            if( space == Space.World )
-            {
-                point.position = transform.TransformPoint( point.position );
-                point.Control1 = transform.TransformVector( point.Control1 );
-                point.Control2 = transform.TransformVector( point.Control2 );
-            }
+            point.position = transform.TransformPoint( point.position );
+            point.Control1 = transform.TransformVector( point.Control1 );
+            point.Control2 = transform.TransformVector( point.Control2 );
             return point;
         }
 
@@ -257,19 +378,19 @@ namespace FantasticSplines
             return index >= 0 && index < PointCount;
         }
 
-        public void InsertPoint( int index, Vector3 point, Space space )
+        public void InsertPoint( int segment, float t )
         {
-            curve.InsertPoint( index, InverseTransformPoint( point, space ) );
+            curve.InsertPoint( segment, t );
         }
 
-        public void AddPoint(Vector3 point, Space space)
+        public void AddPoint(Vector3 point)
         {
-            curve.AddPoint( InverseTransformPoint( point, space ) );
+            curve.AddPoint( InverseTransformPoint( point ) );
         }
 
-        public void AddPoint(CurvePoint point, Space space)
+        public void AddPoint(CurvePoint point)
         {
-            curve.AddPoint( InverseTransformPoint( point, space ) );
+            curve.AddPoint( InverseTransformPoint( point ) );
         }
 
         public void RemovePoint(int index)
@@ -279,17 +400,17 @@ namespace FantasticSplines
 
         public Vector3 GetPointPosition(int index)
         {
-            return TransformPoint( curve.GetPointPosition( index ), Space.World );
+            return TransformPoint( curve.GetPointPosition( index ) );
         }
 
         public CurvePoint GetPoint( int index )
         {
-            return TransformPoint( curve.points[index], Space.World );
+            return TransformPoint( curve.points[index] );
         }
 
-        public void SetPoint( int index, Vector3 point, Space space )
+        public void SetPoint( int index, Vector3 point )
         {
-            curve.SetPointPosition( index, InverseTransformPoint( point, space ) );
+            curve.SetPointPosition( index, InverseTransformPoint( point ) );
         }
 
         public int PointCount { get { return curve.PointCount; } }
@@ -308,23 +429,10 @@ namespace FantasticSplines
                 Gizmos.DrawSphere( GetPointPosition( i ), 0.05f );
             }
 
-            for( int i = 1; i < PointCount; ++i )
+            List<Vector3> points = GetPoints();
+            for( int i = 1; i < points.Count; ++i )
             {
-                int segments = 4;
-                float step = 1.0f / (float)segments;
-                float t = 0;
-
-                CurvePoint point1 = GetPoint(i-1);
-                CurvePoint point2 = GetPoint(i);
-                 
-                Vector3 pos1 = BezierCalculator.GetPoint( point1.position, point1.position + point1.Control2, point2.position + point2.Control1, point2.position, t );
-                for( int s = 0; s < segments; ++s )
-                {
-                    t += step;
-                    Vector3 pos2 = BezierCalculator.GetPoint( point1.position, point1.position + point1.Control2, point2.position + point2.Control1, point2.position, t );
-                    Gizmos.DrawLine( pos1, pos2 );
-                    pos1 = pos2;
-                }
+                Gizmos.DrawLine( points[i-1], points[i] );
             }
 
             /*

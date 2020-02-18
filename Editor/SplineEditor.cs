@@ -143,7 +143,14 @@ namespace FantasticSplines
                     }
                     else
                     {
-                        DoInsertPoint( spline, guiEvent );
+                        if( spline.PointCount < 2 )
+                        {
+                            DoAppendPoint( spline, guiEvent );
+                        }
+                        else
+                        {
+                            DoInsertPoint( spline, guiEvent );
+                        }
                     }
                     break;
             }
@@ -657,7 +664,17 @@ namespace FantasticSplines
                     canShift = false;
                     addPointState = AddPointState.PointPosition;
                     Undo.RecordObject( target, "Add Point" );
-                    spline.AddPoint( new CurvePoint( addPointPosition, newControlPointPosition - addPointPosition, PointType.Mirrored ), Space.World );
+
+                    Vector3 controlPosition = newControlPointPosition - addPointPosition;
+                    if( controlPosition.magnitude < 0.01f )
+                    {
+                        spline.AddPoint( new CurvePoint( addPointPosition ) );
+                    }
+                    else
+                    {
+                        spline.AddPoint( new CurvePoint( addPointPosition, newControlPointPosition - addPointPosition, PointType.Mirrored ) );
+                    }
+
                     EditorUtility.SetDirty( spline );
                     guiEvent.Use();
                 }
@@ -682,13 +699,14 @@ namespace FantasticSplines
             Ray mouseRay = MousePositionToRay( camera, guiEvent.mousePosition );
             Vector3 mouseWorldPosition = MathHelper.LinePlaneIntersection( mouseRay, transform.position + planeOffset, transform.up );
 
-
             List<int> connectingPoints = new List<int>();
-            Vector3 newPointPosition = HandleUtility.ClosestPointToPolyLine( spline.GetPoints().ToArray() );
-            for( int i = 1; i < spline.PointCount; ++i )
+            List<Vector3> points = spline.GetPoints();
+            List<int> curveSegmentIndicies = spline.GetSegmentsForPoints();
+            Vector3 newPointPosition = HandleUtility.ClosestPointToPolyLine( points.ToArray() );
+            for( int i = 1; i < points.Count; ++i )
             {
-                Vector3 direction = (newPointPosition - spline.GetPointPosition( i-1 )).normalized;
-                Vector3 direction2 = (newPointPosition - spline.GetPointPosition( i )).normalized;
+                Vector3 direction = (newPointPosition - points[ i-1 ]).normalized;
+                Vector3 direction2 = (newPointPosition - points[ i ]).normalized;
                 if( Vector3.Dot(-direction, direction2) > 0.99f )
                 {
                     connectingPoints.Add( i - 1 );
@@ -715,16 +733,50 @@ namespace FantasticSplines
                 Handles.DrawDottedLine( planePosition, hitDown.point, 2 );
             }
 
-            int insertIndex = spline.PointCount;
-            if( connectingPoints.Count != 0 )
-            {
-                insertIndex = connectingPoints[connectingPoints.Count - 1];
-            }
-
             if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
             {
+                int segmentIndex = spline.PointCount-1;
+                float t = 0;
+                if( connectingPoints.Count != 0 )
+                {
+                    segmentIndex = curveSegmentIndicies[ connectingPoints[0] ];
+                    
+                    float newSegmentLength = 0;
+                    float segmentLength = 0;
+                    for( int i = 0; i < points.Count-1; ++i )
+                    {
+                        if( curveSegmentIndicies[i] < segmentIndex )
+                        {
+                            continue;
+                        }
+                        if( curveSegmentIndicies[i] > segmentIndex )
+                        {
+                            break;
+                        }
+
+                        Vector3 point1 = points[i];
+                        Vector3 point2 = points[i+1];
+
+                        float resolutionLength = Vector3.Distance( point1, point2 );
+                        segmentLength += resolutionLength;
+
+                        if( i < connectingPoints[0] )
+                        {
+                            newSegmentLength += resolutionLength;
+                        }
+                        if( i == connectingPoints[0] )
+                        {
+                            newSegmentLength += Vector3.Distance( point1, newPointPosition );
+                        }
+                    }
+
+                    Debug.Log( "newSegmentLength " + newSegmentLength );
+                    Debug.Log( "segmentLength " + segmentLength );
+                    t = newSegmentLength / segmentLength;
+                }
+
                 Undo.RecordObject( target, "Insert Point" );
-                spline.InsertPoint( insertIndex, newPointPosition, Space.World );
+                spline.InsertPoint( segmentIndex, t );
                 EditorUtility.SetDirty( spline );
                 guiEvent.Use();
             }
@@ -824,7 +876,7 @@ namespace FantasticSplines
                         int index = pointSelection[i];
                         Vector3 point = spline.GetPointPosition( index );
                         Vector3 newPoint = point + pointMovement;
-                        spline.SetPoint( index, newPoint, Space.World );
+                        spline.SetPoint( index, newPoint );
                     }
                 }
 
