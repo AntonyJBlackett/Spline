@@ -20,6 +20,8 @@ namespace FantasticSplines
     [CustomEditor( typeof( Spline ) )]
     public class SplineEditor : Editor
     {
+        static List<CurvePoint> clipboard = new List<CurvePoint>();
+
         SplineEditMode editMode = SplineEditMode.None;
         SplineAddPointMode addPointMode = SplineAddPointMode.Append;
         float diskRadius = 0.2f;
@@ -130,6 +132,44 @@ namespace FantasticSplines
                 spline.SetPoint( index, point );
             }
             EditorUtility.SetDirty( target );
+        }
+
+        public void DeleteSelectedPoints( Spline spline )
+        {
+            int removePoints = pointSelection.Count;
+            for( int i = 0; i < removePoints; ++i )
+            {
+                RemovePoint( spline, pointSelection[0] );
+            }
+            ClearPointSelection();
+            EditorUtility.SetDirty( target );
+        }
+
+        void PasteCurve( Spline spline )
+        {
+            Undo.RecordObject( target, "Paste Points" );
+            DeleteSelectedPoints( spline );
+            int oldPointCount = spline.PointCount;
+            for( int i = 0; i < clipboard.Count; i++ )
+            {
+                spline.AddPoint( clipboard[i] );
+            }
+
+            pointSelection.Clear();
+            for( int i = oldPointCount; i < spline.PointCount; i++ )
+            {
+                pointSelection.Add( i );
+            }
+        }
+
+        public void CopyCurve( Spline spline )
+        {
+            clipboard.Clear();
+            for( int i = 0; i < pointSelection.Count; i++ )
+            {
+                int index = pointSelection[i];
+                clipboard.Add( spline.GetPoint(index) );
+            }
         }
 
         public override void OnInspectorGUI()
@@ -286,17 +326,24 @@ namespace FantasticSplines
                     guiEvent.Use();
                 }
 
+                if( guiEvent.command && guiEvent.keyCode == KeyCode.C )
+                {
+                    CopyCurve( spline );
+                    guiEvent.Use();
+                }
+
+                if( guiEvent.command && guiEvent.keyCode == KeyCode.V )
+                {
+                    PasteCurve( spline );
+                    guiEvent.Use();
+                }
+
                 if( pointSelection.Count > 0
                     && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace) )
                 {
                     Undo.RecordObject( target, "Delete Points" );
-                    int removePoints = pointSelection.Count;
-                    for( int i = 0; i < removePoints; ++i )
-                    {
-                        RemovePoint( spline, pointSelection[0] );
-                    }
-                    ClearPointSelection();
-                    EditorUtility.SetDirty( target );
+                    DeleteSelectedPoints( spline );
+                    guiEvent.Use();
                 }
             }
         }
