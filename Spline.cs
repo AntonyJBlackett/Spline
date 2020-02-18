@@ -158,8 +158,7 @@ namespace FantasticSplines
         {
             pointType = type;
 
-            if( pointType == PointType.Mirrored 
-                && lastChangedControl == 2 )
+            if( lastChangedControl == 2 )
             {
                 control1 = ConstrainControlPoint( control2, control1, type );
             }
