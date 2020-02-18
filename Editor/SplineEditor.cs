@@ -31,7 +31,6 @@ namespace FantasticSplines
 
         void OnEnable()
         {
-            lastTool = Tools.current;
             ResetEditMode();
         }
 
@@ -414,6 +413,8 @@ namespace FantasticSplines
 
         void ResetEditMode()
         {
+            lastTool = Tool.Move;
+            Tools.current = Tool.Move;
             ClearPointSelection();
             editMode = SplineEditMode.None;
             planeOffset = Vector3.zero;
@@ -540,7 +541,7 @@ namespace FantasticSplines
                 if( Physics.Raycast( down, out hitDown ) )
                 {
                     DrawWireDisk( hitDown.point, hitDown.normal, diskRadius, Camera.current.transform.position );
-                    Handles.DrawDottedLine( planePosition, hitDown.point, 2 );
+                    Handles.DrawDottedLine( planePoint, hitDown.point, 2 );
                 }
             }
         }
