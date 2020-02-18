@@ -60,7 +60,10 @@ namespace FantasticSplines
             Vector3 n = Vector3.Lerp( b, c, t );
             Vector3 p = GetPoint( A, B, C, D, t );
 
+            point1.SetPointType( PointType.Aligned );
             point1.Control2 = a - point1.position;
+
+            point2.SetPointType( PointType.Aligned );
             point2.Control1 = c - point2.position;
 
             CurvePoint newCurvePoint = new CurvePoint( p, m - p, n - p, PointType.Free );
@@ -204,6 +207,17 @@ namespace FantasticSplines
         public bool loop = false;
 
         public int PointCount { get { return points.Count; } }
+        public int SegmentCount
+        {
+            get
+            {
+                if( loop )
+                {
+                    return points.Count;
+                }
+                return points.Count - 1;
+            }
+        }
 
         public void AddPoint(Vector3 position)
         {
@@ -226,17 +240,20 @@ namespace FantasticSplines
 
         public void InsertPoint(int segement, float t)
         {
-            if( segement < 0 || segement > PointCount - 1 )
+            if( segement < 0 || segement > SegmentCount )
             {
                 return;
             }
 
-            CurvePoint point1 = points[segement];
-            CurvePoint point2 = points[segement + 1];
+            int index1 = segement;
+            int index2 = (segement+1) % PointCount;
+
+            CurvePoint point1 = points[index1];
+            CurvePoint point2 = points[index2];
 
             CurvePoint split = BezierCalculator.SplitAt(ref point1, ref point2, t);
-            points[segement] = point1;
-            points[segement + 1] = point2;
+            points[index1] = point1;
+            points[index2] = point2;
     
             if(point1.PointType == PointType.Point && point2.PointType == PointType.Point )
             {

@@ -91,13 +91,21 @@ namespace FantasticSplines
 
             GUILayout.Space( 10 );
             GUILayout.Label( "Tools" );
-            if( GUILayout.Button( "Smooth Selection" ) )
+            if( GUILayout.Button( "Linear Points" ) )
+            {
+                SetSelectionPointType( spline, PointType.Point );
+            }
+            if( GUILayout.Button( "Mirror Control Points" ) )
             {
                 SetSelectionPointType( spline, PointType.Mirrored );
             }
-            if( GUILayout.Button( "Linear Point Type" ) )
+            if( GUILayout.Button( "Aligned Control Points" ) )
             {
-                SetSelectionPointType( spline, PointType.Point );
+                SetSelectionPointType( spline, PointType.Aligned );
+            }
+            if( GUILayout.Button( "Free Control Points" ) )
+            {
+                SetSelectionPointType( spline, PointType.Free );
             }
 
             GUILayout.Space( 10 );
@@ -950,7 +958,7 @@ namespace FantasticSplines
         }
 
         bool moving { get { return movePointCurvePointIndex != -1; } }
-        bool movingControlPoint { get { return movePointCurvePointIndex != -1 && movePointControlPointId == 1 ||  movePointControlPointId == 2; } }
+        bool movingControlPoint { get { return movePointCurvePointIndex != -1 && (movePointControlPointId == 1 ||  movePointControlPointId == 2); } }
         int movePointCurvePointIndex = -1;
         int movePointControlPointId = 0;
         void DoMovePoint(Spline spline, Event guiEvent)
