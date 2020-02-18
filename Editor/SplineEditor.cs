@@ -94,7 +94,24 @@ namespace FantasticSplines
             SceneView.lastActiveSceneView.Frame(bounds, false);
         }
 
-        void SmoothSelection( Spline spline, PointType type)
+        void FlattenSelection(Spline spline, PointType type)
+        {
+            Undo.RecordObject( target, "Flatten Selection" );
+            for( int i = 0; i < pointSelection.Count; ++i )
+            {
+                int index = pointSelection[i];
+                CurvePoint point = spline.GetPoint( index );
+
+                point.position = GetPointOnPlaneY( spline.transform.position, spline.transform.up, point.position );
+                point.Control1 = GetPointOnPlaneY( spline.transform.position, spline.transform.up, point.Control1 + point.position ) - point.position;
+                point.Control2 = GetPointOnPlaneY( spline.transform.position, spline.transform.up, point.Control2 + point.position ) - point.position;
+
+                spline.SetPoint( index, point );
+            }
+            EditorUtility.SetDirty( target );
+        }
+
+        void SmoothSelection( Spline spline, PointType type )
         {
             Undo.RecordObject( target, "Set Point Type" );
             for( int i = 0; i < pointSelection.Count; ++i )
@@ -236,6 +253,10 @@ namespace FantasticSplines
             if( GUILayout.Button( "Smooth Selection" ) )
             {
                 SmoothSelection( spline, PointType.Free );
+            }
+            if( GUILayout.Button( "Flatten Selection" ) )
+            {
+                FlattenSelection( spline, PointType.Free );
             }
 
             GUILayout.Space( 10 );
@@ -488,8 +509,11 @@ namespace FantasticSplines
 
         void DrawSplinePoints(Spline spline)
         {
-            for( int i = 0; i < spline.PointCount; ++i )
+            List<int> sortedPoints = GetPointIndiciesSelectedFirst( spline );
+            sortedPoints.Reverse(); // draw selected on top
+            for( int sortedI = 0; sortedI < sortedPoints.Count; ++sortedI )
             {
+                int i = sortedPoints[sortedI];
                 if( pointSelection.Contains( i ) )
                 {
                     Handles.color = Color.green;
@@ -698,13 +722,41 @@ namespace FantasticSplines
             editMode = SplineEditMode.None;
         }
 
+        List<int> GetPointIndiciesSelectedFirst( Spline spline )
+        {
+            List<int> pointIndicies = new List<int>();
+            for( int i = 0; i < spline.PointCount; ++i )
+            {
+                pointIndicies.Add( i );
+            }
+
+            // selected points take priority
+            pointIndicies.Sort( (int one, int two) => 
+            {
+                if( pointSelection.Contains( one ) == pointSelection.Contains( two ) )
+                {
+                    return 0;
+                }
+                if( pointSelection.Contains( one ) && !pointSelection.Contains( two ) )
+                {
+                    return -1;
+                }
+                return 1;
+            } );
+
+            return pointIndicies;
+        }
+
         bool DoClickSelection(Spline spline, Event guiEvent)
         {
             bool clearSelection = !guiEvent.shift && !guiEvent.command;
             bool hasSelection = pointSelection.Count > 0;
 
-            for( int i = 0; i < spline.PointCount; ++i )
+            List<int> sortedPoints = GetPointIndiciesSelectedFirst( spline );
+            for( int sortedI = 0; sortedI < sortedPoints.Count; ++sortedI )
             {
+                int i = sortedPoints[sortedI];
+
                 if( pointSelection.Contains( i ) )
                 {
                     Handles.color = Color.green;
@@ -737,6 +789,7 @@ namespace FantasticSplines
                             SelectionAddPoint( spline, i );
                             editMode = SplineEditMode.MovePoint;
                         }
+                        break;
                     }
                 }
                 else if( IsMouseOverPoint( Camera.current, curvePoint.position, guiEvent.mousePosition ) )
@@ -758,6 +811,7 @@ namespace FantasticSplines
                             SelectionAddPoint( spline, i );
                             editMode = SplineEditMode.MovePoint;
                         }
+                        break;
                     }
                 }
             }
