@@ -305,12 +305,31 @@ namespace FantasticSplines
                     && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace) )
                 {
                     Undo.RecordObject( target, "Delete Points" );
-                    for( int i = 0; i < pointSelection.Count; ++i )
+                    int removePoints = pointSelection.Count;
+                    for( int i = 0; i < removePoints; ++i )
                     {
-                        spline.RemovePoint( pointSelection[i] );
+                        RemovePoint( spline, pointSelection[0] );
                     }
                     ClearPointSelection();
                     EditorUtility.SetDirty( target );
+                }
+            }
+        }
+
+        void RemovePoint( Spline spline, int index )
+        {
+            spline.RemovePoint( index );
+            for( int i = pointSelection.Count-1; i >= 0; --i )
+            {
+                if( pointSelection[i] == index )
+                {
+                    pointSelection.RemoveAt( i );
+                    continue;
+                }
+
+                if( pointSelection[i] > index )
+                {
+                    pointSelection[i]--;
                 }
             }
         }
