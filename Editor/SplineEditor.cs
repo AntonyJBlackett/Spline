@@ -48,6 +48,103 @@ namespace FantasticSplines
             EditorUtility.SetDirty( target );
         }
 
+        Bounds GetSelectionBounds( Spline spline )
+        {
+            if( pointSelection.Count == 0 )
+            {
+                return GetBounds( spline );
+            }
+
+            Bounds bounds = new Bounds( spline.GetPointPosition(pointSelection[0]), Vector3.one * 0.1f );
+            for( int i = 1; i < pointSelection.Count; ++i )
+            {
+                bounds.Encapsulate( spline.GetPointPosition(pointSelection[i]) );
+            }
+
+            if( bounds.size.magnitude < 1 )
+            {
+                bounds.size = bounds.size.normalized * 1;
+            }
+            
+            return bounds;
+        }
+
+        Bounds GetBounds( Spline spline )
+        {
+            Bounds bounds = new Bounds( spline.GetPointPosition(0), Vector3.zero );
+            for( int i = 1; i < spline.PointCount; ++i )
+            {
+                bounds.Encapsulate( spline.GetPointPosition(i) );
+            }
+            return bounds;
+        }
+
+        public void FrameCamera( Spline spline )
+        {
+            Bounds bounds;
+            if( pointSelection.Count > 0 )
+            {
+                bounds = GetSelectionBounds( spline );
+            }
+            else
+            {
+                bounds = GetBounds( spline );
+            }
+            SceneView.lastActiveSceneView.Frame(bounds, false);
+        }
+
+        void SmoothSelection( Spline spline, PointType type)
+        {
+            Undo.RecordObject( target, "Set Point Type" );
+            for( int i = 0; i < pointSelection.Count; ++i )
+            {
+                int index = pointSelection[i];
+                CurvePoint point = spline.GetPoint( index );
+                CurvePoint before = point;
+                CurvePoint after = point;
+
+                if( index > 0 || spline.Loop )
+                {
+                    int beforeIndex = index - 1;
+                    if( beforeIndex < 0 )
+                    {
+                        beforeIndex = spline.PointCount-1;
+                    }
+                    before = spline.GetPoint( beforeIndex );
+                }
+
+                if( index < spline.PointCount - 1 || spline.Loop )
+                {
+                    int afterIndex = (index + 1) % spline.PointCount;
+                    after = spline.GetPoint( afterIndex );
+                }
+
+                Vector3 direction = (after.position - before.position).normalized;
+                float beforeT = HandleUtility.PointOnLineParameter( before.position, point.position, direction );
+                float afterT = HandleUtility.PointOnLineParameter( after.position, point.position, direction );
+                
+                point.SetPointType( PointType.Aligned );
+
+                if( beforeT > 0 == afterT > 0 )
+                {
+                    Vector3 center = (before.position + after.position) * 0.5f;
+                    Vector3 centerDir = (center - point.position).normalized;
+
+                    Vector3 tangent = Vector3.Cross( spline.transform.up, centerDir );
+
+                    point.Control1 = -tangent * Vector3.Distance( point.position, before.position ) * 0.5f;
+                    point.Control2 = tangent * Vector3.Distance( point.position, after.position ) * 0.5f;
+                }
+                else
+                {
+                    point.Control1 = direction * beforeT * 0.5f;
+                    point.Control2 = direction * afterT * 0.5f;
+                }
+                spline.SetPoint( index, point );
+            }
+            EditorUtility.SetDirty( target );
+        }
+
         public override void OnInspectorGUI()
         {
             Spline spline = target as Spline;
@@ -90,7 +187,7 @@ namespace FantasticSplines
             }
 
             GUILayout.Space( 10 );
-            GUILayout.Label( "Tools" );
+            GUILayout.Label( "Point Types" );
             if( GUILayout.Button( "Linear Points" ) )
             {
                 SetSelectionPointType( spline, PointType.Point );
@@ -106,6 +203,13 @@ namespace FantasticSplines
             if( GUILayout.Button( "Free Control Points" ) )
             {
                 SetSelectionPointType( spline, PointType.Free );
+            }
+            
+            GUILayout.Space( 10 );
+            GUILayout.Label( "Tools" );
+            if( GUILayout.Button( "Smooth Selection" ) )
+            {
+                SmoothSelection( spline, PointType.Free );
             }
 
             GUILayout.Space( 10 );
@@ -153,39 +257,59 @@ namespace FantasticSplines
 
         void KeyboardInputs( Spline spline, Event guiEvent )
         {
-            if( editMode != SplineEditMode.None
-                && guiEvent.type == EventType.KeyDown )
+            if( guiEvent.type == EventType.KeyDown )
             {
-                if( guiEvent.keyCode == KeyCode.W )
+                if( editMode != SplineEditMode.None )
                 {
-                    SetTool( Tool.Move );
+                    if( guiEvent.keyCode == KeyCode.W )
+                    {
+                        SetTool( Tool.Move );
+                        guiEvent.Use();
+                    }
+                    if( guiEvent.keyCode == KeyCode.E )
+                    {
+                        SetTool( Tool.Rotate );
+                        guiEvent.Use();
+                    }
+                    if( guiEvent.keyCode == KeyCode.R )
+                    {
+                        SetTool( Tool.Scale );
+                        guiEvent.Use();
+                    }
+                    if( guiEvent.keyCode == KeyCode.Escape )
+                    {
+                        guiEvent.Use();
+                        ResetEditMode();
+                    }
                 }
-                if( guiEvent.keyCode == KeyCode.E )
+
+                if( guiEvent.keyCode == KeyCode.F )
                 {
-                    SetTool( Tool.Rotate );
-                }
-                if( guiEvent.keyCode == KeyCode.R )
-                {
-                    SetTool( Tool.Scale );
-                }
-                if( guiEvent.keyCode == KeyCode.Escape )
-                {
+                    FrameCamera( spline );
                     guiEvent.Use();
-                    ResetEditMode();
                 }
-            }
-            
-            if( pointSelection.Count > 0
-                && guiEvent.type == EventType.KeyDown
-                && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace ) )
-            {
-                Undo.RecordObject( target, "Delete Points" );
-                for( int i = 0; i < pointSelection.Count; ++i )
+
+                if( guiEvent.command && guiEvent.keyCode == KeyCode.A )
                 {
-                    spline.RemovePoint( pointSelection[i] );
+                    pointSelection.Clear();
+                    for( int i = 0; i < spline.PointCount; ++i )
+                    {
+                        pointSelection.Add( i );
+                    }
+                    guiEvent.Use();
                 }
-                ClearPointSelection();
-                EditorUtility.SetDirty( target );
+
+                if( pointSelection.Count > 0
+                    && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace) )
+                {
+                    Undo.RecordObject( target, "Delete Points" );
+                    for( int i = 0; i < pointSelection.Count; ++i )
+                    {
+                        spline.RemovePoint( pointSelection[i] );
+                    }
+                    ClearPointSelection();
+                    EditorUtility.SetDirty( target );
+                }
             }
         }
 

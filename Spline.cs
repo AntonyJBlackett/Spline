@@ -60,10 +60,16 @@ namespace FantasticSplines
             Vector3 n = Vector3.Lerp( b, c, t );
             Vector3 p = GetPoint( A, B, C, D, t );
 
-            point1.SetPointType( PointType.Aligned );
+            if( point1.PointType == PointType.Mirrored )
+            {
+                point1.SetPointType( PointType.Aligned );
+            }
             point1.Control2 = a - point1.position;
 
-            point2.SetPointType( PointType.Aligned );
+            if( point2.PointType == PointType.Mirrored )
+            {
+                point2.SetPointType( PointType.Aligned );
+            }
             point2.Control1 = c - point2.position;
 
             CurvePoint newCurvePoint = new CurvePoint( p, m - p, n - p, PointType.Free );
