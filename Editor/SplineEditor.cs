@@ -147,7 +147,6 @@ namespace FantasticSplines
 
         void PasteCurve( Spline spline )
         {
-            Undo.RecordObject( target, "Paste Points" );
             DeleteSelectedPoints( spline );
             int oldPointCount = spline.PointCount;
             for( int i = 0; i < clipboard.Count; i++ )
@@ -332,11 +331,21 @@ namespace FantasticSplines
                     guiEvent.Use();
                 }
 
+                if( guiEvent.command && guiEvent.keyCode == KeyCode.X )
+                {
+                    Undo.RecordObject( target, "Cut Points" );
+                    CopyCurve( spline );
+                    DeleteSelectedPoints( spline );
+                    guiEvent.Use();
+                }
+
                 if( guiEvent.command && guiEvent.keyCode == KeyCode.V )
                 {
+                    Undo.RecordObject( target, "Paste Points" );
                     PasteCurve( spline );
                     guiEvent.Use();
                 }
+
 
                 if( pointSelection.Count > 0
                     && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace) )
