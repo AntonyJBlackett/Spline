@@ -258,6 +258,12 @@ namespace FantasticSplines
             {
                 FlattenSelection( spline, PointType.Free );
             }
+            if( GUILayout.Button( "Test Fast Bezier" ) )
+            {
+                UnityFastBezier.Program.Main();
+                Debug.Log( "-------------------" );
+                FastBezier.Program.Main();
+            }
 
             GUILayout.Space( 10 );
             GUILayout.Label( "Debug" );
