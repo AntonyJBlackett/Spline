@@ -154,14 +154,6 @@ namespace FantasticSplines
             control1 = control2 = Vector3.zero;
         }
 
-        public CurvePoint(Vector3 position, Vector3 direction, PointType type)
-        {
-            this.position = position;
-            control1 = -direction;
-            control2 = direction;
-            pointType = type;
-        }
-
         public CurvePoint(Vector3 position, Vector3 control1, Vector3 control2, PointType type)
         {
             this.position = position;
@@ -255,7 +247,12 @@ namespace FantasticSplines
             points[index] = point;
         }
 
-        int LoopIndex( int index )
+        public void SetPoint( int index, CurvePoint point )
+        {
+            points[index] = point;
+        }
+
+        public int LoopIndex( int index )
         {
             return index % PointCount;
         }
@@ -408,9 +405,14 @@ namespace FantasticSplines
             return TransformPoint( curve.points[index] );
         }
 
-        public void SetPoint( int index, Vector3 point )
+        public void SetPointPosition( int index, Vector3 point )
         {
             curve.SetPointPosition( index, InverseTransformPoint( point ) );
+        }
+
+        public void SetPoint(int index, CurvePoint point)
+        {
+            curve.SetPoint( index, InverseTransformPoint( point ) );
         }
 
         public int PointCount { get { return curve.PointCount; } }
