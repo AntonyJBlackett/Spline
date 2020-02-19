@@ -36,9 +36,18 @@ namespace FantasticSplines
 
             public SegmentCache(Bezier3 bez, float distanceOnSpline, int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
             {
-                this.bezier = bez;
-                this.startDistanceInSpline = distanceOnSpline;
-                tdMapping = new Vector2[accuracy];
+                Initialise(bez, distanceOnSpline, accuracy);
+            }
+
+            public void Initialise(Bezier3 bez, float distanceOnSpline,
+                int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
+            {
+                bezier = bez;
+                startDistanceInSpline = distanceOnSpline;
+                if (tdMapping == null || tdMapping.Length != accuracy)
+                {
+                    tdMapping = new Vector2[accuracy];
+                }
                 float invAccuracy = 1f / (accuracy - 1);
                 for (int i = 0; i < accuracy; ++i)
                 {

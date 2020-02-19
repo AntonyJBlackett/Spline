@@ -335,7 +335,14 @@ namespace FantasticSplines
             float length = 0f;
             for (int seg = 0; seg < SegmentCount; ++seg)
             {
-                _segments[seg] = new SegmentCache(CalculateSegment(seg), length);
+                if (_segments[seg] == null)
+                {
+                    _segments[seg] = new SegmentCache(CalculateSegment(seg), length);
+                }
+                else
+                {
+                    _segments[seg].Initialise(CalculateSegment(seg), length);
+                }
                 length += _segments[seg].Length;
             }
 
