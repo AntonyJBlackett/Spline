@@ -322,6 +322,19 @@ namespace FantasticSplines
 
             public Vector3 Position => curve._segments[segmentIndex].GetPositionAtDistance(segmentDistance);
             public Vector3 Tangent => curve._segments[segmentIndex].GetTangentAtDistance(segmentDistance);
+
+            public float DistanceOnSpline
+            {
+                get
+                {
+                    float distance = segmentDistance;
+                    for (int s = segmentIndex - 1; s >= 0; --s)
+                    {
+                        distance += curve._segments[s].Length;
+                    }
+                    return distance;
+                }
+            }
         }
         
         private class SegmentCache
@@ -383,7 +396,7 @@ namespace FantasticSplines
         {
             get
             {
-                if (isDirty) { UpdateCachedData(); }
+                EnsureCacheIsUpdated();
                 return _splineLength;
             }
         }
@@ -391,7 +404,7 @@ namespace FantasticSplines
         {
             get
             {
-                if (isDirty) { UpdateCachedData(); }
+                EnsureCacheIsUpdated();
                 return _invSplineLength;
             }
         }
@@ -414,6 +427,8 @@ namespace FantasticSplines
             _invSplineLength = 1f / length;
             isDirty = false;
         }
+
+        void EnsureCacheIsUpdated() { if (isDirty) { UpdateCachedData(); } }
         
         public int CurvePointCount { get { return curvePoints.Count; } }
         public int SegmentCount
@@ -565,10 +580,7 @@ namespace FantasticSplines
 
         SegmentPointer GetSegmentPointerAtDistance(float distance)
         {
-            if (isDirty)
-            {
-                UpdateCachedData();
-            }
+            EnsureCacheIsUpdated();
 
             float distanceRemain = LoopDistance(distance);
             for (int i = 0; i < _segments.Length; ++i)
@@ -595,13 +607,15 @@ namespace FantasticSplines
             return length * InverseLength;
         }
 
-        public int GetClosestSegmentIndex(Vector3 point, float paramThreshold = 0.000001f)
+        private SegmentPointer GetClosestSegmentPointer(Vector3 point, float paramThreshold = 0.000001f)
         {
+            EnsureCacheIsUpdated();
+            
             float minDistSq = float.MaxValue;
-            int closestSegment = 0;
+            SegmentPointer bestSeg = new SegmentPointer(this, 0, 0f);
             for (int i = 0; i < SegmentCount; i++)
             {
-                Bezier3 curve = CalculateSegment(i);
+                Bezier3 curve = _segments[i].bezier;
                 float curveClosestParam = curve.GetClosestT(point, paramThreshold);
 
                 Vector3 curvePos = curve.GetPoint(curveClosestParam);
@@ -609,37 +623,23 @@ namespace FantasticSplines
                 if (distSq < minDistSq)
                 {
                     minDistSq = distSq;
-                    closestSegment = i;
+                    bestSeg.segmentIndex = i;
+                    bestSeg.segmentDistance = _segments[i].GetDistance(curveClosestParam);
                 }
             }
 
-            return closestSegment;
+            return bestSeg;
+        }
+
+        public int GetClosestSegmentIndex(Vector3 point, float paramThreshold = 0.000001f)
+        {
+            return GetClosestSegmentPointer(point, paramThreshold).segmentIndex;
         }
 
 
         public float GetClosestD(Vector3 point)
         {
-            float paramThreshold = 0.000001f;
-            float minDistSq = float.MaxValue;
-            float closestD = 0;
-            float runningDistance = 0f
-            for (int i = 0; i < SegmentCount; i++)
-            {
-                Bezier3 curve = CalculateSegment(i);
-                float curveClosestParam = curve.GetClosestT(point, paramThreshold);
-
-                Vector3 curvePos = curve.GetPoint(curveClosestParam);
-                float distSq = (curvePos - point).sqrMagnitude;
-                if (distSq < minDistSq)
-                {
-                    minDistSq = distSq;
-                    closestD = runningDistance + curve.GetDistanceAt(curveClosestParam);
-                }
-
-                runningDistance += curve.Length;
-            }
-
-            return closestD;
+            return GetClosestSegmentPointer(point).DistanceOnSpline;
         }
 
         public float GetClosestT(Vector3 point)
@@ -652,26 +652,9 @@ namespace FantasticSplines
             throw new System.NotImplementedException();
         }
         
-        public Vector3 GetClosestPoint(Vector3 point )
+        public Vector3 GetClosestPoint(Vector3 point)
         {
-            float paramThreshold = 0.000001f;
-            float minDistSq = float.MaxValue;
-            Vector3 closestPoint = Vector3.zero;
-            for (int i = 0; i < SegmentCount; i++)
-            {
-                Bezier3 curve = CalculateSegment(i);
-                float curveClosestParam = curve.GetClosestT(point, paramThreshold);
-
-                Vector3 curvePos = curve.GetPoint(curveClosestParam);
-                float distSq = (curvePos - point).sqrMagnitude;
-                if (distSq < minDistSq)
-                {
-                    minDistSq = distSq;
-                    closestPoint = curvePos;
-                }
-            }
-
-            return closestPoint;
+            return GetClosestSegmentPointer(point).Position;
         }
 
         public Vector3 GetClosestPoint(Ray ray)
