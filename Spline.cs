@@ -3,6 +3,7 @@ using UnityEngine;
 
 #if UNITY_EDITOR
 using UnityEditor;
+using FantasticSplines;
 #endif
 
 namespace FantasticSplines
@@ -384,7 +385,7 @@ namespace FantasticSplines
 
     public class Spline : MonoBehaviour, ISpline, IEditableSpline
     {
-        public Curve curve;
+        public Curve curve; // spline in local space
         public bool Loop { get { return curve.loop; } set { curve.loop = value; } }
         public int PointCount { get { return curve.PointCount; } }
 
@@ -444,6 +445,13 @@ namespace FantasticSplines
                 points[i] = TransformPoint( points[i] );
             }
             return points;
+        }
+
+        Ray InverseTransformRay( Ray ray )
+        {
+            ray.origin = InverseTransformPoint( ray.origin );
+            ray.direction = InverseTransformPoint( ray.direction );
+            return ray;
         }
 
         public bool IsIndexInRange( int index )
@@ -624,22 +632,22 @@ namespace FantasticSplines
 
         public float GetClosestT(Vector3 point)
         {
-            return curve.GetClosestT(point);
+            return curve.GetClosestT( InverseTransformPoint( point ) );
         }
 
         public float GetClosestT(Ray ray)
         {
-            return curve.GetClosestT(ray);
+            return curve.GetClosestT( InverseTransformRay( ray ) );
         }
 
         public Vector3 GetClosestPoint(Vector3 point)
         {
-            return curve.GetClosestPoint(point);
+            return TransformPoint( curve.GetClosestPoint( InverseTransformPoint( point ) ) );
         }
 
         public Vector3 GetClosestPoint(Ray ray)
         {
-            return curve.GetClosestPoint(ray);
+            return TransformPoint( curve.GetClosestPoint( InverseTransformRay( ray ) ) );
         }
 
         public float Step(float currentT, float worldDistance)
@@ -649,8 +657,7 @@ namespace FantasticSplines
 
         public List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
         {
-            List<Vector3> points = GetPoints( worldSpacing, includeEndPoint, includeSplinePoints );
-            return TransformPoints( points );
+            return TransformPoints( GetPoints( worldSpacing, includeEndPoint, includeSplinePoints ) );
         }
     }
 }
