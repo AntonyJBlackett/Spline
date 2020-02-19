@@ -35,6 +35,10 @@ namespace FantasticSplines
         {
             ResetEditMode();
         }
+        void OnDisable()
+        {
+            Tools.current = Tool.Move;
+        }
 
         void SetSelectionPointType( IEditableSpline spline, PointType type)
         {
@@ -422,7 +426,7 @@ namespace FantasticSplines
             if( pointSelection.Count > 0 )
             {
                 lastTool = Tools.current;
-                Tools.current = Tool.Custom;
+                Tools.current = Tool.None;
                 editMode = SplineEditMode.MovePoint;
             }
             else

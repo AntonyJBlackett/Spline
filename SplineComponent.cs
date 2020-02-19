@@ -198,19 +198,6 @@ namespace FantasticSplines
             return points;
         }
 
-        public List<int> GetSegmentsForPoints()
-        {
-            List<int> segments = new List<int>();
-
-            float step = resolution / curve.Length;
-            for (float f = 0; f <= 1f; f += step)
-            {
-                segments.Add(curve.GetSegmentIndexAtT(f));
-            }
-
-            return segments;
-        }
-
         public int GetClosestSegmentIndex(Ray ray)
         {
             throw new System.NotImplementedException();

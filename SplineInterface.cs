@@ -22,7 +22,6 @@ namespace FantasticSplines
 
         //TODO remove these and use the four functions below instead.
         List<Vector3> GetPolyLinePoints();
-        List<int> GetSegmentsForPoints();
 
         float GetClosestT(Vector3 point);
         Vector3 GetClosestPoint(Vector3 point);
