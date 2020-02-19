@@ -592,7 +592,7 @@ namespace FantasticSplines
                 Vector3 projectedPos = projected.GetPoint(curveClosestParam);
                 Vector3 pos = curve.GetPoint(curveClosestParam);
 
-                bool infront = Vector3.Dot( ray.direction, (projectedPos - ray.origin) ) >= 0;
+                bool infront = Vector3.Dot( ray.direction, pos - ray.origin ) >= 0;
                 if( infront || !foundPointInFront )
                 {
                     if( !foundPointInFront )
@@ -642,7 +642,7 @@ namespace FantasticSplines
         
         public Vector3 GetClosestPoint(Vector3 point)
         {
-            return GetClosestSegmentPointer(point).Position;
+            return GetClosestSegmentPointer( point).Position;
         }
 
         public Vector3 GetClosestPoint(Ray ray)

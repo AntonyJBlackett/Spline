@@ -159,7 +159,7 @@ namespace FantasticSplines
         Ray InverseTransformRay(Ray ray)
         {
             ray.origin = InverseTransformPoint(ray.origin);
-            ray.direction = InverseTransformPoint(ray.direction);
+            ray.direction = InverseTransformDirection(ray.direction);
             return ray;
         }
 
