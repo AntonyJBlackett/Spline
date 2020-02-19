@@ -322,13 +322,25 @@ namespace FantasticSplines
         }
     }
 
-    public class Spline : MonoBehaviour
+    public class Spline : MonoBehaviour, IEditableSpline
     {
         public Curve curve;
         public bool Loop { get { return curve.loop; } set { curve.loop = value; } }
-        
+        public bool IsLoop() => Loop;
+        public void SetLoop(bool loop) => Loop = loop;
+
+        public Transform GetTransform()
+        {
+            return transform;
+        }
+
+        public Component GetComponent()
+        {
+            return this;
+        }
+
         const int resolution = 10; 
-        public List<Vector3> GetPoints()
+        public List<Vector3> GetPolyLinePoints()
         {
             List<Vector3> points = new List<Vector3>();
             if( PointCount < 2 )
@@ -450,6 +462,11 @@ namespace FantasticSplines
 
         public CurvePoint GetPoint( int index )
         {
+            if( index < 0 || index > PointCount - 1 )
+            {
+                return new CurvePoint( transform.position );
+            }
+
             return curve.points[index].Transform( transform );
         }
 
@@ -464,6 +481,7 @@ namespace FantasticSplines
         }
 
         public int PointCount { get { return curve.PointCount; } }
+        public int GetPointCount() => PointCount;
 
         void OnDrawGizmos()
         {
@@ -479,7 +497,7 @@ namespace FantasticSplines
                 Gizmos.DrawSphere( GetPointPosition( i ), 0.05f );
             }
 
-            List<Vector3> points = GetPoints();
+            List<Vector3> points = GetPolyLinePoints();
             for( int i = 1; i < points.Count; ++i )
             {
                 Gizmos.DrawLine( points[i-1], points[i] );
