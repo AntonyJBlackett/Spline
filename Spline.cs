@@ -79,6 +79,10 @@ namespace FantasticSplines
         // start, control 1, control 2, end
         public Vector3 p0, p1, p2, p3;
         public Vector3[] points => new Vector3[] { p0, p1, p2, p3 };
+        public Vector3 start => p0;
+        public Vector3 startTargent => p1;
+        public Vector3 endTargent => p2;
+        public Vector3 end => p3;
 
         public Bezier3(CurvePoint start, CurvePoint end)
         {
@@ -394,7 +398,7 @@ namespace FantasticSplines
             for( int i = 1; i < PointCount; ++i )
             {
                 Bezier3 bezier = new Bezier3(GetPoint( i - 1 ), GetPoint( i ) );
-                Handles.DrawBezier( bezier.p0, bezier.p3, bezier.p1, bezier.p2, Color.grey, null, 2 );
+                Handles.DrawBezier( bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.grey, null, 2 );
             }
             Gizmos.color = Color.white;
             for( int i = 0; i < PointCount; ++i )
