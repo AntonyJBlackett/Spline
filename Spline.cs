@@ -604,7 +604,8 @@ namespace FantasticSplines
         {
             return TransformPoints( curve.GetPoints() );
         }
-
+        
+        //TODO this will break when scaled
         public float GetSpeed(float t)
         {
             return curve.GetSpeed(t);
@@ -619,12 +620,14 @@ namespace FantasticSplines
         {
             return TransformPoint( curve.GetPoint(t) );
         }
-
+        
+        //TODO this will break when scaled
         public float GetLength(float fromT = 0, float toT = 1)
         {
             return curve.GetLength(fromT, toT);
         }
-
+        
+        //TODO this will break when scaled
         public float GetT(float length)
         {
             return curve.GetT(length);
@@ -649,12 +652,14 @@ namespace FantasticSplines
         {
             return TransformPoint( curve.GetClosestPoint( InverseTransformRay( ray ) ) );
         }
-
+        
+        //TODO this will break when scaled
         public float Step(float currentT, float worldDistance)
         {
             return curve.Step(currentT, worldDistance);
         }
 
+        //TODO this will break when scaled
         public List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
         {
             return TransformPoints( GetPoints( worldSpacing, includeEndPoint, includeSplinePoints ) );
