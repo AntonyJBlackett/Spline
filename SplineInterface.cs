@@ -57,4 +57,16 @@ namespace FantasticSplines
     {
         T GetValueAt( float t );
     }
+
+    public static class SplineUtils
+    {
+        public static Vector3 GetPositionAtDistance(this ISpline spline, float distance)
+        {
+            return spline.GetPoint(spline.GetT(distance));
+        }
+        public static Vector3 GetTangentAtDistance(this ISpline spline, float distance)
+        {
+            return spline.GetDirection(spline.GetT(distance));
+        }
+    }
 }

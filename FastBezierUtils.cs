@@ -264,6 +264,35 @@ namespace FastBezier
             right = new Bezier3(p, n, c, D);
         }
 
+        public Bezier3 MiddleSplitAt(float t1, float t2)
+        {
+            Vector3 originalPos = P(t2);
+            Bezier3 right = RightSplitAt(t1);
+            float newT = Mathf.InverseLerp(t1, 1f, t2);
+            // This SHOULD be the same identical point
+            Debug.Assert((right.P(newT) - originalPos).sqrMagnitude < 0.0001f);
+            return right.LeftSplitAt(newT);
+        }
+
+        public Bezier3 LeftSplitAt(float t)
+        {
+            Vector3 a = Vector3.Lerp(A, B, t);
+            Vector3 b = Vector3.Lerp(B, C, t);
+            Vector3 m = Vector3.Lerp(a, b, t);
+            Vector3 p = P(t);
+
+            return new Bezier3(A, a, m, p);
+        }
+        public Bezier3 RightSplitAt(float t)
+        {
+            Vector3 b = Vector3.Lerp(B, C, t);
+            Vector3 c = Vector3.Lerp(C, D, t);
+            Vector3 n = Vector3.Lerp(b, c, t);
+            Vector3 p = P(t);
+
+            return new Bezier3(p, n, c, D);
+        }
+
         /// <summary>
         /// Gets the distance between 0 and 1 quadratic aproximations.
         /// </summary>
@@ -317,7 +346,12 @@ namespace FastBezier
                 return z * sum;
             }
         }
-        
+
+        public float GetDistanceAt(float t)
+        {
+            return LeftSplitAt(t).Length;
+        }
+
         public float GetLengthInterpolated(int steps)
         {
             float step = 1f / steps;

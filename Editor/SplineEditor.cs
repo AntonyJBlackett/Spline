@@ -17,7 +17,7 @@ namespace FantasticSplines
         Insert
     }
 
-    [CustomEditor( typeof( Spline ) )]
+    [CustomEditor( typeof( SplineComponent ) )]
     public class SplineEditor : Editor
     {
         static List<CurvePoint> clipboard = new List<CurvePoint>();
@@ -189,9 +189,22 @@ namespace FantasticSplines
             }
         }
 
+        public static void ShowScriptGUI(MonoBehaviour script)
+        {           
+            if (script != null)
+            {
+                MonoScript theScript = MonoScript.FromMonoBehaviour(script);
+                using (new EditorGUI.DisabledScope(true))
+                {
+                    EditorGUILayout.ObjectField("Script", theScript, script.GetType(), false);
+                }
+            }
+        }
+
         public override void OnInspectorGUI()
         {
             IEditableSpline spline = target as IEditableSpline;
+            ShowScriptGUI(spline as MonoBehaviour);
 
             GUILayout.Label( "Edit Modes" );
             if( editMode == SplineEditMode.AddPoint && addPointMode == SplineAddPointMode.Append )

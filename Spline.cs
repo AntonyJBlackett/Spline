@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using UnityEngine;
 
 #if UNITY_EDITOR
@@ -30,9 +30,9 @@ namespace FantasticSplines
         {
             Bezier3 bezier = new Bezier3( point1, point2 );
 
-            Vector3 a = Vector3.Lerp( bezier.p0, bezier.p1, t );
-            Vector3 b = Vector3.Lerp( bezier.p1, bezier.p2, t );
-            Vector3 c = Vector3.Lerp( bezier.p2, bezier.p3, t );
+            Vector3 a = Vector3.Lerp( bezier.A, bezier.B, t );
+            Vector3 b = Vector3.Lerp( bezier.B, bezier.C, t );
+            Vector3 c = Vector3.Lerp( bezier.C, bezier.D, t );
             Vector3 m = Vector3.Lerp( a, b, t );
             Vector3 n = Vector3.Lerp( b, c, t );
             Vector3 p = bezier.GetPoint( t );
@@ -59,10 +59,6 @@ namespace FantasticSplines
         FastBezier.Bezier3 bezier3;
 
         // confused?
-        public Vector3 p0 => bezier3.A;
-        public Vector3 p1 => bezier3.B;
-        public Vector3 p2 => bezier3.C;
-        public Vector3 p3 => bezier3.D;
         public Vector3 A => bezier3.A;
         public Vector3 B => bezier3.B;
         public Vector3 C => bezier3.C;
@@ -78,6 +74,32 @@ namespace FantasticSplines
             bezier3.B = start.position + start.Control2;
             bezier3.C = end.position + end.Control1;
             bezier3.D = end.position;
+        }
+
+        public Bezier3(FastBezier.Bezier3 bez)
+        {
+            this.bezier3 = bez;
+        }
+
+        public Bezier3 LeftSplit(float t)
+        {
+            if (Mathf.Approximately(t, 1f))
+            {
+                return this;
+            }
+            return new Bezier3(bezier3.LeftSplitAt(t));
+        }
+        public Bezier3 RightSplit(float t)
+        {
+            if (Mathf.Approximately(t, 0f))
+            {
+                return this;
+            }
+            return new Bezier3(bezier3.RightSplitAt(t));
+        }
+        public Bezier3 MiddleSplit(float t1, float t2)
+        {
+            return new Bezier3(bezier3.MiddleSplitAt(t1, t2));
         }
 
         public float GetClosestT(Vector3 pos, float paramThreshold = 0.000001f)
@@ -121,11 +143,16 @@ namespace FantasticSplines
             t = Mathf.Clamp( t, 0.0001f, 0.9999f ); // clamp like this of there is no tangent at position exactly on the curve point
             float oneMinusT = 1f - t;
             return
-                3f * oneMinusT * oneMinusT * (p1 - p0) +
-                6f * oneMinusT * t * (p2 - p1) +
-                3f * t * t * (p3 -p2);
+                3f * oneMinusT * oneMinusT * (B - A) +
+                6f * oneMinusT * t * (C - B) +
+                3f * t * t * (D - C);
         }
 
+        public float GetDistanceAt(float t)
+        {
+            return bezier3.GetDistanceAt(t);
+        }
+        
         public float Length => bezier3.Length;
     }
 
@@ -265,13 +292,129 @@ namespace FantasticSplines
         }
     }
 
+    
     [System.Serializable]
     public class Curve : ISpline
     {
-        public List<CurvePoint> curvePoints = new List<CurvePoint>();
+        public const int DEFAULT_SEGMENT_LUT_ACCURACY = 8;
+        
+        [SerializeField]
+        private List<CurvePoint> curvePoints = new List<CurvePoint>();
 
         public bool loop = false;
 
+        [System.NonSerialized] private bool isDirty = true; 
+        [System.NonSerialized] private float _splineLength;
+        [System.NonSerialized] private float _invSplineLength;
+        [System.NonSerialized] private SegmentCache[] _segments;
+
+        private struct SegmentPointer
+        {
+            public SegmentPointer(Curve c, int segIndex, float distance)
+            {
+                curve = c;
+                segmentIndex = segIndex;
+                segmentDistance = distance;
+            }
+            public Curve curve;
+            public int segmentIndex;
+            public float segmentDistance;
+
+            public Vector3 Position => curve._segments[segmentIndex].GetPositionAtDistance(segmentDistance);
+            public Vector3 Tangent => curve._segments[segmentIndex].GetTangentAtDistance(segmentDistance);
+        }
+        
+        private class SegmentCache
+        {
+            public Bezier3 bezier;
+            private Vector2[] tdMapping;
+
+            public float Length => tdMapping[tdMapping.Length - 1].y;
+            public SegmentCache(Bezier3 bez, int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
+            {
+                this.bezier = bez;
+                tdMapping = new Vector2[accuracy];
+                float invAccuracy = 1f / (accuracy-1);
+                for (int i = 0; i < accuracy; ++i)
+                {
+                    float t = i * invAccuracy;
+                    float d = bez.GetDistanceAt(t);
+                    tdMapping[i] = new Vector2(t,d);
+                }
+            }
+
+            public Vector3 GetPositionAtT(float t) => bezier.GetPoint(t);
+            public Vector3 GetTangentAtT(float t) => bezier.GetTangent(t);
+            public Vector3 GetPositionAtDistance(float distance) => GetPositionAtT(GetT(distance));
+            public Vector3 GetTangentAtDistance(float distance) => GetTangentAtT(GetT(distance));
+            
+            public float GetT(float d)
+            {
+                // TODO: Binary search this
+                for (int i = 1; i < tdMapping.Length; ++i)
+                {
+                    if (d <= tdMapping[i].y)
+                    {
+                        float ratio = Mathf.InverseLerp(tdMapping[i - 1].y, tdMapping[i].y, d);
+                        return Mathf.Lerp(tdMapping[i - 1].x, tdMapping[i].x, ratio);
+                    }
+                }
+
+                return 1f;
+            }
+
+            public float GetDistance(float t)
+            {
+                // TODO: Binary search this
+                for (int i = 1; i < tdMapping.Length; ++i)
+                {
+                    if (t <= tdMapping[i].x)
+                    {
+                        float ratio = Mathf.InverseLerp(tdMapping[i - 1].x, tdMapping[i].x, t);
+                        return Mathf.Lerp(tdMapping[i - 1].y, tdMapping[i].y, ratio);
+                    }
+                }
+
+                return Length;
+            }
+        }
+        
+        public float Length
+        {
+            get
+            {
+                if (isDirty) { UpdateCachedData(); }
+                return _splineLength;
+            }
+        }
+        public float InverseLength
+        {
+            get
+            {
+                if (isDirty) { UpdateCachedData(); }
+                return _invSplineLength;
+            }
+        }
+        
+        void UpdateCachedData()
+        {
+            if (_segments == null || _segments.Length != SegmentCount)
+            {
+                _segments = new SegmentCache[SegmentCount];
+            }
+
+            float length = 0f;
+            for (int seg = 0; seg < SegmentCount; ++seg)
+            {
+                _segments[seg] = new SegmentCache(CalculateSegment(seg));
+                length += _segments[seg].Length;
+            }
+
+            _splineLength = length;
+            _invSplineLength = 1f / length;
+            isDirty = false;
+        }
+        
         public int CurvePointCount { get { return curvePoints.Count; } }
         public int SegmentCount
         {
@@ -292,6 +435,7 @@ namespace FantasticSplines
         public void AddCurvePoint(CurvePoint point)
         {
             curvePoints.Add( point );
+            isDirty = true;
         }
 
         public void RemoveCurvePoint(int index)
@@ -301,12 +445,14 @@ namespace FantasticSplines
                 return;
             }
             curvePoints.RemoveAt( index );
+            isDirty = true;
         }
 
         public void InsertCurvePoint( float normalisedT )
         {
-            int segment = GetSegmentIndex( normalisedT );
-            float segmentT = GetSegmentT( normalisedT );
+            SegmentPointer seg = GetSegmentPointerAtDistance(normalisedT * Length);
+            int segment = seg.segmentIndex;
+            float segmentT = _segments[segment].GetT(seg.segmentDistance);
 
             if( segment < 0 || segment > SegmentCount )
             {
@@ -329,6 +475,7 @@ namespace FantasticSplines
             }
 
             curvePoints.Insert( segment+1, split );
+            isDirty = true;
         }
 
         public void SetCurvePointPosition( int index, Vector3 position )
@@ -340,14 +487,16 @@ namespace FantasticSplines
             CurvePoint point = curvePoints[index];
             point.position = position;
             curvePoints[index] = point;
+            isDirty = true;
         }
 
         public void SetCurvePoint( int index, CurvePoint point )
         {
             curvePoints[index] = point;
+            isDirty = true;
         }
 
-        public Bezier3 GetSegment( int segment )
+        public Bezier3 CalculateSegment( int segment )
         {
             segment = LoopSegementIndex( segment );
             int index1 = segment;
@@ -379,66 +528,71 @@ namespace FantasticSplines
 
             return Mathf.Clamp01( normalisedT );
         }
-
-        float GetSegmentT( float normalisedT )
+        float LoopDistance(float distance)
         {
             if( loop )
             {
-                return Mathf.Repeat( normalisedT * SegmentCount, 1 );
+                return Mathf.Repeat( distance, Length );
             }
-            else
-            {
-                float totalT = Mathf.Clamp01(normalisedT) * SegmentCount;
-                int segment = GetSegmentIndex( normalisedT );
-                return totalT - segment;
-            }
-        }
 
-        int GetSegmentIndex( float normalisedT )
-        {
-            normalisedT = LoopNormalisedT( normalisedT );
-            int segment = (int)(normalisedT * SegmentCount);
-            return Mathf.Clamp( segment, 0, SegmentCount-1 );
+            return Mathf.Clamp( distance, 0f, Length );
         }
 
         public float GetSpeed(float normalisedT)
         {
-            return GetSegment( GetSegmentIndex( normalisedT ) ).GetTangent( GetSegmentT( normalisedT ) ).magnitude;
+            return GetDirection(normalisedT).magnitude;
         }
 
         public Vector3 GetDirection(float normalisedT)
         {
-            return GetSegment( GetSegmentIndex( normalisedT ) ).GetTangent( GetSegmentT( normalisedT ) );
+            return GetSegmentPointerAtDistance(normalisedT * Length).Tangent;
         }
 
         public Vector3 GetPoint( float normalisedT )
         {
-            return GetSegment( GetSegmentIndex( normalisedT ) ).GetPoint( GetSegmentT( normalisedT ) );
+            return GetSegmentPointerAtDistance(normalisedT * Length).Position;
         }
 
-        public float GetLength(float fromNormalisedT = 0, float toNormalisedT = 1)
+        public int GetSegmentIndexAtT( float normalisedT )
         {
-            float length = 0;
+            return GetSegmentPointerAtDistance(normalisedT * Length).segmentIndex;
+        }
 
-            int fromSegment = GetSegmentIndex( fromNormalisedT );
-            float fromSegmentT = GetSegmentT( fromNormalisedT );
+        public float GetLength(float fromNormalisedT, float toNormalisedT)
+        {
+            return GetDistance(toNormalisedT) - GetDistance(fromNormalisedT);
+        }
 
-            int toSegment = GetSegmentIndex( toNormalisedT );
-            float toSegmentT = GetSegmentT( toNormalisedT );
-            for( int i = fromSegment; i <= toSegment; ++i )
+        SegmentPointer GetSegmentPointerAtDistance(float distance)
+        {
+            if (isDirty)
             {
-                length += GetSegment( i ).Length;
+                UpdateCachedData();
             }
 
-            length -= GetSegment( fromSegment ).Length * fromSegmentT;
-            length -= GetSegment( toSegment ).Length * (1-toSegmentT);
+            float distanceRemain = LoopDistance(distance);
+            for (int i = 0; i < _segments.Length; ++i)
+            {
+                if (distanceRemain >= _segments[i].Length)
+                {
+                    distanceRemain -= _segments[i].Length;
+                }
+                else
+                {
+                    return new SegmentPointer(this, i, distanceRemain);
+                }
+            }
+            return new SegmentPointer(this, _segments.Length-1, _segments[_segments.Length-1].Length);
+        }
 
-            return length;
+        public float GetDistance(float t)
+        {
+            return t * Length;
         }
 
         public float GetT(float length)
         {
-            throw new System.NotImplementedException();
+            return length * InverseLength;
         }
 
         public int GetClosestSegmentIndex(Vector3 point, float paramThreshold = 0.000001f)
@@ -447,7 +601,7 @@ namespace FantasticSplines
             int closestSegment = 0;
             for (int i = 0; i < SegmentCount; i++)
             {
-                Bezier3 curve = GetSegment(i);
+                Bezier3 curve = CalculateSegment(i);
                 float curveClosestParam = curve.GetClosestT(point, paramThreshold);
 
                 Vector3 curvePos = curve.GetPoint(curveClosestParam);
@@ -462,14 +616,16 @@ namespace FantasticSplines
             return closestSegment;
         }
 
-        public float GetClosestT(Vector3 point)
+
+        public float GetClosestD(Vector3 point)
         {
             float paramThreshold = 0.000001f;
             float minDistSq = float.MaxValue;
-            float closestT = 0;
+            float closestD = 0;
+            float runningDistance = 0f
             for (int i = 0; i < SegmentCount; i++)
             {
-                Bezier3 curve = GetSegment(i);
+                Bezier3 curve = CalculateSegment(i);
                 float curveClosestParam = curve.GetClosestT(point, paramThreshold);
 
                 Vector3 curvePos = curve.GetPoint(curveClosestParam);
@@ -477,11 +633,18 @@ namespace FantasticSplines
                 if (distSq < minDistSq)
                 {
                     minDistSq = distSq;
-                    closestT = i + curveClosestParam;
+                    closestD = runningDistance + curve.GetDistanceAt(curveClosestParam);
                 }
+
+                runningDistance += curve.Length;
             }
 
-            return closestT / SegmentCount;
+            return closestD;
+        }
+
+        public float GetClosestT(Vector3 point)
+        {
+            return GetClosestD(point) * InverseLength;
         }
 
         public float GetClosestT(Ray ray)
@@ -496,7 +659,7 @@ namespace FantasticSplines
             Vector3 closestPoint = Vector3.zero;
             for (int i = 0; i < SegmentCount; i++)
             {
-                Bezier3 curve = GetSegment(i);
+                Bezier3 curve = CalculateSegment(i);
                 float curveClosestParam = curve.GetClosestT(point, paramThreshold);
 
                 Vector3 curvePos = curve.GetPoint(curveClosestParam);
@@ -518,7 +681,8 @@ namespace FantasticSplines
 
         public float Step(float t, float worldDistance)
         {
-            throw new System.NotImplementedException();
+            float step = worldDistance * InverseLength;
+            return LoopNormalisedT(t + step);
         }
 
         public List<CurvePoint> GetPoints()
@@ -534,297 +698,4 @@ namespace FantasticSplines
         }
     }
 
-    public class Spline : MonoBehaviour, ISpline, IEditableSpline
-    {
-#if UNITY_EDITOR
-        void OnDrawGizmos()
-        {
-            if( Selection.activeObject == gameObject )
-            {
-                return;
-            }
-            for( int i = 0; i < curve.SegmentCount; ++i )
-            {
-                Bezier3 bezier = curve.GetSegment(i);
-                Handles.DrawBezier( bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.grey, null, 2 );
-            }
-            Gizmos.color = Color.white;
-            for( int i = 0; i < PointCount; ++i )
-            {
-                Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
-            }
-        }
-#endif
-
-        public Curve curve; // spline in local space
-        public bool Loop { get { return curve.loop; } set { curve.loop = value; } }
-        public int PointCount { get { return curve.CurvePointCount; } }
-
-        Vector3 InverseTransformPoint( Vector3 point )
-        {
-            return transform.InverseTransformPoint( point );
-        }
-
-        Vector3 TransformPoint( Vector3 point )
-        {
-            return transform.TransformPoint( point );
-        }
-
-        Vector3 InverseTransformVector( Vector3 vector )
-        {
-            return transform.InverseTransformVector( vector );
-        }
-
-        Vector3 TransformVector( Vector3 vector )
-        {
-            return transform.TransformVector( vector );
-        }
-
-        Vector3 InverseTransformDirection( Vector3 direction )
-        {
-            return transform.InverseTransformDirection( direction );
-        }
-
-        Vector3 TransformDirection( Vector3 direction )
-        {
-            return transform.TransformDirection( direction );
-        }
-
-        CurvePoint TransformPoint( CurvePoint point )
-        {
-            return point.Transform( transform );
-        }
-
-        CurvePoint InverseTransformPoint( CurvePoint point )
-        {
-            return point.InverseTransform( transform );
-        }
-
-        List<Vector3> TransformPoints( List<Vector3> points )
-        {
-            for( int i = 0; i < points.Count; ++i )
-            {
-                points[i] = TransformPoint( points[i] );
-            }
-            return points;
-        }
-
-        List<CurvePoint> TransformPoints( List<CurvePoint> points )
-        {
-            for( int i = 0; i < points.Count; ++i )
-            {
-                points[i] = TransformPoint( points[i] );
-            }
-            return points;
-        }
-
-        Ray InverseTransformRay( Ray ray )
-        {
-            ray.origin = InverseTransformPoint( ray.origin );
-            ray.direction = InverseTransformPoint( ray.direction );
-            return ray;
-        }
-
-        public bool IsIndexInRange( int index )
-        {
-            return index >= 0 && index < PointCount;
-        }
-
-        public void InsertPoint( float normalisedT )
-        {
-            curve.InsertCurvePoint( normalisedT );
-        }
-
-        public void AddPoint(CurvePoint point)
-        {
-            curve.AddCurvePoint( point.InverseTransform( transform ) );
-        }
-
-        public void RemovePoint(int index)
-        {
-            curve.RemoveCurvePoint( index );
-        }
-
-        public CurvePoint GetPoint( int index )
-        {
-            if( index < 0 || index > PointCount - 1 )
-            {
-                return new CurvePoint( transform.position );
-            }
-
-            return TransformPoint( curve.GetCurvePoint(index) );
-        }
-
-        public void SetPoint(int index, CurvePoint point)
-        {
-            curve.SetCurvePoint( index, point.InverseTransform( transform ) );
-        }
-
-        public bool IsLoop() => Loop;
-        public void SetLoop(bool loop) => Loop = loop;
-        public int GetPointCount() => PointCount;
-        public Transform GetTransform() => transform;
-        public Component GetComponent() => this;
-
-        const int resolution = 10; 
-        public List<Vector3> GetPolyLinePoints()
-        {
-            List<Vector3> points = new List<Vector3>();
-            if( PointCount < 2 )
-            {
-                return points;
-            }
-
-            int curveSegments = PointCount;
-            if( Loop )
-            {
-                curveSegments += 1;
-            }
-            for( int i = 1; i < curveSegments; ++i )
-            {
-                float step = 1.0f / (float)resolution;
-                float t = 0;
-
-                int index1 = (i - 1);
-                int index2 = i % PointCount;
-
-                CurvePoint point1 = GetPoint(index1);
-                CurvePoint point2 = GetPoint(index2);
-
-                if( point1.PointType == PointType.Point && point2.PointType == PointType.Point )
-                {
-                    points.Add( point1.position );
-                    if( i == curveSegments - 1 )
-                    {
-                        points.Add( point2.position );
-                    }
-                    continue;
-                }
-
-                for( int s = 0; s < resolution+1; ++s )
-                {
-                    points.Add( TransformPoint( curve.GetSegment( index1 ).GetPoint( t ) ) );
-                    t += step;
-                }
-            }
-            return points;
-        }
-        public List<int> GetSegmentsForPoints()
-        {
-            List<int> segments = new List<int>();
-
-            int curveSegments = PointCount;
-            if( Loop )
-            {
-                curveSegments += 1;
-            }
-            for( int i = 1; i < curveSegments; ++i )
-            {
-                int index1 = (i - 1);
-                int index2 = i % PointCount;
-
-                CurvePoint point1 = GetPoint(index1);
-                CurvePoint point2 = GetPoint(index2);
-
-                if( point1.PointType == PointType.Point && point2.PointType == PointType.Point )
-                {
-                    segments.Add( index1 );
-                    if( i == curveSegments - 1 )
-                    {
-                        segments.Add( index1 );
-                    }
-                    continue;
-                }
-
-                for( int s = 0; s < resolution+1; ++s )
-                {
-                    segments.Add( index1 );
-                }
-            }
-            return segments;
-        }
-
-        public int GetClosestSegmentIndex(Vector3 point)
-        {
-            return curve.GetClosestSegmentIndex( InverseTransformPoint( point ) );
-        }
-
-        public int GetClosestSegmentIndex(Ray ray)
-        {
-            throw new System.NotImplementedException();
-        }
-
-        public List<CurvePoint> GetPoints()
-        {
-            return TransformPoints( curve.GetPoints() );
-        }
-        
-        //TODO this will break when scaled
-        public float GetSpeed(float t)
-        {
-            return curve.GetSpeed(t);
-        }
-
-        public Vector3 GetDirection(float t)
-        {
-            return TransformVector( curve.GetDirection(t) );
-        }
-
-        public Vector3 GetPoint(float t)
-        {
-            return TransformPoint( curve.GetPoint(t) );
-        }
-        
-        public float GetLength()
-        {
-            return curve.GetLength(0, 1);
-        }
-        public float GetLength(float toNormalisedT)
-        {
-            return curve.GetLength(0, toNormalisedT);
-        }
-        //TODO this will break when scaled
-        public float GetLength(float fromNormalisedT, float toNormalisedT)
-        {
-            return curve.GetLength(fromNormalisedT, toNormalisedT);
-        }
-        
-        //TODO this will break when scaled
-        public float GetT(float length)
-        {
-            return curve.GetT(length);
-        }
-
-        public float GetClosestT(Vector3 point)
-        {
-            return curve.GetClosestT( InverseTransformPoint( point ) );
-        }
-
-        public float GetClosestT(Ray ray)
-        {
-            return curve.GetClosestT( InverseTransformRay( ray ) );
-        }
-
-        public Vector3 GetClosestPoint(Vector3 point)
-        {
-            return TransformPoint( curve.GetClosestPoint( InverseTransformPoint( point ) ) );
-        }
-
-        public Vector3 GetClosestPoint(Ray ray)
-        {
-            return TransformPoint( curve.GetClosestPoint( InverseTransformRay( ray ) ) );
-        }
-        
-        //TODO this will break when scaled
-        public float Step(float currentT, float worldDistance)
-        {
-            return curve.Step(currentT, worldDistance);
-        }
-
-        //TODO this will break when scaled
-        public List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
-        {
-            return TransformPoints( GetPoints( worldSpacing, includeEndPoint, includeSplinePoints ) );
-        }
-    }
 }
