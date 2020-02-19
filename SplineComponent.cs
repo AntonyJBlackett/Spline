@@ -32,6 +32,12 @@ namespace FantasticSplines
         }
         
 #if UNITY_EDITOR
+        public static bool ShowSegmentLengths
+        {
+            get => UnityEditor.EditorPrefs.GetBool("FantasticSplinesShowLength", false);
+            set => UnityEditor.EditorPrefs.SetBool("FantasticSplinesShowLength", value);
+        }
+        
         void OnDrawGizmos()
         {
             if (Selection.activeObject == gameObject)
@@ -48,12 +54,26 @@ namespace FantasticSplines
             }
 
             Handles.matrix = Matrix4x4.identity;
-            ;
 
             Gizmos.color = Color.white;
             for (int i = 0; i < PointCount; ++i)
             {
                 Gizmos.DrawSphere(GetPoint(i).position, 0.05f);
+            }
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            if (ShowSegmentLengths)
+            {
+                Handles.matrix = this.transform.localToWorldMatrix;
+                for (int i = 0; i < curve.SegmentCount; ++i)
+                {
+                    Bezier3 bezier = curve.CalculateSegment(i);
+                    Vector3 pos = bezier.GetPoint(0.5f);
+                    Handles.Label(pos, bezier.Length.ToString("N2"));
+                }
+                Handles.matrix = Matrix4x4.identity;
             }
         }
 #endif
