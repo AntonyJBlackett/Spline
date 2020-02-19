@@ -17,48 +17,45 @@ namespace FantasticSplines
 
     public static class BezierCalculator
     {
-        public static Vector3 GetPoint(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+        public static Vector3 GetPoint( Bezier3 bezier, float t )
         {
             t = Mathf.Clamp01( t );
             float oneMinusT = 1f - t;
             return
-                oneMinusT * oneMinusT * oneMinusT * p0 +
-                3f * oneMinusT * oneMinusT * t * p1 +
-                3f * oneMinusT * t * t * p2 +
-                t * t * t * p3;
+                oneMinusT * oneMinusT * oneMinusT * bezier.p0 +
+                3f * oneMinusT * oneMinusT * t * bezier.p1 +
+                3f * oneMinusT * t * t * bezier.p2 +
+                t * t * t * bezier.p3;
         }
 
-        public static Vector3 GetTangent(Vector3 p0, Vector3 p1, Vector3 p2, Vector3 p3, float t)
+        public static Vector3 GetTangent( Bezier3 bezier, float t)
         {
             t = Mathf.Clamp01( t );
             float oneMinusT = 1f - t;
             return
-                3f * oneMinusT * oneMinusT * (p1 - p0) +
-                6f * oneMinusT * t * (p2 - p1) +
-                3f * t * t * (p3 - p2);
+                3f * oneMinusT * oneMinusT * (bezier.p1 - bezier.p0) +
+                6f * oneMinusT * t * (bezier.p2 - bezier.p1) +
+                3f * t * t * (bezier.p3 -bezier.p2);
         }
 
         /// <summary>
-        /// Splits the curve at given position (t : 0..1).
+        /// Splits the curve at given position (t : 0..1). alters point1 and point2 control points so the curve remains the same
         /// </summary>
         /// <param name="t">A number from 0 to 1.</param>
-        /// <returns>Two curves.</returns>
+        /// <returns>new CurvePoint between two points</returns>
         /// <remarks>
         /// (De Casteljau's algorithm, see: http://caffeineowl.com/graphics/2d/vectorial/bezierintro.html)
         /// </remarks>
         public static CurvePoint SplitAt(ref CurvePoint point1, ref CurvePoint point2, float t)
         {
-            Vector3 A = point1.position;
-            Vector3 B = point1.position + point1.Control2;
-            Vector3 C = point2.position + point2.Control1;
-            Vector3 D = point2.position;
+            Bezier3 bezier = new Bezier3( point1, point2 );
 
-            Vector3 a = Vector3.Lerp( A, B, t );
-            Vector3 b = Vector3.Lerp( B, C, t );
-            Vector3 c = Vector3.Lerp( C, D, t );
+            Vector3 a = Vector3.Lerp( bezier.p0, bezier.p1, t );
+            Vector3 b = Vector3.Lerp( bezier.p1, bezier.p2, t );
+            Vector3 c = Vector3.Lerp( bezier.p2, bezier.p3, t );
             Vector3 m = Vector3.Lerp( a, b, t );
             Vector3 n = Vector3.Lerp( b, c, t );
-            Vector3 p = GetPoint( A, B, C, D, t );
+            Vector3 p = GetPoint( bezier, t );
 
             if( point1.PointType == PointType.Mirrored )
             {
@@ -74,6 +71,21 @@ namespace FantasticSplines
 
             CurvePoint newCurvePoint = new CurvePoint( p, m - p, n - p, PointType.Free );
             return newCurvePoint;
+        }
+    }
+
+    public struct Bezier3
+    {
+        // start, control 1, control 2, end
+        public Vector3 p0, p1, p2, p3;
+        public Vector3[] points => new Vector3[] { p0, p1, p2, p3 };
+
+        public Bezier3(CurvePoint start, CurvePoint end)
+        {
+            p0 = start.position;
+            p1 = start.position + start.Control2;
+            p2 = end.position + end.Control1;
+            p3 = end.position;
         }
     }
 
@@ -292,12 +304,7 @@ namespace FantasticSplines
 
             index2 %= PointCount;
 
-            return BezierCalculator.GetPoint( 
-                points[index1].position, 
-                points[index1].position + points[index1].Control2, 
-                points[index2].position + points[index2].Control1, 
-                points[index2].position, 
-                t );
+            return BezierCalculator.GetPoint( new Bezier3( points[index1], points[index2] ), t );
         }
 
         public void SetPointPosition( int index, Vector3 position )
@@ -394,28 +401,6 @@ namespace FantasticSplines
             {
                 Gizmos.DrawLine( points[i-1], points[i] );
             }
-
-            /*
-            if( PointCount > 1 )
-            {
-                Vector3 start = GetPoint( 0 );
-                Vector3 next = GetPoint( 1 );
-                Vector3 direction = (next - start).normalized;
-                Vector3 right = Vector3.Cross( transform.up, direction );
-
-                float arrowSize = 0.1f;
-                Vector3 arrowLeft = -right * arrowSize;
-                Vector3 arrowRight = right * arrowSize;
-                Vector3 arrowHead = direction * arrowSize * 2;
-
-                Mesh arrow = new Mesh();
-                arrow.vertices = new Vector3[] { arrowHead, arrowLeft, arrowRight };
-                arrow.normals = new Vector3[] { transform.up, transform.up, transform.up };
-                arrow.triangles = new int[] { 0, 1, 2, 1, 0, 2 };
-                arrow.colors = new Color[] { Color.white, Color.white, Color.white };
-                Gizmos.DrawMesh( arrow, 0, start );
-            }
-            */
         }
 
         public bool IsLoop() => Loop;
@@ -508,9 +493,9 @@ namespace FantasticSplines
             throw new System.NotImplementedException();
         }
 
-        public CurvePoint[] GetPoints()
+        public List<CurvePoint> GetPoints()
         {
-            return curve.points.ToArray();
+            return curve.points;
         }
 
         public float GetSpeed(float t)
@@ -563,7 +548,7 @@ namespace FantasticSplines
             throw new System.NotImplementedException();
         }
 
-        public Vector3[] GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
+        public List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
         {
             throw new System.NotImplementedException();
         }
