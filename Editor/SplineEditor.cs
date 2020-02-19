@@ -1121,17 +1121,8 @@ namespace FantasticSplines
             //Vector3 newPointPosition = spline.GetClosestPoint( mouseRay );
 
             List<Vector3> points = spline.GetPolyLinePoints();
-            List<int> curveSegmentIndicies = spline.GetSegmentsForPoints();
             Vector3 newPointPosition = HandleUtility.ClosestPointToPolyLine( points.ToArray() );
-            for( int i = 1; i < points.Count; ++i )
-            {
-                Vector3 direction = (newPointPosition - points[ i-1 ]).normalized;
-                Vector3 direction2 = (newPointPosition - points[ i ]).normalized;
-                if( Vector3.Dot(-direction, direction2) > 0.99f )
-                {
-                    segmentIndex = i - 1;
-                }
-            }
+            newPointPosition = spline.GetClosestPoint( newPointPosition );
 
             planePosition = MathHelper.LinePlaneIntersection( newPointPosition, transform.up, transform.position, transform.up );
             planeOffset = newPointPosition - planePosition;
@@ -1154,40 +1145,10 @@ namespace FantasticSplines
 
             if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
             {
-                float t = 0;
-                float newSegmentLength = 0;
-                float segmentLength = 0;
-                for( int i = 0; i < points.Count-1; ++i )
-                {
-                    if( curveSegmentIndicies[i] < segmentIndex )
-                    {
-                        continue;
-                    }
-                    if( curveSegmentIndicies[i] > segmentIndex )
-                    {
-                        break;
-                    }
-
-                    Vector3 point1 = points[i];
-                    Vector3 point2 = points[i+1];
-
-                    float resolutionLength = Vector3.Distance( point1, point2 );
-                    segmentLength += resolutionLength;
-
-                    if( i < segmentIndex )
-                    {
-                        newSegmentLength += resolutionLength;
-                    }
-                    if( i == segmentIndex )
-                    {
-                        newSegmentLength += Vector3.Distance( point1, newPointPosition );
-                    }
-                }
-
-                t = newSegmentLength / segmentLength;
+                float t = spline.GetClosestT( newPointPosition );
 
                 Undo.RecordObject( target, "Insert Point" );
-                spline.InsertPoint( segmentIndex, t );
+                spline.InsertPoint( t );
                 EditorUtility.SetDirty( spline.GetComponent() );
                 guiEvent.Use();
             }

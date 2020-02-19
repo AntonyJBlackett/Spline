@@ -303,20 +303,23 @@ namespace FantasticSplines
             curvePoints.RemoveAt( index );
         }
 
-        public void InsertCurvePoint(int segement, float t)
+        public void InsertCurvePoint( float normalisedT )
         {
-            if( segement < 0 || segement > SegmentCount )
+            int segment = GetSegmentIndex( normalisedT );
+            float segmentT = GetSegmentT( normalisedT );
+
+            if( segment < 0 || segment > SegmentCount )
             {
                 return;
             }
 
-            int index1 = segement;
-            int index2 = (segement+1) % CurvePointCount;
+            int index1 = segment;
+            int index2 = (segment+1) % CurvePointCount;
 
             CurvePoint point1 = curvePoints[index1];
             CurvePoint point2 = curvePoints[index2];
 
-            CurvePoint split = BezierCalculator.SplitAt(ref point1, ref point2, t);
+            CurvePoint split = BezierCalculator.SplitAt(ref point1, ref point2, segmentT);
             curvePoints[index1] = point1;
             curvePoints[index2] = point2;
     
@@ -325,7 +328,7 @@ namespace FantasticSplines
                 split.SetPointType( PointType.Point );
             }
 
-            curvePoints.Insert( segement+1, split );
+            curvePoints.Insert( segment+1, split );
         }
 
         public void SetCurvePointPosition( int index, Vector3 position )
@@ -438,19 +441,74 @@ namespace FantasticSplines
             throw new System.NotImplementedException();
         }
 
+        public int GetClosestSegmentIndex(Vector3 point, float paramThreshold = 0.000001f)
+        {
+            float minDistSq = float.MaxValue;
+            int closestSegment = 0;
+            for (int i = 0; i < SegmentCount; i++)
+            {
+                Bezier3 curve = GetSegment(i);
+                float curveClosestParam = curve.GetClosestT(point, paramThreshold);
+
+                Vector3 curvePos = curve.GetPoint(curveClosestParam);
+                float distSq = (curvePos - point).sqrMagnitude;
+                if (distSq < minDistSq)
+                {
+                    minDistSq = distSq;
+                    closestSegment = i;
+                }
+            }
+
+            return closestSegment;
+        }
+
         public float GetClosestT(Vector3 point)
         {
-            throw new System.NotImplementedException();
+            float paramThreshold = 0.000001f;
+            float minDistSq = float.MaxValue;
+            float closestT = 0;
+            for (int i = 0; i < SegmentCount; i++)
+            {
+                Bezier3 curve = GetSegment(i);
+                float curveClosestParam = curve.GetClosestT(point, paramThreshold);
+
+                Vector3 curvePos = curve.GetPoint(curveClosestParam);
+                float distSq = (curvePos - point).sqrMagnitude;
+                if (distSq < minDistSq)
+                {
+                    minDistSq = distSq;
+                    closestT = i + curveClosestParam;
+                }
+            }
+
+            return closestT / SegmentCount;
         }
 
         public float GetClosestT(Ray ray)
         {
             throw new System.NotImplementedException();
         }
-
-        public Vector3 GetClosestPoint(Vector3 point)
+        
+        public Vector3 GetClosestPoint(Vector3 point )
         {
-            throw new System.NotImplementedException();
+            float paramThreshold = 0.000001f;
+            float minDistSq = float.MaxValue;
+            Vector3 closestPoint = Vector3.zero;
+            for (int i = 0; i < SegmentCount; i++)
+            {
+                Bezier3 curve = GetSegment(i);
+                float curveClosestParam = curve.GetClosestT(point, paramThreshold);
+
+                Vector3 curvePos = curve.GetPoint(curveClosestParam);
+                float distSq = (curvePos - point).sqrMagnitude;
+                if (distSq < minDistSq)
+                {
+                    minDistSq = distSq;
+                    closestPoint = curvePos;
+                }
+            }
+
+            return closestPoint;
         }
 
         public Vector3 GetClosestPoint(Ray ray)
@@ -572,9 +630,9 @@ namespace FantasticSplines
             return index >= 0 && index < PointCount;
         }
 
-        public void InsertPoint( int segment, float t )
+        public void InsertPoint( float normalisedT )
         {
-            curve.InsertCurvePoint( segment, t );
+            curve.InsertCurvePoint( normalisedT );
         }
 
         public void AddPoint(CurvePoint point)
@@ -684,6 +742,11 @@ namespace FantasticSplines
                 }
             }
             return segments;
+        }
+
+        public int GetClosestSegmentIndex(Vector3 point)
+        {
+            return curve.GetClosestSegmentIndex( InverseTransformPoint( point ) );
         }
 
         public int GetClosestSegmentIndex(Ray ray)

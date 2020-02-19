@@ -16,16 +16,17 @@ namespace FantasticSplines
         CurvePoint GetPoint(int index);
         void SetPoint(int index, CurvePoint point);
 
-        void InsertPoint(int segment, float t ); // inserts a point between two points
-        void AddPoint(CurvePoint point);
-        void RemovePoint(int index);
+        void InsertPoint( float t ); // inserts a point on the curve without changing its shape
+        void AddPoint(CurvePoint point); // appends a point to the end of the curve at position
+        void RemovePoint(int index); // removes a Curve Point at index
 
         //TODO remove these and use the four functions below instead.
         List<Vector3> GetPolyLinePoints();
         List<int> GetSegmentsForPoints();
 
+        float GetClosestT(Vector3 point);
+        Vector3 GetClosestPoint(Vector3 point);
         Vector3 GetClosestPoint(Ray ray);
-        int GetClosestSegmentIndex(Ray ray);
     }
 
     // This is just a curve in 3D space
