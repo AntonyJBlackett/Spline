@@ -521,7 +521,13 @@ namespace FantasticSplines
             return GetDistance(toNormalisedT) - GetDistance(fromNormalisedT);
         }
 
-        SegmentPointer GetSegmentPointerAtDistance(float distance)
+        public SegmentPointer GetSegmentPointer(SegmentPosition segmentPosition)
+        {
+            EnsureCacheIsUpdated();
+            return new SegmentPointer(this, segmentPosition);
+        }
+
+        public SegmentPointer GetSegmentPointerAtDistance(float distance)
         {
             EnsureCacheIsUpdated();
 

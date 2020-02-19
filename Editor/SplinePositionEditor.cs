@@ -2,7 +2,7 @@
 using UnityEngine;
 using FantasticSplines;
 
-[CustomPropertyDrawer(typeof(SplineComponent.SplinePosition))]
+[CustomPropertyDrawer(typeof(FantasticSplines.SplinePosition))]
 public class SplineComponentPositionEditor : PropertyDrawer
 {
     public override float GetPropertyHeight(SerializedProperty property, GUIContent label)
@@ -17,9 +17,13 @@ public class SplineComponentPositionEditor : PropertyDrawer
         float splineWidth = position.width / 3f;
         float sliderWidth = position.width - splineWidth;
         
-        SerializedProperty splineProp = property.FindPropertyRelative(nameof(SplineComponent.SplinePosition.spline));
-        SerializedProperty distanceProp = property.FindPropertyRelative(nameof(SplineComponent.SplinePosition.distance));
+        SerializedProperty splineProp = property.FindPropertyRelative(nameof(SplinePosition.spline));
+        SerializedProperty segmentPositionProperty = property.FindPropertyRelative(nameof(SplinePosition.segmentPosition));
+        SerializedProperty segIndexProp = segmentPositionProperty.FindPropertyRelative("_index");
+        SerializedProperty segTProp = segmentPositionProperty.FindPropertyRelative("_segmentT");
+        
         SplineComponent spline = splineProp.objectReferenceValue as SplineComponent;
+        SegmentPosition segPos = new SegmentPosition(segIndexProp.intValue, segTProp.floatValue);
         
         position.width = splineWidth;
         EditorGUI.PropertyField(position, splineProp, GUIContent.none);
@@ -30,10 +34,13 @@ public class SplineComponentPositionEditor : PropertyDrawer
         {
             float length = (spline == null) ? 1f : spline.GetLength();
             EditorGUI.BeginChangeCheck();
-            float distance = EditorGUI.Slider(position, GUIContent.none, distanceProp.floatValue, 0f, length);
+            float distanceOnSpline = spline.GetDistanceOnSpline(segPos);
+            float distance = EditorGUI.Slider(position, GUIContent.none, distanceOnSpline, 0f, length);
             if (EditorGUI.EndChangeCheck())
             {
-                distanceProp.floatValue = distance;
+                segPos = spline.GetSegmentAtDistance(distance);
+                segIndexProp.intValue = segPos.index;
+                segTProp.floatValue = segPos.segmentT;
             }
         }
 
