@@ -226,9 +226,10 @@ namespace FantasticSplines
     }
 
     [System.Serializable]
-    public class Curve
+    public class Curve : ISpline
     {
         public List<CurvePoint> points = new List<CurvePoint>();
+
         public bool loop = false;
 
         public int PointCount { get { return points.Count; } }
@@ -243,10 +244,9 @@ namespace FantasticSplines
                 return points.Count - 1;
             }
         }
-
-        public void AddPoint(Vector3 position)
+        public CurvePoint GetPoint(int index)
         {
-            points.Add( new CurvePoint( position ) );
+            return points[index];
         }
 
         public void AddPoint(CurvePoint point)
@@ -288,15 +288,6 @@ namespace FantasticSplines
             points.Insert( segement+1, split );
         }
 
-        public Vector3 GetPointPosition( int index )
-        {
-            if( index < 0 || index > points.Count )
-            {
-                return Vector3.zero;
-            }
-            return points[index].position;
-        }
-
         public Vector3 GetPointPosition(int segment, float t)
         {
             int index1 = segment;
@@ -327,6 +318,68 @@ namespace FantasticSplines
         {
             return index % PointCount;
         }
+
+        public float GetSpeed(float t)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public Vector3 GetDirection(float t)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public Vector3 GetPoint(float t)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public float GetLength(float fromT = 0, float toT = 1)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public float GetT(float length)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public float GetClosestT(Vector3 point)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public float GetClosestT(Ray ray)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public Vector3 GetClosestPoint(Vector3 point)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public Vector3 GetClosestPoint(Ray ray)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public float Step(float t, float worldDistance)
+        {
+            throw new System.NotImplementedException();
+        }
+
+        public List<CurvePoint> GetPoints()
+        {
+            List<CurvePoint> result = new List<CurvePoint>();
+            result.AddRange( points );
+            return result;
+        }
+
+        public List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
+        {
+            throw new System.NotImplementedException();
+        }
     }
 
     public class Spline : MonoBehaviour, ISpline, IEditableSpline
@@ -337,14 +390,60 @@ namespace FantasticSplines
 
         Vector3 InverseTransformPoint( Vector3 point )
         {
-            point = transform.InverseTransformPoint( point );
-            return point;
+            return transform.InverseTransformPoint( point );
         }
 
         Vector3 TransformPoint( Vector3 point )
         {
-            point = transform.TransformPoint( point );
-            return point;
+            return transform.TransformPoint( point );
+        }
+
+        Vector3 InverseTransformVector( Vector3 vector )
+        {
+            return transform.InverseTransformVector( vector );
+        }
+
+        Vector3 TransformVector( Vector3 vector )
+        {
+            return transform.TransformVector( vector );
+        }
+
+        Vector3 InverseTransformDirection( Vector3 direction )
+        {
+            return transform.InverseTransformDirection( direction );
+        }
+
+        Vector3 TransformDirection( Vector3 direction )
+        {
+            return transform.TransformDirection( direction );
+        }
+
+        CurvePoint TransformPoint( CurvePoint point )
+        {
+            return point.Transform( transform );
+        }
+
+        CurvePoint InverseTransformPoint( CurvePoint point )
+        {
+            return point.InverseTransform( transform );
+        }
+
+        List<Vector3> TransformPoints( List<Vector3> points )
+        {
+            for( int i = 0; i < points.Count; ++i )
+            {
+                points[i] = TransformPoint( points[i] );
+            }
+            return points;
+        }
+
+        List<CurvePoint> TransformPoints( List<CurvePoint> points )
+        {
+            for( int i = 0; i < points.Count; ++i )
+            {
+                points[i] = TransformPoint( points[i] );
+            }
+            return points;
         }
 
         public bool IsIndexInRange( int index )
@@ -374,7 +473,7 @@ namespace FantasticSplines
                 return new CurvePoint( transform.position );
             }
 
-            return curve.points[index].Transform( transform );
+            return TransformPoint( curve.GetPoint(index) );
         }
 
         public void SetPoint(int index, CurvePoint point)
@@ -495,62 +594,63 @@ namespace FantasticSplines
 
         public List<CurvePoint> GetPoints()
         {
-            return curve.points;
+            return TransformPoints( curve.GetPoints() );
         }
 
         public float GetSpeed(float t)
         {
-            throw new System.NotImplementedException();
+            return curve.GetSpeed(t);
         }
 
         public Vector3 GetDirection(float t)
         {
-            throw new System.NotImplementedException();
+            return TransformVector( curve.GetDirection(t) );
         }
 
         public Vector3 GetPoint(float t)
         {
-            throw new System.NotImplementedException();
+            return TransformPoint( curve.GetPoint(t) );
         }
 
         public float GetLength(float fromT = 0, float toT = 1)
         {
-            throw new System.NotImplementedException();
+            return curve.GetLength(fromT, toT);
         }
 
         public float GetT(float length)
         {
-            throw new System.NotImplementedException();
+            return curve.GetT(length);
         }
 
         public float GetClosestT(Vector3 point)
         {
-            throw new System.NotImplementedException();
+            return curve.GetClosestT(point);
         }
 
         public float GetClosestT(Ray ray)
         {
-            throw new System.NotImplementedException();
+            return curve.GetClosestT(ray);
         }
 
         public Vector3 GetClosestPoint(Vector3 point)
         {
-            throw new System.NotImplementedException();
+            return curve.GetClosestPoint(point);
         }
 
         public Vector3 GetClosestPoint(Ray ray)
         {
-            throw new System.NotImplementedException();
+            return curve.GetClosestPoint(ray);
         }
 
-        public float Step(float t, float worldDistance)
+        public float Step(float currentT, float worldDistance)
         {
-            throw new System.NotImplementedException();
+            return curve.Step(currentT, worldDistance);
         }
 
         public List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
         {
-            throw new System.NotImplementedException();
+            List<Vector3> points = GetPoints( worldSpacing, includeEndPoint, includeSplinePoints );
+            return TransformPoints( points );
         }
     }
 }
