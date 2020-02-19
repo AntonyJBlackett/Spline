@@ -323,18 +323,7 @@ namespace FantasticSplines
             public Vector3 Position => curve._segments[segmentIndex].GetPositionAtDistance(segmentDistance);
             public Vector3 Tangent => curve._segments[segmentIndex].GetTangentAtDistance(segmentDistance);
 
-            public float DistanceOnSpline
-            {
-                get
-                {
-                    float distance = segmentDistance;
-                    for (int s = segmentIndex - 1; s >= 0; --s)
-                    {
-                        distance += curve._segments[s].Length;
-                    }
-                    return distance;
-                }
-            }
+            public float DistanceOnSpline => curve._segments[segmentIndex].startDistanceInSpline + segmentDistance;
         }
         
         private class SegmentCache
@@ -342,10 +331,13 @@ namespace FantasticSplines
             public Bezier3 bezier;
             private Vector2[] tdMapping;
 
+            public float startDistanceInSpline;
             public float Length => tdMapping[tdMapping.Length - 1].y;
-            public SegmentCache(Bezier3 bez, int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
+            
+            public SegmentCache(Bezier3 bez, float distanceOnSpline, int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
             {
                 this.bezier = bez;
+                this.startDistanceInSpline = distanceOnSpline;
                 tdMapping = new Vector2[accuracy];
                 float invAccuracy = 1f / (accuracy-1);
                 for (int i = 0; i < accuracy; ++i)
@@ -419,7 +411,7 @@ namespace FantasticSplines
             float length = 0f;
             for (int seg = 0; seg < SegmentCount; ++seg)
             {
-                _segments[seg] = new SegmentCache(CalculateSegment(seg));
+                _segments[seg] = new SegmentCache(CalculateSegment(seg), length);
                 length += _segments[seg].Length;
             }
 
