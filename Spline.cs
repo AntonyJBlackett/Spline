@@ -322,22 +322,108 @@ namespace FantasticSplines
         }
     }
 
-    public class Spline : MonoBehaviour, IEditableSpline
+    public class Spline : MonoBehaviour, ISpline, IEditableSpline
     {
         public Curve curve;
         public bool Loop { get { return curve.loop; } set { curve.loop = value; } }
+        public int PointCount { get { return curve.PointCount; } }
+
+        Vector3 InverseTransformPoint( Vector3 point )
+        {
+            point = transform.InverseTransformPoint( point );
+            return point;
+        }
+
+        Vector3 TransformPoint( Vector3 point )
+        {
+            point = transform.TransformPoint( point );
+            return point;
+        }
+
+        public bool IsIndexInRange( int index )
+        {
+            return index >= 0 && index < PointCount;
+        }
+
+        public void InsertPoint( int segment, float t )
+        {
+            curve.InsertPoint( segment, t );
+        }
+
+        public void AddPoint(CurvePoint point)
+        {
+            curve.AddPoint( point.InverseTransform( transform ) );
+        }
+
+        public void RemovePoint(int index)
+        {
+            curve.RemovePoint( index );
+        }
+
+        public CurvePoint GetPoint( int index )
+        {
+            if( index < 0 || index > PointCount - 1 )
+            {
+                return new CurvePoint( transform.position );
+            }
+
+            return curve.points[index].Transform( transform );
+        }
+
+        public void SetPoint(int index, CurvePoint point)
+        {
+            curve.SetPoint( index, point.InverseTransform( transform ) );
+        }
+
+        void OnDrawGizmos()
+        {
+#if UNITY_EDITOR
+            if( Selection.activeObject == gameObject )
+            {
+                return;
+            }
+#endif
+            Gizmos.color = Color.white;
+            for( int i = 0; i < PointCount; ++i )
+            {
+                Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
+            }
+
+            List<Vector3> points = GetPolyLinePoints();
+            for( int i = 1; i < points.Count; ++i )
+            {
+                Gizmos.DrawLine( points[i-1], points[i] );
+            }
+
+            /*
+            if( PointCount > 1 )
+            {
+                Vector3 start = GetPoint( 0 );
+                Vector3 next = GetPoint( 1 );
+                Vector3 direction = (next - start).normalized;
+                Vector3 right = Vector3.Cross( transform.up, direction );
+
+                float arrowSize = 0.1f;
+                Vector3 arrowLeft = -right * arrowSize;
+                Vector3 arrowRight = right * arrowSize;
+                Vector3 arrowHead = direction * arrowSize * 2;
+
+                Mesh arrow = new Mesh();
+                arrow.vertices = new Vector3[] { arrowHead, arrowLeft, arrowRight };
+                arrow.normals = new Vector3[] { transform.up, transform.up, transform.up };
+                arrow.triangles = new int[] { 0, 1, 2, 1, 0, 2 };
+                arrow.colors = new Color[] { Color.white, Color.white, Color.white };
+                Gizmos.DrawMesh( arrow, 0, start );
+            }
+            */
+        }
+
+        #region IEditableSpline
         public bool IsLoop() => Loop;
         public void SetLoop(bool loop) => Loop = loop;
-
-        public Transform GetTransform()
-        {
-            return transform;
-        }
-
-        public Component GetComponent()
-        {
-            return this;
-        }
+        public int GetPointCount() => PointCount;
+        public Transform GetTransform() => transform;
+        public Component GetComponent() => this;
 
         const int resolution = 10; 
         public List<Vector3> GetPolyLinePoints()
@@ -417,113 +503,68 @@ namespace FantasticSplines
             }
             return segments;
         }
+        #endregion
 
-        Vector3 InverseTransformPoint( Vector3 point )
+        #region ISpline
+        public CurvePoint[] GetPoints()
         {
-            point = transform.InverseTransformPoint( point );
-            return point;
+            return curve.points.ToArray();
         }
 
-        Vector3 TransformPoint( Vector3 point )
+        public float GetSpeed(float t)
         {
-            point = transform.TransformPoint( point );
-            return point;
+            throw new System.NotImplementedException();
         }
 
-        public bool IsIndexInRange( int index )
+        public Vector3 GetDirection(float t)
         {
-            return index >= 0 && index < PointCount;
+            throw new System.NotImplementedException();
         }
 
-        public void InsertPoint( int segment, float t )
+        public Vector3 GetPoint(float t)
         {
-            curve.InsertPoint( segment, t );
+            throw new System.NotImplementedException();
         }
 
-        public void AddPoint(Vector3 point)
+        public float GetLength(float fromT = 0, float toT = 1)
         {
-            curve.AddPoint( InverseTransformPoint( point ) );
+            throw new System.NotImplementedException();
         }
 
-        public void AddPoint(CurvePoint point)
+        public float GetT(float length)
         {
-            curve.AddPoint( point.InverseTransform( transform ) );
+            throw new System.NotImplementedException();
         }
 
-        public void RemovePoint(int index)
+        public float GetClosestT(Vector3 point)
         {
-            curve.RemovePoint( index );
+            throw new System.NotImplementedException();
         }
 
-        public Vector3 GetPointPosition(int index)
+        public float GetClosestT(Ray ray)
         {
-            return TransformPoint( curve.GetPointPosition( index ) );
+            throw new System.NotImplementedException();
         }
 
-        public CurvePoint GetPoint( int index )
+        public Vector3 GetClosestPoint(Vector3 point)
         {
-            if( index < 0 || index > PointCount - 1 )
-            {
-                return new CurvePoint( transform.position );
-            }
-
-            return curve.points[index].Transform( transform );
+            throw new System.NotImplementedException();
         }
 
-        public void SetPointPosition( int index, Vector3 point )
+        public Vector3 GetClosestPoint(Ray ray)
         {
-            curve.SetPointPosition( index, InverseTransformPoint( point ) );
+            throw new System.NotImplementedException();
         }
 
-        public void SetPoint(int index, CurvePoint point)
+        public float Step(float t, float worldDistance)
         {
-            curve.SetPoint( index, point.InverseTransform( transform ) );
+            throw new System.NotImplementedException();
         }
 
-        public int PointCount { get { return curve.PointCount; } }
-        public int GetPointCount() => PointCount;
-
-        void OnDrawGizmos()
+        public Vector3[] GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false)
         {
-#if UNITY_EDITOR
-            if( Selection.activeObject == gameObject )
-            {
-                return;
-            }
-#endif
-            Gizmos.color = Color.white;
-            for( int i = 0; i < PointCount; ++i )
-            {
-                Gizmos.DrawSphere( GetPointPosition( i ), 0.05f );
-            }
-
-            List<Vector3> points = GetPolyLinePoints();
-            for( int i = 1; i < points.Count; ++i )
-            {
-                Gizmos.DrawLine( points[i-1], points[i] );
-            }
-
-            /*
-            if( PointCount > 1 )
-            {
-                Vector3 start = GetPoint( 0 );
-                Vector3 next = GetPoint( 1 );
-                Vector3 direction = (next - start).normalized;
-                Vector3 right = Vector3.Cross( transform.up, direction );
-
-                float arrowSize = 0.1f;
-                Vector3 arrowLeft = -right * arrowSize;
-                Vector3 arrowRight = right * arrowSize;
-                Vector3 arrowHead = direction * arrowSize * 2;
-
-                Mesh arrow = new Mesh();
-                arrow.vertices = new Vector3[] { arrowHead, arrowLeft, arrowRight };
-                arrow.normals = new Vector3[] { transform.up, transform.up, transform.up };
-                arrow.triangles = new int[] { 0, 1, 2, 1, 0, 2 };
-                arrow.colors = new Color[] { Color.white, Color.white, Color.white };
-                Gizmos.DrawMesh( arrow, 0, start );
-            }
-            */
+            throw new System.NotImplementedException();
         }
+        #endregion
     }
 }
