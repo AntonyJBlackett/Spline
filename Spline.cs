@@ -418,7 +418,6 @@ namespace FantasticSplines
             */
         }
 
-        #region IEditableSpline
         public bool IsLoop() => Loop;
         public void SetLoop(bool loop) => Loop = loop;
         public int GetPointCount() => PointCount;
@@ -503,9 +502,12 @@ namespace FantasticSplines
             }
             return segments;
         }
-        #endregion
 
-        #region ISpline
+        public int GetClosestSegmentIndex(Ray ray)
+        {
+            throw new System.NotImplementedException();
+        }
+
         public CurvePoint[] GetPoints()
         {
             return curve.points.ToArray();
@@ -565,6 +567,5 @@ namespace FantasticSplines
         {
             throw new System.NotImplementedException();
         }
-        #endregion
     }
 }
