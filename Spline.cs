@@ -154,6 +154,26 @@ namespace FantasticSplines
         }
         
         public float Length => bezier3.Length;
+
+        public static Bezier3 ProjectToPlane(Bezier3 curve, Vector3 planePoint, Vector3 planeNormal)
+        {
+            Bezier3 result = curve;
+            result.bezier3.A = MathHelper.LinePlaneIntersection( curve.A, planeNormal, planePoint, planeNormal );
+            result.bezier3.B = MathHelper.LinePlaneIntersection( curve.B, planeNormal, planePoint, planeNormal );
+            result.bezier3.C = MathHelper.LinePlaneIntersection( curve.C, planeNormal, planePoint, planeNormal );
+            result.bezier3.D = MathHelper.LinePlaneIntersection( curve.D, planeNormal, planePoint, planeNormal );
+            return result;
+        }
+
+        public static Bezier3 Transform( Bezier3 curve, Transform transform )
+        {
+            Bezier3 result = curve;
+            result.bezier3.A = transform.TransformPoint(curve.A);
+            result.bezier3.B = transform.TransformPoint(curve.B);
+            result.bezier3.C = transform.TransformPoint(curve.C);
+            result.bezier3.D = transform.TransformPoint(curve.D);
+            return result;
+        }
     }
 
     [System.Serializable]
@@ -554,11 +574,56 @@ namespace FantasticSplines
             return bestSeg;
         }
 
+        private SegmentPointer GetClosestSegmentPointer(Ray ray, float paramThreshold = 0.000001f)
+        {
+            EnsureCacheIsUpdated();
+
+            float minDistSqWorld = float.MaxValue;
+            float minDistSqProjected = float.MaxValue;
+            SegmentPointer bestSeg = new SegmentPointer(this, 0, 0f);
+            bool foundPointInFront = false;
+            for (int i = 0; i < SegmentCount; i++)
+            {
+                Bezier3 curve = _segments[i].bezier;
+                Bezier3 projected = Bezier3.ProjectToPlane( curve, ray.origin, ray.direction );
+
+                float curveClosestParam = projected.GetClosestT(ray.origin, paramThreshold);
+
+                Vector3 projectedPos = projected.GetPoint(curveClosestParam);
+                Vector3 pos = curve.GetPoint(curveClosestParam);
+
+                bool infront = Vector3.Dot( ray.direction, (projectedPos - ray.origin) ) >= 0;
+                if( infront || !foundPointInFront )
+                {
+                    if( !foundPointInFront )
+                    {
+                        minDistSqWorld = float.MaxValue;
+                        minDistSqProjected = float.MaxValue;
+                        foundPointInFront = true;
+                    }
+
+                    float distSqProjected = (projectedPos - ray.origin).sqrMagnitude;
+                    float distSqWorld = (pos - ray.origin).sqrMagnitude;
+                    if( 
+                        ( distSqProjected < minDistSqProjected )
+                        || ( Mathf.Abs( distSqProjected - minDistSqProjected ) < float.Epsilon && distSqWorld < minDistSqWorld )  
+                    )
+                    {
+                        minDistSqProjected = distSqProjected;
+                        minDistSqWorld = distSqWorld;
+                        bestSeg.segmentIndex = i;
+                        bestSeg.segmentDistance = _segments[i].GetDistance( curveClosestParam );
+                    }
+                }
+            }
+
+            return bestSeg;
+        }
+
         public int GetClosestSegmentIndex(Vector3 point, float paramThreshold = 0.000001f)
         {
             return GetClosestSegmentPointer(point, paramThreshold).segmentIndex;
         }
-
 
         public float GetClosestD(Vector3 point)
         {
@@ -582,7 +647,7 @@ namespace FantasticSplines
 
         public Vector3 GetClosestPoint(Ray ray)
         {
-            throw new System.NotImplementedException();
+            return GetClosestSegmentPointer(ray).Position;
         }
 
         public float Step(float t, float worldDistance)

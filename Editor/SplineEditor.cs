@@ -1131,15 +1131,8 @@ namespace FantasticSplines
             Transform transform = spline.GetTransform();
             Camera camera = Camera.current;
             
-            int segmentIndex = spline.GetPointCount()-1;
-            //TODO: implement this
-            //Ray mouseRay = MousePositionToRay( camera, guiEvent.mousePosition );
-            //int insertIndex = spline.GetClosestSegmentIndex( mouseRay );
-            //Vector3 newPointPosition = spline.GetClosestPoint( mouseRay );
-
-            List<Vector3> points = spline.GetPolyLinePoints();
-            Vector3 newPointPosition = HandleUtility.ClosestPointToPolyLine( points.ToArray() );
-            newPointPosition = spline.GetClosestPoint( newPointPosition );
+            Ray mouseRay = MousePositionToRay( camera, guiEvent.mousePosition );
+            Vector3 newPointPosition = spline.GetClosestPoint( mouseRay );
 
             planePosition = MathHelper.LinePlaneIntersection( newPointPosition, transform.up, transform.position, transform.up );
             planeOffset = newPointPosition - planePosition;

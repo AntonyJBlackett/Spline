@@ -34,27 +34,29 @@ namespace FantasticSplines
 #if UNITY_EDITOR
         void OnDrawGizmos()
         {
-            if (Selection.activeObject == gameObject)
+            if (Selection.activeObject != gameObject)
             {
-                return;
+                for (int i = 0; i < curve.SegmentCount; ++i)
+                {
+                    Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment(i), transform );
+                    Handles.DrawBezier(bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.grey, null,
+                        2);
+                }
+                
+                Gizmos.color = Color.white;
+                for (int i = 0; i < PointCount; ++i)
+                {
+                    Gizmos.DrawSphere(GetPoint(i).position, 0.05f);
+                }
             }
 
-            Handles.matrix = this.transform.localToWorldMatrix;
+            /*Ray ray = new Ray( Vector3.zero, Vector3.up );
             for (int i = 0; i < curve.SegmentCount; ++i)
             {
-                Bezier3 bezier = curve.CalculateSegment(i);
-                Handles.DrawBezier(bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.grey, null,
+                Bezier3 bezier = Bezier3.ProjectToPlane( Bezier3.Transform( curve.CalculateSegment(i), transform ), ray.origin, ray.direction );
+                Handles.DrawBezier(bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.red, null,
                     2);
-            }
-
-            Handles.matrix = Matrix4x4.identity;
-            ;
-
-            Gizmos.color = Color.white;
-            for (int i = 0; i < PointCount; ++i)
-            {
-                Gizmos.DrawSphere(GetPoint(i).position, 0.05f);
-            }
+            }*/
         }
 #endif
 
