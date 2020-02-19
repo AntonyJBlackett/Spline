@@ -3,7 +3,6 @@ using UnityEngine;
 
 #if UNITY_EDITOR
 using UnityEditor;
-using FantasticSplines;
 #endif
 
 namespace FantasticSplines
@@ -385,6 +384,26 @@ namespace FantasticSplines
 
     public class Spline : MonoBehaviour, ISpline, IEditableSpline
     {
+#if UNITY_EDITOR
+        void OnDrawGizmos()
+        {
+            if( Selection.activeObject == gameObject )
+            {
+                return;
+            }
+            for( int i = 1; i < PointCount; ++i )
+            {
+                Bezier3 bezier = new Bezier3(GetPoint( i - 1 ), GetPoint( i ) );
+                Handles.DrawBezier( bezier.p0, bezier.p3, bezier.p1, bezier.p2, Color.grey, null, 2 );
+            }
+            Gizmos.color = Color.white;
+            for( int i = 0; i < PointCount; ++i )
+            {
+                Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
+            }
+        }
+#endif
+
         public Curve curve; // spline in local space
         public bool Loop { get { return curve.loop; } set { curve.loop = value; } }
         public int PointCount { get { return curve.PointCount; } }
@@ -487,27 +506,6 @@ namespace FantasticSplines
         public void SetPoint(int index, CurvePoint point)
         {
             curve.SetPoint( index, point.InverseTransform( transform ) );
-        }
-
-        void OnDrawGizmos()
-        {
-#if UNITY_EDITOR
-            if( Selection.activeObject == gameObject )
-            {
-                return;
-            }
-#endif
-            Gizmos.color = Color.white;
-            for( int i = 0; i < PointCount; ++i )
-            {
-                Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
-            }
-
-            List<Vector3> points = GetPolyLinePoints();
-            for( int i = 1; i < points.Count; ++i )
-            {
-                Gizmos.DrawLine( points[i-1], points[i] );
-            }
         }
 
         public bool IsLoop() => Loop;
