@@ -276,6 +276,9 @@ namespace FantasticSplines
             {
                 FlattenSelection( spline, PointType.Free );
             }
+            GUILayout.Space( 10 );
+            GUILayout.Label( "Gizmos" );
+            SplineComponent.ShowSegmentLengths = GUILayout.Toggle( SplineComponent.ShowSegmentLengths, "Show Segment Lengths" );
 
             GUILayout.Space( 10 );
             GUILayout.Label( "Debug" );

@@ -32,6 +32,12 @@ namespace FantasticSplines
         }
         
 #if UNITY_EDITOR
+        public static bool ShowSegmentLengths
+        {
+            get => UnityEditor.EditorPrefs.GetBool("FantasticSplinesShowLength", false);
+            set => UnityEditor.EditorPrefs.SetBool("FantasticSplinesShowLength", value);
+        }
+        
         void OnDrawGizmos()
         {
             if (Selection.activeObject != gameObject)
@@ -56,7 +62,24 @@ namespace FantasticSplines
                 Bezier3 bezier = Bezier3.ProjectToPlane( Bezier3.Transform( curve.CalculateSegment(i), transform ), ray.origin, ray.direction );
                 Handles.DrawBezier(bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.red, null,
                     2);
+
             }*/
+            
+        }
+
+        private void OnDrawGizmosSelected()
+        {
+            if (ShowSegmentLengths)
+            {
+                Handles.matrix = this.transform.localToWorldMatrix;
+                for (int i = 0; i < curve.SegmentCount; ++i)
+                {
+                    Bezier3 bezier = curve.CalculateSegment(i);
+                    Vector3 pos = bezier.GetPoint(0.5f);
+                    Handles.Label(pos, bezier.Length.ToString("N2"));
+                }
+                Handles.matrix = Matrix4x4.identity;
+            }
         }
 #endif
 
