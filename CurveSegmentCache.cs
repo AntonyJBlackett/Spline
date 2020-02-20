@@ -8,6 +8,8 @@ namespace FantasticSplines
 
     public partial class Curve
     {
+        public const int DEFAULT_SEGMENT_LUT_ACCURACY = 8;
+              
         public struct SegmentPointer
         {
             public SegmentPointer(Curve c, int segIndex, float distance)
