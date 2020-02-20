@@ -10,26 +10,6 @@ namespace FantasticSplines
 {
     public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
     {
-        [System.Serializable]
-        public struct SplinePosition
-        {
-            public SplineComponent spline;
-            public float distance;
-
-            public SplinePosition(SplineComponent spline, float distance)
-            {
-                this.spline = spline;
-                this.distance = distance;
-            }
-
-            public Vector3 Position => spline.GetPositionAtDistance(distance);
-            public Vector3 Tangent => spline.GetTangentAtDistance(distance);
-
-            public SplinePosition Move(float stepDistance)
-            {
-                return new SplinePosition(spline, distance + stepDistance);
-            }
-        }
         
 #if UNITY_EDITOR
         public static bool ShowSegmentLengths
@@ -75,7 +55,7 @@ namespace FantasticSplines
                 for (int i = 0; i < curve.SegmentCount; ++i)
                 {
                     Bezier3 bezier = curve.CalculateSegment(i);
-                    Vector3 pos = bezier.GetPoint(0.5f);
+                    Vector3 pos = bezier.GetPos(0.5f);
                     Handles.Label(pos, bezier.Length.ToString("N2"));
                 }
                 Handles.matrix = Matrix4x4.identity;
@@ -252,6 +232,17 @@ namespace FantasticSplines
         public Vector3 GetPoint(float t)
         {
             return TransformPoint(curve.GetPoint(t));
+        }
+
+        public float GetDistanceOnSpline(SegmentPosition position)
+        {
+            return curve.GetSegmentPointer(position).DistanceOnSpline;
+        }
+
+        public SegmentPosition GetSegmentAtDistance(float distance)
+        {
+            var pointer = curve.GetSegmentPointerAtDistance(distance);
+            return new SegmentPosition(pointer.segmentIndex, pointer.segmentT);
         }
 
         public float GetLength()

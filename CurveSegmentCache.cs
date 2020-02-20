@@ -1,5 +1,6 @@
-﻿using System.Collections;
+using System.Collections;
 using System.Collections.Generic;
+using UnityEditor;
 using UnityEngine;
 
 namespace FantasticSplines
@@ -7,7 +8,7 @@ namespace FantasticSplines
 
     public partial class Curve
     {
-        private struct SegmentPointer
+        public struct SegmentPointer
         {
             public SegmentPointer(Curve c, int segIndex, float distance)
             {
@@ -15,10 +16,17 @@ namespace FantasticSplines
                 segmentIndex = segIndex;
                 segmentDistance = distance;
             }
+            public SegmentPointer(Curve c, SegmentPosition segPos)
+            {
+                curve = c;
+                segmentIndex = segPos.index;
+                segmentDistance = curve._segments[segmentIndex].GetDistance(segPos.segmentT);
+            }
 
             public Curve curve;
             public int segmentIndex;
             public float segmentDistance;
+            public float segmentT => curve._segments[segmentIndex].GetT(segmentDistance);
 
             public Vector3 Position => curve._segments[segmentIndex].GetPositionAtDistance(segmentDistance);
             public Vector3 Tangent => curve._segments[segmentIndex].GetTangentAtDistance(segmentDistance);
@@ -52,12 +60,12 @@ namespace FantasticSplines
                 for (int i = 0; i < accuracy; ++i)
                 {
                     float t = i * invAccuracy;
-                    float d = bez.GetDistanceAt(t);
+                    float d = bez.CalculateDistanceAt(t);
                     tdMapping[i] = new Vector2(t, d);
                 }
             }
 
-            public Vector3 GetPositionAtT(float t) => bezier.GetPoint(t);
+            public Vector3 GetPositionAtT(float t) => bezier.GetPos(t);
             public Vector3 GetTangentAtT(float t) => bezier.GetTangent(t);
             public Vector3 GetPositionAtDistance(float distance) => GetPositionAtT(GetT(distance));
             public Vector3 GetTangentAtDistance(float distance) => GetTangentAtT(GetT(distance));

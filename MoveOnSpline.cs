@@ -6,7 +6,7 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class MoveOnSpline : MonoBehaviour
 {
-	public SplineComponent.SplinePosition myPosition;
+	public SplinePosition myPosition;
 
 	public float speed;
 	

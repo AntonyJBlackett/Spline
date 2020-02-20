@@ -35,7 +35,7 @@ namespace FantasticSplines
             Vector3 c = Vector3.Lerp( bezier.C, bezier.D, t );
             Vector3 m = Vector3.Lerp( a, b, t );
             Vector3 n = Vector3.Lerp( b, c, t );
-            Vector3 p = bezier.GetPoint( t );
+            Vector3 p = bezier.GetPos( t );
 
             if( point1.PointType == PointType.Mirrored )
             {
@@ -51,128 +51,6 @@ namespace FantasticSplines
 
             CurvePoint newCurvePoint = new CurvePoint( p, m - p, n - p, PointType.Free );
             return newCurvePoint;
-        }
-    }
-
-    public struct Bezier3
-    {
-        FastBezier.Bezier3 bezier3;
-
-        // confused?
-        public Vector3 A => bezier3.A;
-        public Vector3 B => bezier3.B;
-        public Vector3 C => bezier3.C;
-        public Vector3 D => bezier3.D;
-        public Vector3 start => bezier3.A;
-        public Vector3 startTargent => bezier3.B;
-        public Vector3 endTargent => bezier3.C;
-        public Vector3 end => bezier3.D;
-
-        public Bezier3(CurvePoint start, CurvePoint end)
-        {
-            bezier3.A = start.position;
-            bezier3.B = start.position + start.Control2;
-            bezier3.C = end.position + end.Control1;
-            bezier3.D = end.position;
-        }
-
-        public Bezier3(FastBezier.Bezier3 bez)
-        {
-            this.bezier3 = bez;
-        }
-
-        public Bezier3 LeftSplit(float t)
-        {
-            if (Mathf.Approximately(t, 1f))
-            {
-                return this;
-            }
-            return new Bezier3(bezier3.LeftSplitAt(t));
-        }
-        public Bezier3 RightSplit(float t)
-        {
-            if (Mathf.Approximately(t, 0f))
-            {
-                return this;
-            }
-            return new Bezier3(bezier3.RightSplitAt(t));
-        }
-        public Bezier3 MiddleSplit(float t1, float t2)
-        {
-            return new Bezier3(bezier3.MiddleSplitAt(t1, t2));
-        }
-
-        public float GetClosestT(Vector3 pos, float paramThreshold = 0.000001f)
-        {
-            return GetClosestTRec(pos, 0.0f, 1.0f, paramThreshold);
-        }
-
-        float GetClosestTRec(Vector3 pos, float beginT, float endT, float thresholdT)
-        {
-            float mid = (beginT + endT)/2.0f;
-
-            // Base case for recursion.
-            if ((endT - beginT) < thresholdT)
-                return mid;
-
-            // The two halves have param range [start, mid] and [mid, end]. We decide which one to use by using a midpoint param calculation for each section.
-            float paramA = (beginT+mid) / 2.0f;
-            float paramB = (mid+endT) / 2.0f;
-        
-            Vector3 posA = GetPoint(paramA);
-            Vector3 posB = GetPoint(paramB);
-            float distASq = (posA - pos).sqrMagnitude;
-            float distBSq = (posB - pos).sqrMagnitude;
-
-            if (distASq < distBSq)
-                endT = mid;
-            else
-                beginT = mid;
-
-            // The (tail) recursive call.
-            return GetClosestTRec(pos, beginT, endT, thresholdT);
-        }
-
-        public Vector3 GetPoint( float t )
-        {
-            return bezier3.P( t );
-        }
-
-        public Vector3 GetTangent( float t )
-        {
-            t = Mathf.Clamp( t, 0.0001f, 0.9999f ); // clamp like this of there is no tangent at position exactly on the curve point
-            float oneMinusT = 1f - t;
-            return
-                3f * oneMinusT * oneMinusT * (B - A) +
-                6f * oneMinusT * t * (C - B) +
-                3f * t * t * (D - C);
-        }
-
-        public float GetDistanceAt(float t)
-        {
-            return bezier3.GetDistanceAt(t);
-        }
-        
-        public float Length => bezier3.Length;
-
-        public static Bezier3 ProjectToPlane(Bezier3 curve, Vector3 planePoint, Vector3 planeNormal)
-        {
-            Bezier3 result = curve;
-            result.bezier3.A = MathHelper.LinePlaneIntersection( curve.A, planeNormal, planePoint, planeNormal );
-            result.bezier3.B = MathHelper.LinePlaneIntersection( curve.B, planeNormal, planePoint, planeNormal );
-            result.bezier3.C = MathHelper.LinePlaneIntersection( curve.C, planeNormal, planePoint, planeNormal );
-            result.bezier3.D = MathHelper.LinePlaneIntersection( curve.D, planeNormal, planePoint, planeNormal );
-            return result;
-        }
-
-        public static Bezier3 Transform( Bezier3 curve, Transform transform )
-        {
-            Bezier3 result = curve;
-            result.bezier3.A = transform.TransformPoint(curve.A);
-            result.bezier3.B = transform.TransformPoint(curve.B);
-            result.bezier3.C = transform.TransformPoint(curve.C);
-            result.bezier3.D = transform.TransformPoint(curve.D);
-            return result;
         }
     }
 
@@ -527,7 +405,13 @@ namespace FantasticSplines
             return GetDistance(toNormalisedT) - GetDistance(fromNormalisedT);
         }
 
-        SegmentPointer GetSegmentPointerAtDistance(float distance)
+        public SegmentPointer GetSegmentPointer(SegmentPosition segmentPosition)
+        {
+            EnsureCacheIsUpdated();
+            return new SegmentPointer(this, segmentPosition);
+        }
+
+        public SegmentPointer GetSegmentPointerAtDistance(float distance)
         {
             EnsureCacheIsUpdated();
 
@@ -567,7 +451,7 @@ namespace FantasticSplines
                 Bezier3 curve = _segments[i].bezier;
                 float curveClosestParam = curve.GetClosestT(point, paramThreshold);
 
-                Vector3 curvePos = curve.GetPoint(curveClosestParam);
+                Vector3 curvePos = curve.GetPos(curveClosestParam);
                 float distSq = (curvePos - point).sqrMagnitude;
                 if (distSq < minDistSq)
                 {
@@ -595,8 +479,8 @@ namespace FantasticSplines
 
                 float curveClosestParam = projected.GetClosestT(ray.origin, paramThreshold);
 
-                Vector3 projectedPos = projected.GetPoint(curveClosestParam);
-                Vector3 pos = curve.GetPoint(curveClosestParam);
+                Vector3 projectedPos = projected.GetPos(curveClosestParam);
+                Vector3 pos = curve.GetPos(curveClosestParam);
 
                 bool infront = Vector3.Dot( ray.direction, pos - ray.origin ) >= 0;
                 if( infront || !foundPointInFront )
