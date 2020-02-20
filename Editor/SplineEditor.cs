@@ -301,6 +301,7 @@ namespace FantasticSplines
             GUILayout.Label( "Gizmos" );
             EditorGUI.BeginChangeCheck();
             ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
+            ShowCurvePointControls = GUILayout.Toggle( ShowCurvePointControls, "Show Point Controls" );
             if( EditorGUI.EndChangeCheck() )
             {
                 EditorUtility.SetDirty( target );
@@ -317,8 +318,14 @@ namespace FantasticSplines
 
         public static bool ShowSegmentLengths
         {
-            get => EditorPrefs.GetBool("FantasticSplinesShowLength", false);
-            set => EditorPrefs.SetBool("FantasticSplinesShowLength", value);
+            get => EditorPrefs.GetBool("FantasticSplinesShowSegmentLengths", false);
+            set => EditorPrefs.SetBool("FantasticSplinesShowSegmentLengths", value);
+        }
+
+        public static bool ShowCurvePointControls
+        {
+            get => EditorPrefs.GetBool("FantasticSplinesShowCurvePointControls", true);
+            set => EditorPrefs.SetBool("FantasticSplinesShowCurvePointControls", value);
         }
 
         float rightClickStart;
@@ -722,18 +729,23 @@ namespace FantasticSplines
 
         void DrawSplineSelectionControlPoint(IEditableSpline spline)
         {
-            if( pointSelection.Count == 0 )
+            if( !ShowCurvePointControls )
             {
-                for( int i = 0; i < spline.GetPointCount(); ++i )
-                {
-                    DrawControlPoints( spline, i );
-                }
+                return;
             }
-            else
+
+            if( pointSelection.Count > 0 )
             {
                 for( int i = 0; i < pointSelection.Count; ++i )
                 {
                     DrawControlPoints( spline, pointSelection[i] );
+                }
+            }
+            else 
+            {
+                for( int i = 0; i < spline.GetPointCount(); ++i )
+                {
+                    DrawControlPoints( spline, i );
                 }
             }
         }
@@ -857,7 +869,7 @@ namespace FantasticSplines
                 bool control1Detected = overControl1 && control1Interactable;
                 bool control2Detected = overControl2 && control2Interactable;
 
-                bool controlsEnabled = pointSelection.Contains( index ) || pointSelection.Count == 0;
+                bool controlsEnabled = ShowCurvePointControls && (pointSelection.Contains( index ) || pointSelection.Count == 0);
 
                 if( controlsEnabled &&
                     curvePoint.PointType != PointType.Point &&
