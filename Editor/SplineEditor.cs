@@ -1,6 +1,7 @@
 ﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
+using UnityEngine.UIElements;
 
 namespace FantasticSplines
 {
@@ -323,18 +324,22 @@ namespace FantasticSplines
             }
         }
 
+        Vector2 rightClickMovement = Vector2.zero;
         void RightClickCancel( Event guiEvent )
         {
             if( guiEvent.button == 1 && guiEvent.type == EventType.MouseDown )
             {
+                rightClickMovement = Vector2.zero;
                 rightClickStart = Time.unscaledTime;
             }
             if( guiEvent.button == 1 && guiEvent.type == EventType.MouseDrag )
             {
+                rightClickMovement += guiEvent.delta;
                 // cancel right click
                 rightClickStart = 0;
             }
-            if( guiEvent.button == 1 && guiEvent.type == EventType.MouseUp )
+            if( startMovementThreshold > rightClickMovement.magnitude 
+                && guiEvent.button == 1 && guiEvent.type == EventType.MouseUp )
             {
                 if( Time.unscaledTime - rightClickStart < rightClickTime )
                 {
@@ -796,9 +801,14 @@ namespace FantasticSplines
             return pointIndicies;
         }
 
+        bool IsMouseButtonEvent(Event guiEvent, int button )
+        {
+            return guiEvent.button == button && guiEvent.isMouse && ( guiEvent.type == EventType.MouseDown || guiEvent.type == EventType.MouseDrag || guiEvent.type == EventType.MouseUp );
+        }
+
         bool DoClickSelection(IEditableSpline spline, Event guiEvent)
         {
-            bool clearSelection = !guiEvent.shift && !guiEvent.command;
+            bool clearSelection = IsMouseButtonEvent( guiEvent, 0 ) && !guiEvent.shift && !guiEvent.command;
             bool hasSelection = pointSelection.Count > 0;
 
             List<int> sortedPoints = GetPointIndiciesSelectedFirst( spline );
@@ -884,7 +894,7 @@ namespace FantasticSplines
         bool dragSelectActive = false;
         bool DoDragSelection(IEditableSpline spline, Event guiEvent)
         {
-            bool clearSelection = false;
+            bool clearSelection = IsMouseButtonEvent( guiEvent, 0 ) && !dragSelectActive;
             if( spline.GetPointCount() > 0 && !dragSelectActive && guiEvent.type == EventType.MouseDown && guiEvent.button == 0 && guiEvent.shift )
             {
                 mouseDragSelectionStart = guiEvent.mousePosition;
@@ -978,8 +988,22 @@ namespace FantasticSplines
             return clearSelection;
         }
 
+        bool hadSelectionOnMouseDown = false;
         void DoPointSelection(IEditableSpline spline, Event guiEvent)
         {
+            if( guiEvent.type == EventType.MouseDown )
+            {
+                hadSelectionOnMouseDown = pointSelection.Count > 0;
+            }
+            if( guiEvent.type == EventType.Used && (pointSelection.Count > 0 || hadSelectionOnMouseDown) )
+            {
+                Selection.activeObject = spline.GetTransform().gameObject;
+            }
+            else if( guiEvent.type != EventType.Repaint && guiEvent.type != EventType.Layout && guiEvent.type != EventType.Used && !IsMouseButtonEvent( guiEvent, 0 ) )
+            {
+                hadSelectionOnMouseDown = false;
+            }
+
             bool clearClick = DoClickSelection( spline, guiEvent );
             bool clearDrag = DoDragSelection( spline, guiEvent );
             bool clearSelection = clearClick && clearDrag;
