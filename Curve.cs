@@ -51,8 +51,24 @@ namespace FantasticSplines
     {
         [SerializeField]
         private List<CurvePoint> curvePoints = new List<CurvePoint>();
-
-        public bool loop = false;
+        
+        [SerializeField]
+        private bool loop = false;
+        public bool Loop
+        {
+            get
+            {
+                return loop;
+            }
+            set
+            {
+                if( value != loop )
+                {
+                    isDirty = true;
+                }
+                loop = value;
+            }
+        }
 
         [System.NonSerialized] private bool isDirty = true; 
         [System.NonSerialized] private float _splineLength;
@@ -134,18 +150,23 @@ namespace FantasticSplines
 
         public void AddCurvePointAt( int index, CurvePoint point )
         {
+            if( index < 0 || index > curvePoints.Count )
+            {
+                return;
+            }
             curvePoints.Insert( index, point );
             isDirty = true;
         }
 
-        public void RemoveCurvePoint(int index)
+        public bool RemoveCurvePoint(int index)
         {
             if( index < 0 || index > CurvePointCount )
             {
-                return;
+                return false;
             }
             curvePoints.RemoveAt( index );
             isDirty = true;
+            return true;
         }
 
         public void InsertCurvePoint( float normalisedT )
@@ -174,7 +195,7 @@ namespace FantasticSplines
                 split.SetPointType( PointType.Point );
             }
 
-            curvePoints.Insert( segment+1, split );
+            curvePoints.Insert( segment + 1, split );
             isDirty = true;
         }
 
@@ -192,6 +213,10 @@ namespace FantasticSplines
 
         public void SetCurvePoint( int index, CurvePoint point )
         {
+            if( index < 0 || index > curvePoints.Count )
+            {
+                return;
+            }
             curvePoints[index] = point;
             isDirty = true;
         }

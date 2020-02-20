@@ -10,7 +10,7 @@ namespace FantasticSplines
 {
     public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
     {
-        
+
 #if UNITY_EDITOR
         void OnDrawGizmos()
         {
@@ -48,8 +48,8 @@ namespace FantasticSplines
 
         public bool Loop
         {
-            get { return curve.loop; }
-            set { curve.loop = value; }
+            get { return curve.Loop; }
+            set { curve.Loop = value; }
         }
 
         public int PointCount
@@ -131,7 +131,7 @@ namespace FantasticSplines
 
         public void InsertPoint(float t)
         {
-            curve.InsertCurvePoint(t);
+            curve.InsertCurvePoint( t );
         }
 
         public void AddPoint(CurvePoint point)
@@ -165,7 +165,7 @@ namespace FantasticSplines
         }
 
         public bool IsLoop() => Loop;
-        public void SetLoop(bool loop) => Loop = loop;
+        public void SetLoop(bool loop) { Loop = loop; }
         public int GetPointCount() => PointCount;
         public Transform GetTransform() => transform;
         public Component GetComponent() => this;
