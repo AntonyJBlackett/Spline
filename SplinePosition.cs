@@ -62,6 +62,7 @@ namespace FantasticSplines
                 exit--;
                 if( exit < 0 )
                 {
+                    Debug.LogWarning( "Hit iterations limit in MoveUntilAtWorldDistance() on spline: " + spline.name, spline.gameObject );
                     break;
                 }
             }
