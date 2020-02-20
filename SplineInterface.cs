@@ -24,6 +24,10 @@ namespace FantasticSplines
         float GetClosestT(Vector3 point);
         Vector3 GetClosestPoint(Vector3 point);
         Vector3 GetClosestPoint(Ray ray);
+
+
+        // debug drawing
+        void DrawSegmentLengths();
     }
 
     // This is just a curve in 3D space

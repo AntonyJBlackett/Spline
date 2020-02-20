@@ -299,7 +299,12 @@ namespace FantasticSplines
             }
             GUILayout.Space( 10 );
             GUILayout.Label( "Gizmos" );
-            SplineComponent.ShowSegmentLengths = GUILayout.Toggle( SplineComponent.ShowSegmentLengths, "Show Segment Lengths" );
+            EditorGUI.BeginChangeCheck();
+            ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
+            if( EditorGUI.EndChangeCheck() )
+            {
+                EditorUtility.SetDirty( target );
+            }
 
             GUILayout.Space( 10 );
             GUILayout.Label( "Debug" );
@@ -308,6 +313,12 @@ namespace FantasticSplines
             GUILayout.Label( "Moving Point: " + Moving.ToString() );
 
             DrawDefaultInspector();
+        }
+
+        public static bool ShowSegmentLengths
+        {
+            get => EditorPrefs.GetBool("FantasticSplinesShowLength", false);
+            set => EditorPrefs.SetBool("FantasticSplinesShowLength", value);
         }
 
         float rightClickStart;
@@ -736,6 +747,16 @@ namespace FantasticSplines
 
             DrawSplinePoints( spline );
             DrawSplineSelectionControlPoint( spline );
+
+            DrawSegmentLengths( spline );
+        }
+
+        void DrawSegmentLengths( IEditableSpline spline )
+        {
+            if( ShowSegmentLengths )
+            {
+                spline.DrawSegmentLengths();
+            }
         }
 
         bool IsIndexInRange( IEditableSpline spline, int index )

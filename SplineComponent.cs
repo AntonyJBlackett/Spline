@@ -12,12 +12,6 @@ namespace FantasticSplines
     {
         
 #if UNITY_EDITOR
-        public static bool ShowSegmentLengths
-        {
-            get => UnityEditor.EditorPrefs.GetBool("FantasticSplinesShowLength", false);
-            set => UnityEditor.EditorPrefs.SetBool("FantasticSplinesShowLength", value);
-        }
-        
         void OnDrawGizmos()
         {
             if (Selection.activeObject != gameObject)
@@ -35,33 +29,20 @@ namespace FantasticSplines
                     Gizmos.DrawSphere(GetPoint(i).position, 0.05f);
                 }
             }
-
-            /*Ray ray = new Ray( Vector3.zero, Vector3.up );
-            for (int i = 0; i < curve.SegmentCount; ++i)
-            {
-                Bezier3 bezier = Bezier3.ProjectToPlane( Bezier3.Transform( curve.CalculateSegment(i), transform ), ray.origin, ray.direction );
-                Handles.DrawBezier(bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.red, null,
-                    2);
-
-            }*/
-            
-        }
-
-        private void OnDrawGizmosSelected()
-        {
-            if (ShowSegmentLengths)
-            {
-                Handles.matrix = this.transform.localToWorldMatrix;
-                for (int i = 0; i < curve.SegmentCount; ++i)
-                {
-                    Bezier3 bezier = curve.CalculateSegment(i);
-                    Vector3 pos = bezier.GetPos(0.5f);
-                    Handles.Label(pos, bezier.Length.ToString("N2"));
-                }
-                Handles.matrix = Matrix4x4.identity;
-            }
         }
 #endif
+
+        public void DrawSegmentLengths()
+        {
+#if UNITY_EDITOR
+            for (int i = 0; i < curve.SegmentCount; ++i)
+            {
+                Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment(i), transform );
+                Vector3 pos = bezier.GetPos(0.5f);
+                Handles.Label(pos, bezier.Length.ToString("N2"));
+            }
+#endif
+        }
 
         public Curve curve; // spline in local space
 
