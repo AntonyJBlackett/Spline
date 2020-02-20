@@ -19,7 +19,7 @@ namespace FantasticSplines
             public SegmentPointer(Curve c, SegmentPosition segPos)
             {
                 curve = c;
-                segmentIndex = segPos.index;
+                segmentIndex = c.LoopSegementIndex( segPos.index );
                 segmentDistance = curve._segments[segmentIndex].GetDistance(segPos.segmentT);
             }
 
