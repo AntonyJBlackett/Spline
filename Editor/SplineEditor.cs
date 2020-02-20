@@ -817,7 +817,10 @@ namespace FantasticSplines
                 bool control1Detected = overControl1 && control1Interactable;
                 bool control2Detected = overControl2 && control2Interactable;
 
-                if( curvePoint.PointType != PointType.Point &&
+                bool controlsEnabled = pointSelection.Contains( index ) || pointSelection.Count == 0;
+
+                if( controlsEnabled &&
+                    curvePoint.PointType != PointType.Point &&
                     ( control1Detected || control2Detected ) )
                 {
                     useEvent = true;
