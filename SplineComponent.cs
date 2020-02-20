@@ -55,7 +55,7 @@ namespace FantasticSplines
                 for (int i = 0; i < curve.SegmentCount; ++i)
                 {
                     Bezier3 bezier = curve.CalculateSegment(i);
-                    Vector3 pos = bezier.GetPoint(0.5f);
+                    Vector3 pos = bezier.GetPos(0.5f);
                     Handles.Label(pos, bezier.Length.ToString("N2"));
                 }
                 Handles.matrix = Matrix4x4.identity;

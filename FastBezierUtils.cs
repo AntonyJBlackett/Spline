@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace FastBezier
+namespace FantasticSplines
 {
     public static class Utils
     {
@@ -108,20 +108,22 @@ namespace FastBezier
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public Vector3 P(float t)
+        public Vector3 GetPos(float t)
         {
             float mt = (1.0f - t);
             return mt * mt * A + 2.0f * t * mt * B + t * t * C;
         }
+
+        public Vector3 P(float t) => GetPos(t);
         
         public float GetLengthInterpolated(int steps)
         {
             float step = 1f / steps;
             float distance = 0f;
-            Vector3 prev = P(0f);
+            Vector3 prev = GetPos(0f);
             for (float t = step; t < 1f; t += step)
             {
-                Vector3 curr = P(t);
+                Vector3 curr = GetPos(t);
                 distance += (curr - prev).magnitude;
                 prev = curr;
             }
@@ -192,24 +194,51 @@ namespace FastBezier
         /// End point.
         /// </summary>
         public Vector3 D;
+    
+        public Vector3 start => A;
+        public Vector3 startTargent => B;
+        public Vector3 endTargent => C;
+        public Vector3 end => D;
 
         /// <summary>
         /// Creates a cubic Bézier curve.
         /// </summary>
-        /// <param name="a"></param>
-        /// <param name="b"></param>
-        /// <param name="c"></param>
-        /// <param name="d"></param>
-        public Bezier3(Vector3 a, Vector3 b, Vector3 c, Vector3 d) { A = a; B = b; C = c; D = d; }
+        public Bezier3(Vector3 startPoint, Vector3 control1, Vector3 control2, Vector3 endPoint) { A = startPoint; B = control1; C = control2; D = endPoint; }
+
+        /// <summary>
+        /// Creates a cubic Bézier curve.
+        /// </summary>
+        public Bezier3(CurvePoint start, CurvePoint end)
+        {
+            A = start.position;
+            B = start.position + start.Control2;
+            C = end.position + end.Control1;
+            D = end.position;
+        }
 
         /// <summary>
         /// Interpolated point at t : 0..1 position.
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public Vector3 P(float t)
+        public Vector3 GetPos(float t)
         {
             return A + 3.0f * t * (B - A) + 3.0f * t * t * (C - 2.0f * B + A) + t * t * t * (D - 3.0f * C + 3.0f * B - A);
+        }
+
+        /// <summary>
+        /// Interpolated tangent at t : 0..1 position.
+        /// </summary>
+        /// <param name="t"></param>
+        /// <returns></returns>
+        public Vector3 GetTangent( float t )
+        {
+            t = Mathf.Clamp( t, 0.0001f, 0.9999f ); // clamp like this of there is no tangent at position exactly on the curve point
+            float oneMinusT = 1f - t;
+            return
+                3f * oneMinusT * oneMinusT * (B - A) +
+                6f * oneMinusT * t * (C - B) +
+                3f * t * t * (D - C);
         }
 
         /// <summary>
@@ -229,18 +258,11 @@ namespace FastBezier
         }
 
         /// <summary>
-        /// Splits the curve at given position (t : 0..1).
+        /// Gets the calculated length of the mid-point quadratic approximation
         /// </summary>
-        /// <param name="t">A number from 0 to 1.</param>
-        /// <returns>Two curves.</returns>
-        /// <remarks>
-        /// (De Casteljau's algorithm, see: http://caffeineowl.com/graphics/2d/vectorial/bezierintro.html)
-        /// </remarks>
-        public Bezier3[] SplitAt(float t)
+        public float ApproximateQuadraticLength
         {
-            Bezier3[] retVal = new Bezier3[2];
-            SplitAt(t, ref retVal[0], ref retVal[1]);
-            return retVal;
+            get { return ApproximateQuadratic.Length; }
         }
 
         /// <summary>
@@ -251,14 +273,14 @@ namespace FastBezier
         /// <remarks>
         /// (De Casteljau's algorithm, see: http://caffeineowl.com/graphics/2d/vectorial/bezierintro.html)
         /// </remarks>
-        public void SplitAt(float t, ref Bezier3 left, ref Bezier3 right)
+        public void SplitAt(float t, out Bezier3 left, out Bezier3 right)
         {
             Vector3 a = Vector3.Lerp(A, B, t);
             Vector3 b = Vector3.Lerp(B, C, t);
             Vector3 c = Vector3.Lerp(C, D, t);
             Vector3 m = Vector3.Lerp(a, b, t);
             Vector3 n = Vector3.Lerp(b, c, t);
-            Vector3 p = P(t);
+            Vector3 p = GetPos(t);
 
             left = new Bezier3(A, a, m, p);
             right = new Bezier3(p, n, c, D);
@@ -266,55 +288,40 @@ namespace FastBezier
 
         public Bezier3 MiddleSplitAt(float t1, float t2)
         {
-            Vector3 originalPos = P(t2);
             Bezier3 right = RightSplitAt(t1);
             float newT = Mathf.InverseLerp(t1, 1f, t2);
-            // This SHOULD be the same identical point
-            Debug.Assert((right.P(newT) - originalPos).sqrMagnitude < 0.0001f);
+            #if DEBUG
+            Debug.Assert((right.GetPos(newT) - GetPos(t2)).sqrMagnitude < 0.0001f);
+            #endif
             return right.LeftSplitAt(newT);
         }
 
         public Bezier3 LeftSplitAt(float t)
         {
+            if (Mathf.Approximately(t, 1f))
+            {
+                return this;
+            }
             Vector3 a = Vector3.Lerp(A, B, t);
             Vector3 b = Vector3.Lerp(B, C, t);
             Vector3 m = Vector3.Lerp(a, b, t);
-            Vector3 p = P(t);
+            Vector3 p = GetPos(t);
 
             return new Bezier3(A, a, m, p);
         }
+        
         public Bezier3 RightSplitAt(float t)
         {
+            if (Mathf.Approximately(t, 0f))
+            {
+                return this;
+            }
             Vector3 b = Vector3.Lerp(B, C, t);
             Vector3 c = Vector3.Lerp(C, D, t);
             Vector3 n = Vector3.Lerp(b, c, t);
-            Vector3 p = P(t);
+            Vector3 p = GetPos(t);
 
             return new Bezier3(p, n, c, D);
-        }
-
-        /// <summary>
-        /// Gets the distance between 0 and 1 quadratic aproximations.
-        /// </summary>
-        private float D01
-        {
-            get { return (D - 3.0f * C + 3.0f * B - A).magnitude / 2.0f; }
-        }
-        
-        /// <summary>
-        /// Gets the split point for adaptive quadratic approximation.
-        /// </summary>
-        private float Tmax
-        {
-            get { return Mathf.Pow(Div18Sqrt3 * InterpolationPrecision / D01, OneThird); }
-        }
-
-        /// <summary>
-        /// Gets the calculated length of the mid-point quadratic approximation
-        /// </summary>
-        public float ApproximateQuadraticLength
-        {
-            get { return ApproximateQuadratic.Length; }
         }
 
         /// <summary>
@@ -347,7 +354,7 @@ namespace FastBezier
             }
         }
 
-        public float GetDistanceAt(float t)
+        public float CalculateDistanceAt(float t)
         {
             return LeftSplitAt(t).Length;
         }
@@ -356,15 +363,67 @@ namespace FastBezier
         {
             float step = 1f / steps;
             float distance = 0f;
-            Vector3 prev = P(0f);
+            Vector3 prev = GetPos(0f);
             for (float t = step; t < 1f; t += step)
             {
-                Vector3 curr = P(t);
+                Vector3 curr = GetPos(t);
                 distance += (curr - prev).magnitude;
                 prev = curr;
             }
 
             return distance;
         }
+
+        public float GetClosestT(Vector3 pos, float paramThreshold = 0.000001f)
+        {
+            return GetClosestTRecursive(pos, 0.0f, 1.0f, paramThreshold);
+        }
+
+        float GetClosestTRecursive(Vector3 pos, float beginT, float endT, float thresholdT)
+        {
+            float mid = (beginT + endT)/2.0f;
+
+            // Base case for recursion.
+            if ((endT - beginT) < thresholdT)
+                return mid;
+
+            // The two halves have param range [start, mid] and [mid, end]. We decide which one to use by using a midpoint param calculation for each section.
+            float paramA = (beginT+mid) / 2.0f;
+            float paramB = (mid+endT) / 2.0f;
+        
+            Vector3 posA = GetPos(paramA);
+            Vector3 posB = GetPos(paramB);
+            float distASq = (posA - pos).sqrMagnitude;
+            float distBSq = (posB - pos).sqrMagnitude;
+
+            if (distASq < distBSq)
+                endT = mid;
+            else
+                beginT = mid;
+
+            // The (tail) recursive call.
+            return GetClosestTRecursive(pos, beginT, endT, thresholdT);
+        }
+        
+        public static Bezier3 ProjectToPlane(Bezier3 curve, Vector3 planePoint, Vector3 planeNormal)
+        {
+            Bezier3 result = curve;
+            result.A = MathHelper.LinePlaneIntersection( curve.A, planeNormal, planePoint, planeNormal );
+            result.B = MathHelper.LinePlaneIntersection( curve.B, planeNormal, planePoint, planeNormal );
+            result.C = MathHelper.LinePlaneIntersection( curve.C, planeNormal, planePoint, planeNormal );
+            result.D = MathHelper.LinePlaneIntersection( curve.D, planeNormal, planePoint, planeNormal );
+            return result;
+        }
+
+        public static Bezier3 Transform( Bezier3 curve, Transform transform )
+        {
+            Bezier3 result = curve;
+            result.A = transform.TransformPoint(curve.A);
+            result.B = transform.TransformPoint(curve.B);
+            result.C = transform.TransformPoint(curve.C);
+            result.D = transform.TransformPoint(curve.D);
+            return result;
+        }
     }
+
 }
