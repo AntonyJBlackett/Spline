@@ -28,7 +28,7 @@ namespace FantasticSplines
         
         public float DistanceOnSpline => spline.GetDistanceOnSpline(segmentPosition);
         public Vector3 Position => spline.GetPositionAtDistance(DistanceOnSpline);
-        public Vector3 Tangent => spline.GetPositionAtDistance(DistanceOnSpline);
+        public Vector3 Tangent => spline.GetTangentAtDistance(DistanceOnSpline);
 
         public SplinePosition(SplineComponent spline, float distance)
         {
