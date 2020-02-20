@@ -43,18 +43,21 @@ namespace FantasticSplines
         {
             Vector3 origin = Position;
 
-            SplinePosition result = new SplinePosition(spline, DistanceOnSpline + step);
+            SplinePosition stepPosition = new SplinePosition(spline, DistanceOnSpline + step);
             float splineLength = spline.GetLength();
 
             Vector3 lastPosition = origin;
-            float worldDistanceTest = Vector3.Distance( result.Position, origin );
+            float worldDistanceTest = Vector3.Distance( stepPosition.Position, origin );
+
+            float distanceOnSpline = stepPosition.DistanceOnSpline;
 
             int exit = 100;
-            while( worldDistanceTest < worldDistance && result.DistanceOnSpline < splineLength )
+            while( worldDistanceTest < worldDistance && distanceOnSpline < splineLength )
             {
-                lastPosition = result.Position;
-                result = new SplinePosition(spline, result.DistanceOnSpline + step );
-                worldDistanceTest = Vector3.Distance( result.Position, origin );
+                lastPosition = stepPosition.Position;
+                stepPosition = new SplinePosition(spline, distanceOnSpline + step );
+                distanceOnSpline = stepPosition.DistanceOnSpline;
+                worldDistanceTest = Vector3.Distance( stepPosition.Position, origin );
 
                 exit--;
                 if( exit < 0 )
@@ -66,7 +69,7 @@ namespace FantasticSplines
             float lastWorldDistanceTest = Vector3.Distance( lastPosition, origin );
             float t = Mathf.InverseLerp( lastWorldDistanceTest, worldDistanceTest, worldDistance );
 
-            return new SplinePosition(spline, result.DistanceOnSpline - step + (step * t) );
+            return new SplinePosition(spline, distanceOnSpline - step + (step * t) );
         }
     }
 }
