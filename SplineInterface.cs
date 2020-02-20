@@ -18,10 +18,8 @@ namespace FantasticSplines
 
         void InsertPoint( float t ); // inserts a point on the curve without changing its shape
         void AddPoint(CurvePoint point); // appends a point to the end of the curve at position
+        void AddPointAt(int index, CurvePoint point); // adds the given CurvePoint at index in the list of CurvePoint in curve
         void RemovePoint(int index); // removes a Curve Point at index
-
-        //TODO remove these and use the four functions below instead.
-        List<Vector3> GetPolyLinePoints();
 
         float GetClosestT(Vector3 point);
         Vector3 GetClosestPoint(Vector3 point);

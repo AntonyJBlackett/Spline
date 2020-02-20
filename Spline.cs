@@ -396,6 +396,12 @@ namespace FantasticSplines
             isDirty = true;
         }
 
+        public void AddCurvePointAt( int index, CurvePoint point )
+        {
+            curvePoints.Insert( index, point );
+            isDirty = true;
+        }
+
         public void RemoveCurvePoint(int index)
         {
             if( index < 0 || index > CurvePointCount )
@@ -668,5 +674,4 @@ namespace FantasticSplines
             throw new System.NotImplementedException();
         }
     }
-
 }

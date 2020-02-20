@@ -178,6 +178,11 @@ namespace FantasticSplines
             curve.AddCurvePoint(point.InverseTransform(transform));
         }
 
+        public void AddPointAt( int index, CurvePoint point)
+        {
+            curve.AddCurvePointAt( index, point.InverseTransform(transform) );
+        }
+
         public void RemovePoint(int index)
         {
             curve.RemoveCurvePoint(index);
