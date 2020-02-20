@@ -649,6 +649,7 @@ namespace FantasticSplines
         {
             ValidatePointSelection( spline );
             Transform transform = spline.GetTransform();
+            Handles.color = Color.grey;
             for( int i = 0; i < pointSelection.Count; ++i )
             {
                 int index = pointSelection[i];
@@ -668,6 +669,8 @@ namespace FantasticSplines
             }
         }
 
+        Color ControlPointEditColor => (Color.cyan + Color.grey + Color.grey) * 0.33f;
+
         void DrawControlPoints( IEditableSpline spline, int index )
         {
             CurvePoint point = spline.GetPoint( index );
@@ -676,9 +679,17 @@ namespace FantasticSplines
                 return;
             }
 
+            if( pointSelection.Contains( index ) )
+            {
+                Handles.color = ControlPointEditColor;
+            }
+            else
+            {
+                Handles.color = Color.grey;
+            }
+
             Vector3 control1 = point.position + point.Control1;
             Vector3 control2 = point.position + point.Control2;
-            Handles.color = Color.grey;
 
             if( index > 0 || spline.IsLoop() )
             {
@@ -713,10 +724,8 @@ namespace FantasticSplines
 
         void DrawSpline(IEditableSpline spline)
         {
-            //DrawSplineLines( spline );
             DrawBezierSplineLines( spline );
             DrawSplinePlaneProjectionLines( spline );
-            //DrawSplinePlaneProjectedSplineLines( spline );
             DrawBezierPlaneProjectedSplineLines( spline );
             DrawSplineSelectionDisks( spline );
 
@@ -1024,7 +1033,7 @@ namespace FantasticSplines
             Vector3 controlPlane1 = GetPointOnPlaneY( point, transform.up, control1 );
             Vector3 controlPlane2 = GetPointOnPlaneY( point, transform.up, control2 );
             
-            Handles.color = Color.green;
+            Handles.color = ControlPointEditColor;
             // draw control placement GUI
             Handles.SphereHandleCap( 0, control1, Quaternion.identity, handleCapSize*0.5f, EventType.Repaint );
             Handles.SphereHandleCap( 0, control2, Quaternion.identity, handleCapSize*0.5f, EventType.Repaint );
@@ -1035,7 +1044,7 @@ namespace FantasticSplines
             Handles.DrawDottedLine( point, control1, 2 );
             Handles.DrawDottedLine( point, control2, 2 );
 
-            Handles.color = Color.yellow;
+            Handles.color = Color.white;
             DrawWireDisk( controlPlane1, transform.up, diskRadius*0.5f, camera.transform.position );
             DrawWireDisk( controlPlane2, transform.up, diskRadius*0.5f, camera.transform.position );
 
