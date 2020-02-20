@@ -108,6 +108,7 @@ public class SplineSpawner : MonoBehaviour
         while( spawning )
         {
             GameObject instance = Instantiate( prefab, transform );
+            instance.SetActive( true );
             instance.transform.position = splinePosition.Position;
             instance.transform.rotation = Quaternion.LookRotation( splinePosition.Tangent, Vector3.up );
 

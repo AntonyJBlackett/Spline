@@ -106,6 +106,7 @@ public class FenceBuilder : MonoBehaviour
         if( post != null )
         {
             GameObject postInstance = Instantiate( post, transform );
+            postInstance.SetActive( true );
             postInstance.transform.position = post1Position.Position;
             postInstance.transform.rotation = Quaternion.LookRotation( post1Position.Tangent, Vector3.up );
         }
@@ -113,18 +114,20 @@ public class FenceBuilder : MonoBehaviour
         while( post1Position.DistanceOnSpline < spline.GetLength() )
         {
 
-            GameObject instance = Instantiate( segment, transform );
+            GameObject segmentInstance = Instantiate( segment, transform );
+            segmentInstance.SetActive( true );
 
             Vector3 segmentDirection = (post2Position.Position - post1Position.Position).normalized;
             Vector3 segmentPosition = post1Position.Position + segmentDirection * separation * 0.5f;
 
-            instance.transform.position = segmentPosition;
-            instance.transform.rotation = Quaternion.LookRotation( segmentDirection, Vector3.up );
+            segmentInstance.transform.position = segmentPosition;
+            segmentInstance.transform.rotation = Quaternion.LookRotation( segmentDirection, Vector3.up );
             
             if( post != null )
             {
                 Vector3 nextPostPosition = post1Position.Position + segmentDirection * separation;
                 GameObject postInstance = Instantiate( post, transform );
+                postInstance.SetActive( true );
                 postInstance.transform.position = nextPostPosition;
                 postInstance.transform.rotation = Quaternion.LookRotation( post2Position.Tangent, Vector3.up );
             }
