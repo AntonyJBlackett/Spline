@@ -34,7 +34,7 @@ public class SplineComponentPositionEditor : PropertyDrawer
         {
             float length = (spline == null) ? 1f : spline.GetLength();
             EditorGUI.BeginChangeCheck();
-            float distanceOnSpline = spline.GetDistanceOnSpline(segPos);
+            float distanceOnSpline = (spline == null) ? 0 : spline.GetDistanceOnSpline(segPos);
             float distance = EditorGUI.Slider(position, GUIContent.none, distanceOnSpline, 0f, length);
             if (EditorGUI.EndChangeCheck())
             {
