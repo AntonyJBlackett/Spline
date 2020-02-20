@@ -245,7 +245,12 @@ namespace FantasticSplines
             }
 
             _splineLength = length;
-            _invSplineLength = 1f / length;
+            _invSplineLength = 1;
+
+            if( length > float.Epsilon )
+            {
+                _invSplineLength = 1f / length;
+            }
             isDirty = false;
         }
 
@@ -258,9 +263,9 @@ namespace FantasticSplines
             {
                 if( loop )
                 {
-                    return curvePoints.Count;
+                    return Mathf.Max(0,curvePoints.Count);
                 }
-                return curvePoints.Count - 1;
+                return Mathf.Max(0,curvePoints.Count-1);
             }
         }
         public CurvePoint GetCurvePoint(int index)
@@ -353,7 +358,7 @@ namespace FantasticSplines
                 return segment % SegmentCount;
             }
 
-            return Mathf.Clamp( segment, 0, SegmentCount );
+            return Mathf.Clamp( segment, 0, SegmentCount-1 );
         }
 
         int LoopCurvePointIndex( int index )
