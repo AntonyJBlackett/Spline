@@ -1,6 +1,4 @@
-﻿using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
+﻿using UnityEngine;
 
 namespace FantasticSplines
 {
@@ -39,6 +37,36 @@ namespace FantasticSplines
         public SplinePosition Move(float stepDistance)
         {
             return new SplinePosition(spline, DistanceOnSpline + stepDistance);
+        }
+
+        public SplinePosition MoveUntilAtWorldDistance(float worldDistance, float step)
+        {
+            Vector3 origin = Position;
+
+            SplinePosition result = new SplinePosition(spline, DistanceOnSpline + step);
+            float splineLength = spline.GetLength();
+
+            Vector3 lastPosition = origin;
+            float worldDistanceTest = Vector3.Distance( result.Position, origin );
+
+            int exit = 100;
+            while( worldDistanceTest < worldDistance && result.DistanceOnSpline < splineLength )
+            {
+                lastPosition = result.Position;
+                result = new SplinePosition(spline, result.DistanceOnSpline + step );
+                worldDistanceTest = Vector3.Distance( result.Position, origin );
+
+                exit--;
+                if( exit < 0 )
+                {
+                    break;
+                }
+            }
+
+            float lastWorldDistanceTest = Vector3.Distance( lastPosition, origin );
+            float t = Mathf.InverseLerp( lastWorldDistanceTest, worldDistanceTest, worldDistance );
+
+            return new SplinePosition(spline, result.DistanceOnSpline - step + (step * t) );
         }
     }
 }
