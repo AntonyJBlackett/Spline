@@ -10,9 +10,6 @@ namespace FantasticSplines
 {
     public class Spline : SplineBehaviour
     {
-        public IEditableSpline GetEditableSpline() { return this; }
-        public Object GetUndoObject() { return this; }
-
 #if UNITY_EDITOR
         void OnDrawGizmos()
         {

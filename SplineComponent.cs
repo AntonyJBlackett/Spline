@@ -10,6 +10,9 @@ namespace FantasticSplines
 {
     public abstract class SplineBehaviour : MonoBehaviour, ISpline, IEditableSpline
     {
+        public IEditableSpline GetEditableSpline() { return this; }
+        public Object GetUndoObject() { return this; }
+
         public abstract float GetSpeed(float t);
         public abstract Vector3 GetDirection(float t);
         public abstract Vector3 GetPoint(float t);
@@ -42,9 +45,6 @@ namespace FantasticSplines
     
     public class SplineComponent : SplineBehaviour
     {
-        public IEditableSpline GetEditableSpline() { return this; }
-        public Object GetUndoObject() { return this; }
-
 #if UNITY_EDITOR
         void OnDrawGizmos()
         {
