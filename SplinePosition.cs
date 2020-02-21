@@ -17,21 +17,29 @@ namespace FantasticSplines
             this._segmentT = segmentT; 
         }
     }
-    
+
     [System.Serializable]
     public struct SplinePosition
     {
         public SplineComponent spline;
         public SegmentPosition segmentPosition;
-        
-        public float DistanceOnSpline => spline.GetDistanceOnSpline(segmentPosition);
-        public Vector3 Position => spline.GetPositionAtDistance(DistanceOnSpline);
-        public Vector3 Tangent => spline.GetTangentAtDistance(DistanceOnSpline);
+
+        public float DistanceOnSpline => spline.GetDistanceOnSpline( segmentPosition );
+        public Vector3 Position => spline.GetPositionAtDistance( DistanceOnSpline );
+        public Vector3 Tangent => spline.GetTangentAtDistance( DistanceOnSpline );
+
+        public bool AtEnd { get; private set; }
+        public bool AtStart { get; private set; }
 
         public SplinePosition(SplineComponent spline, float distance)
         {
             this.spline = spline;
             this.segmentPosition = spline.GetSegmentAtDistance(distance);
+            
+            float length = spline.GetLength();
+            float inaccuracy = float.Epsilon * spline.PointCount;
+            this.AtEnd = distance >= length - inaccuracy;
+            this.AtStart = distance < float.Epsilon;
         }
 
         public SplinePosition Move(float stepDistance)
@@ -51,20 +59,30 @@ namespace FantasticSplines
 
             float distanceOnSpline = stepPosition.DistanceOnSpline;
 
-            int exit = 100;
-            while( worldDistanceTest < worldDistance && distanceOnSpline < splineLength )
+            if( step < float.Epsilon )
+            {
+                step = Mathf.Max( 0.001f, worldDistance / 20.0f );
+            }
+            int maxIterations = Mathf.CeilToInt(worldDistance * 5f  / step);
+            int iterationsLeft = maxIterations;
+            while( worldDistanceTest < worldDistance && !stepPosition.AtEnd )
             {
                 lastPosition = stepPosition.Position;
                 stepPosition = new SplinePosition(spline, distanceOnSpline + step );
                 distanceOnSpline = stepPosition.DistanceOnSpline;
                 worldDistanceTest = Vector3.Distance( stepPosition.Position, origin );
 
-                exit--;
-                if( exit < 0 )
+                --iterationsLeft;
+                if( iterationsLeft < 0 )
                 {
-                    Debug.LogWarning( "Hit iterations limit in MoveUntilAtWorldDistance() on spline: " + spline.name, spline.gameObject );
+                    Debug.LogWarning( "Hit iterations limit of " + maxIterations + " in MoveUntilAtWorldDistance() on spline: " + spline.name, spline.gameObject );
                     break;
                 }
+            }
+
+            if( stepPosition.AtEnd )
+            {
+                return stepPosition;
             }
 
             float lastWorldDistanceTest = Vector3.Distance( lastPosition, origin );
