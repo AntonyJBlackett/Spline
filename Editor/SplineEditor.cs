@@ -519,6 +519,10 @@ namespace FantasticSplines
         {
             Event guiEvent = Event.current;
             IEditableSpline spline = GetSpline();
+            if( spline == null )
+            {
+                return;
+            }
 
             SceneViewEventSetup( guiEvent );
 
