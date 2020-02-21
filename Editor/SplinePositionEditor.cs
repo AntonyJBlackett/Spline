@@ -22,7 +22,7 @@ public class SplineComponentPositionEditor : PropertyDrawer
         SerializedProperty segIndexProp = segmentPositionProperty.FindPropertyRelative("_index");
         SerializedProperty segTProp = segmentPositionProperty.FindPropertyRelative("_segmentT");
         
-        SplineComponent spline = splineProp.objectReferenceValue as SplineComponent;
+        SplineBehaviour spline = splineProp.objectReferenceValue as SplineBehaviour;
         SegmentPosition segPos = new SegmentPosition(segIndexProp.intValue, segTProp.floatValue);
         
         position.width = splineWidth;
