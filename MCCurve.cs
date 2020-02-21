@@ -124,6 +124,7 @@ namespace FantasticSplines
 			while (distance > segments[sIndex].Length)
 			{
 				distance -= segments[sIndex].Length;
+				++sIndex;
 			}
 
 			float finalT = segments[sIndex].GetT(distance);
@@ -246,13 +247,13 @@ namespace FantasticSplines
 
 			if (loop || index > 0)
 			{
-				int prevIndex = MathHelper.WrapIndex(index - 1, PointCount);
+				int prevIndex = MathHelper.WrapIndex(index - 1, SegmentCount);
 				segments[prevIndex] = segments[prevIndex].WithRightCurvePoint(point);
 			}
 
 			if (loop || index < segments.Count)
 			{
-				index = MathHelper.WrapIndex(index, PointCount);
+				index = MathHelper.WrapIndex(index, SegmentCount);
 				segments[index] = segments[index].WithLeftCurvePoint(point);
 			}
 		}
@@ -306,7 +307,7 @@ namespace FantasticSplines
 			// now fixup the previous segment
 			if (loop || index > 0)
 			{
-				int prevIndex = MathHelper.WrapIndex(index - 1, PointCount);
+				int prevIndex = MathHelper.WrapIndex(index - 1, SegmentCount);
 				segments[prevIndex] = segments[prevIndex].WithRightCurvePoint(point);
 			}
 		}
@@ -330,9 +331,9 @@ namespace FantasticSplines
 			}
 			else
 			{
-				CurvePoint b = GetPoint(index + 1);
+				CurvePoint b = GetPoint(MathHelper.WrapIndex(index+1, SegmentCount));
 				segments.RemoveAt(index);
-				int prevIndex = MathHelper.WrapIndex(index - 1, PointCount);
+				int prevIndex = MathHelper.WrapIndex(index - 1, SegmentCount);
 				segments[prevIndex] = segments[prevIndex].WithRightCurvePoint(b);
 			}
 		}

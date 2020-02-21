@@ -16,6 +16,11 @@ namespace FantasticSplines
             this._index = index; 
             this._segmentT = segmentT; 
         }
+
+        public override string ToString()
+        {
+            return string.Format("Seg[{0},{1}]", index, segmentT);
+        }
     }
 
     [System.Serializable]
