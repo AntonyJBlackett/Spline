@@ -5,6 +5,103 @@ using UnityEngine;
 
 namespace FantasticSplines
 {
+    public struct TDMap
+    {
+        // MUST BE POWER OF 2
+        private const int ACCURACY = 16;
+
+        private struct TD
+        {
+            public float t, d;
+
+            public TD(float t, float d)
+            {
+                this.t = t;
+                this.d = d;
+            }
+        }
+
+        private TD[] tdMapping;
+        public float Length => tdMapping[tdMapping.Length - 1].d;
+
+        public bool IsValid()
+        {
+            return tdMapping != null;
+        }
+
+        public TDMap(Bezier3 bez)
+        {
+            tdMapping = null;
+            Initialise(bez);
+        }
+
+        public void Initialise(Bezier3 bez)
+        {
+            if (tdMapping == null || tdMapping.Length != ACCURACY)
+            {
+                tdMapping = new TD[ACCURACY];
+            }
+
+            float invAccuracy = 1f / (ACCURACY - 1);
+            for (int i = 0; i < ACCURACY; ++i)
+            {
+                float t = i * invAccuracy;
+                float d = bez.CalculateDistanceAt(t);
+                tdMapping[i] = new TD(t, d);
+            }
+        }
+
+        int Split(ref int low, ref int high, int mid, bool isLow)
+        {
+            if (isLow)
+            {
+                high = mid;
+            }
+            else
+            {
+                low = mid;
+            }
+
+            return (low + high) / 2;
+        }
+
+        public float GetT(float d)
+        {
+            int low = 0;
+            int high = ACCURACY;
+            int mid = (low + high) / 2;
+
+            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 8
+            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 4 
+            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 2
+
+            #if DEBUG
+            Debug.Assert(ACCURACY == 16);
+            Debug.Assert(low + 1 == high - 1);
+            #endif
+            high -= 1;
+
+            return MathHelper.Remap(d, tdMapping[low].d, tdMapping[high].d, tdMapping[low].t, tdMapping[high].t);
+        }
+
+        public float GetDistance(float t)
+        {
+            int low = 0;
+            int high = ACCURACY;
+            int mid = (low + high) / 2;
+
+            mid = Split(ref low, ref high, mid, t < tdMapping[mid].d); // 8
+            mid = Split(ref low, ref high, mid, t < tdMapping[mid].d); // 4 
+            mid = Split(ref low, ref high, mid, t < tdMapping[mid].d); // 2
+
+            #if DEBUG
+            Debug.Assert(ACCURACY == 16);
+            Debug.Assert(low + 1 == high - 1);
+            #endif
+            high -= 1;
+            return MathHelper.Remap(t, tdMapping[low].t, tdMapping[high].t, tdMapping[low].d, tdMapping[high].d);
+        }
+    }
 
     public partial class Curve
     {
@@ -36,13 +133,16 @@ namespace FantasticSplines
             public float DistanceOnSpline => curve._segments[segmentIndex].startDistanceInSpline + segmentDistance;
         }
 
+        
         private class SegmentCache
         {
             public Bezier3 bezier;
-            private Vector2[] tdMapping;
+            private TDMap tdMapping;
 
             public float startDistanceInSpline;
-            public float Length => tdMapping[tdMapping.Length - 1].y;
+            public float Length => tdMapping.Length;
+            public float GetT(float d) => tdMapping.GetT(d);
+            public float GetDistance(float t) => tdMapping.GetDistance(t);
 
             public SegmentCache(Bezier3 bez, float distanceOnSpline, int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
             {
@@ -54,53 +154,14 @@ namespace FantasticSplines
             {
                 bezier = bez;
                 startDistanceInSpline = distanceOnSpline;
-                if (tdMapping == null || tdMapping.Length != accuracy)
-                {
-                    tdMapping = new Vector2[accuracy];
-                }
-                float invAccuracy = 1f / (accuracy - 1);
-                for (int i = 0; i < accuracy; ++i)
-                {
-                    float t = i * invAccuracy;
-                    float d = bez.CalculateDistanceAt(t);
-                    tdMapping[i] = new Vector2(t, d);
-                }
+                tdMapping.Initialise(bez);
             }
 
             public Vector3 GetPositionAtT(float t) => bezier.GetPos(t);
             public Vector3 GetTangentAtT(float t) => bezier.GetTangent(t);
-            public Vector3 GetPositionAtDistance(float distance) => GetPositionAtT(GetT(distance));
-            public Vector3 GetTangentAtDistance(float distance) => GetTangentAtT(GetT(distance));
+            public Vector3 GetPositionAtDistance(float distance) => GetPositionAtT(tdMapping.GetT(distance));
+            public Vector3 GetTangentAtDistance(float distance) => GetTangentAtT(tdMapping.GetT(distance));
 
-            public float GetT(float d)
-            {
-                // TODO: Binary search this
-                for (int i = 1; i < tdMapping.Length; ++i)
-                {
-                    if (d <= tdMapping[i].y)
-                    {
-                        float ratio = Mathf.InverseLerp(tdMapping[i - 1].y, tdMapping[i].y, d);
-                        return Mathf.Lerp(tdMapping[i - 1].x, tdMapping[i].x, ratio);
-                    }
-                }
-
-                return 1f;
-            }
-
-            public float GetDistance(float t)
-            {
-                // TODO: Binary search this
-                for (int i = 1; i < tdMapping.Length; ++i)
-                {
-                    if (t <= tdMapping[i].x)
-                    {
-                        float ratio = Mathf.InverseLerp(tdMapping[i - 1].x, tdMapping[i].x, t);
-                        return Mathf.Lerp(tdMapping[i - 1].y, tdMapping[i].y, ratio);
-                    }
-                }
-
-                return Length;
-            }
         }
     }
 }

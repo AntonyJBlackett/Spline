@@ -26,6 +26,9 @@ namespace FantasticSplines
         [SerializeField]
         PointType pointType;
 
+        public Vector3 Control1Position => position + control1;
+        public Vector3 Control2Position => position + control2;
+
         public static Vector3 ConstrainControlPoint(Vector3 master, Vector3 constrain, PointType type)
         {
             switch( type )

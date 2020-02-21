@@ -168,6 +168,7 @@ namespace FantasticSplines
     /// <summary>
     /// Cubic Bézier curve calculation class.
     /// </summary>
+    [System.Serializable]
     public struct Bezier3
     {
         const float InterpolationPrecision = 0.001f;
@@ -196,8 +197,8 @@ namespace FantasticSplines
         public Vector3 D;
     
         public Vector3 start => A;
-        public Vector3 startTargent => B;
-        public Vector3 endTargent => C;
+        public Vector3 startControl => B-A;
+        public Vector3 endControl => C-D;
         public Vector3 end => D;
 
         /// <summary>
