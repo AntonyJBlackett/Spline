@@ -91,26 +91,35 @@ namespace FantasticSplines
 
 		public float Length
 		{
-			get { return segments.Sum(s => s.Length); }
+			get
+			{
+				float length = 0f;
+				for (int i = 0; i < SegmentCount; ++i)
+				{
+					length += segments[i].Length;
+				}
+
+				return length;
+			}
 		}
 		public float InverseLength => 1f / Length;
 
-		public int SegmentCount => segments.Count;
+		public int SegmentCount => loop ? segments.Count : segments.Count-1;
 
 		public int PointCount
 		{
 			get
 			{
 				// Special case - if we have a single 0-length segment. Then we only have 1 point.
-				if (SegmentCount == 1 && Mathf.Approximately(Length, 0f))
+				if (segments.Count == 1 && Mathf.Approximately(Length, 0f))
 				{
 					return 1;
 				}
-				if (loop || SegmentCount == 0)
+				if (loop || segments.Count == 0)
 				{
-					return SegmentCount;
+					return segments.Count;
 				}
-				return SegmentCount + 1;
+				return segments.Count + 1;
 			}
 		}
 
@@ -128,7 +137,7 @@ namespace FantasticSplines
 			}
 
 			float finalT = segments[sIndex].GetT(distance);
-			return new SegmentPosition(sIndex, distance);
+			return new SegmentPosition(sIndex, finalT);
 		}
 		
 		float LoopNormalisedT(float normalisedT)
@@ -251,7 +260,7 @@ namespace FantasticSplines
 				segments[prevIndex] = segments[prevIndex].WithRightCurvePoint(point);
 			}
 
-			if (loop || index < segments.Count)
+			if (loop || index < SegmentCount)
 			{
 				index = MathHelper.WrapIndex(index, SegmentCount);
 				segments[index] = segments[index].WithLeftCurvePoint(point);
@@ -282,7 +291,7 @@ namespace FantasticSplines
 			}
 			else
 			{
-				CurveSegment lastSeg = segments[segments.Count - 1];
+				CurveSegment lastSeg = segments[SegmentCount - 1];
 				Bezier3 newBez = new Bezier3(lastSeg.bezier.end, lastSeg.bezier.endControl, point.Control1, point.position);
 				CurveSegment newSegment = new CurveSegment(newBez, lastSeg.endPointType, point.PointType);
 				segments.Add(newSegment);
@@ -379,12 +388,25 @@ namespace FantasticSplines
 		public float GetDistance(SegmentPosition position)
 		{
 			float distance = 0f;
-			for (int i = 0; i < position.index; ++i)
+			int maxIndex = Mathf.Min(position.index, SegmentCount);
+			for (int i = 0; i < maxIndex; ++i)
 			{
 				distance += segments[i].Length;
 			}
 
-			return distance + segments[position.index].GetDistance(position.segmentT);
+			return distance + segments[maxIndex].GetDistance(position.segmentT);
+		}
+		
+		public Vector3 GetPosition(SegmentPosition position)
+		{
+			int index = Mathf.Min(position.index, SegmentCount - 1);
+			return segments[index].GetPosition(position.segmentT);
+		}
+
+		public Vector3 GetDirection(SegmentPosition position)
+		{
+			int index = Mathf.Min(position.index, SegmentCount - 1);
+			return segments[index].GetDirection(position.segmentT);
 		}
 		
         public SegmentPosition GetClosestSegmentPointer(Vector3 point, float paramThreshold = 0.000001f)
@@ -414,7 +436,7 @@ namespace FantasticSplines
             float minDistSqProjected = float.MaxValue;
             SegmentPosition bestSeg = new SegmentPosition(0, 0f);
             bool foundPointInFront = false;
-            for (int i = 0; i < segments.Count; i++)
+            for (int i = 0; i < SegmentCount; i++)
             {
                 Bezier3 curve = segments[i].bezier;
                 Bezier3 projected = Bezier3.ProjectToPlane( curve, ray.origin, ray.direction );

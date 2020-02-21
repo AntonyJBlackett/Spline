@@ -8,9 +8,40 @@ using UnityEditor;
 
 namespace FantasticSplines
 {
-    public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
+    public abstract class SplineBehaviour : MonoBehaviour, ISpline, IEditableSpline
     {
-
+        public abstract float GetSpeed(float t);
+        public abstract Vector3 GetDirection(float t);
+        public abstract Vector3 GetPoint(float t);
+        public abstract float GetLength(float fromT = 0, float toT = 1);
+        public abstract float GetT(float length);
+        public abstract Transform GetTransform();
+        public abstract Component GetComponent();
+        public abstract int GetPointCount();
+        public abstract bool IsLoop();
+        public abstract void SetLoop(bool loop);
+        public abstract CurvePoint GetPoint(int index);
+        public abstract SegmentPosition GetSegmentAtDistance(float distance);
+        public abstract float GetDistanceOnSpline(SegmentPosition position);
+        public abstract Vector3 GetPosition(SegmentPosition position);
+        public abstract Vector3 GetDirection(SegmentPosition position);
+        public abstract void SetPoint(int index, CurvePoint point);
+        public abstract void InsertPoint(float t);
+        public abstract void AddPoint(CurvePoint point);
+        public abstract void AddPointAt(int index, CurvePoint point);
+        public abstract void RemovePoint(int index);
+        public abstract float GetClosestT(Vector3 point);
+        public abstract Vector3 GetClosestPoint(Vector3 point);
+        public abstract Vector3 GetClosestPoint(Ray ray);
+        public abstract void DrawSegmentLengths();
+        public abstract float GetClosestT(Ray ray);
+        public abstract float Step(float t, float worldDistance);
+        public abstract List<CurvePoint> GetPoints();
+        public abstract List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false);
+    }
+    
+    public class SplineComponent : SplineBehaviour
+    {
 #if UNITY_EDITOR
         void OnDrawGizmos()
         {
@@ -32,7 +63,7 @@ namespace FantasticSplines
         }
 #endif
 
-        public void DrawSegmentLengths()
+        public override void DrawSegmentLengths()
         {
 #if UNITY_EDITOR
             for (int i = 0; i < curve.SegmentCount; ++i)
@@ -129,27 +160,27 @@ namespace FantasticSplines
             return index >= 0 && index < PointCount;
         }
 
-        public void InsertPoint(float t)
+        public override void InsertPoint(float t)
         {
             curve.InsertCurvePoint( t );
         }
 
-        public void AddPoint(CurvePoint point)
+        public override void AddPoint(CurvePoint point)
         {
             curve.AddCurvePoint(point.InverseTransform(transform));
         }
 
-        public void AddPointAt( int index, CurvePoint point)
+        public override void AddPointAt( int index, CurvePoint point)
         {
             curve.AddCurvePointAt( index, point.InverseTransform(transform) );
         }
 
-        public void RemovePoint(int index)
+        public override void RemovePoint(int index)
         {
             curve.RemoveCurvePoint(index);
         }
 
-        public CurvePoint GetPoint(int index)
+        public override CurvePoint GetPoint(int index)
         {
             if (index < 0 || index > PointCount - 1)
             {
@@ -159,16 +190,16 @@ namespace FantasticSplines
             return TransformPoint(curve.GetCurvePoint(index));
         }
 
-        public void SetPoint(int index, CurvePoint point)
+        public override void SetPoint(int index, CurvePoint point)
         {
             curve.SetCurvePoint(index, point.InverseTransform(transform));
         }
 
-        public bool IsLoop() => Loop;
-        public void SetLoop(bool loop) { Loop = loop; }
-        public int GetPointCount() => PointCount;
-        public Transform GetTransform() => transform;
-        public Component GetComponent() => this;
+        public override bool IsLoop() => Loop;
+        public override void SetLoop(bool loop) { Loop = loop; }
+        public override int GetPointCount() => PointCount;
+        public override Transform GetTransform() => transform;
+        public override Component GetComponent() => this;
 
         const float resolution = 0.1f;
 
@@ -194,33 +225,43 @@ namespace FantasticSplines
             throw new System.NotImplementedException();
         }
 
-        public List<CurvePoint> GetPoints()
+        public override List<CurvePoint> GetPoints()
         {
             return TransformPoints(curve.GetPoints());
         }
 
         //TODO this will break when scaled
-        public float GetSpeed(float t)
+        public override float GetSpeed(float t)
         {
             return curve.GetSpeed(t);
         }
 
-        public Vector3 GetDirection(float t)
+        public override Vector3 GetDirection(float t)
         {
             return TransformVector(curve.GetDirection(t));
         }
 
-        public Vector3 GetPoint(float t)
+        public override Vector3 GetPoint(float t)
         {
             return TransformPoint(curve.GetPoint(t));
         }
 
-        public float GetDistanceOnSpline(SegmentPosition position)
+        public override float GetDistanceOnSpline(SegmentPosition position)
         {
             return curve.GetSegmentPointer(position).DistanceOnSpline;
         }
 
-        public SegmentPosition GetSegmentAtDistance(float distance)
+        public override Vector3 GetPosition(SegmentPosition position)
+        {
+            return curve.GetSegmentPointer(position).Position;
+        }
+
+        public override Vector3 GetDirection(SegmentPosition position)
+        {
+            return curve.GetSegmentPointer(position).Tangent;
+        }
+
+        public override SegmentPosition GetSegmentAtDistance(float distance)
         {
             var pointer = curve.GetSegmentPointerAtDistance(distance);
             return new SegmentPosition(pointer.segmentIndex, pointer.segmentT);
@@ -237,45 +278,45 @@ namespace FantasticSplines
         }
 
         //TODO this will break when scaled
-        public float GetLength(float fromNormalisedT, float toNormalisedT)
+        public override float GetLength(float fromNormalisedT, float toNormalisedT)
         {
             return curve.GetDistance(toNormalisedT) - curve.GetDistance(fromNormalisedT);
         }
 
         //TODO this will break when scaled
-        public float GetT(float length)
+        public override float GetT(float length)
         {
             return curve.GetT(length);
         }
 
-        public float GetClosestT(Vector3 point)
+        public override float GetClosestT(Vector3 point)
         {
             return curve.GetClosestT(InverseTransformPoint(point));
         }
 
-        public float GetClosestT(Ray ray)
+        public override float GetClosestT(Ray ray)
         {
             return curve.GetClosestT(InverseTransformRay(ray));
         }
 
-        public Vector3 GetClosestPoint(Vector3 point)
+        public override Vector3 GetClosestPoint(Vector3 point)
         {
             return TransformPoint(curve.GetClosestPoint(InverseTransformPoint(point)));
         }
 
-        public Vector3 GetClosestPoint(Ray ray)
+        public override Vector3 GetClosestPoint(Ray ray)
         {
             return TransformPoint(curve.GetClosestPoint(InverseTransformRay(ray)));
         }
 
         //TODO this will break when scaled
-        public float Step(float currentT, float worldDistance)
+        public override float Step(float currentT, float worldDistance)
         {
             return curve.Step(currentT, worldDistance);
         }
 
         //TODO this will break when scaled
-        public List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true,
+        public override List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true,
             bool includeSplinePoints = false)
         {
             return TransformPoints(GetPoints(worldSpacing, includeEndPoint, includeSplinePoints));

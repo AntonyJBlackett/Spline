@@ -26,23 +26,23 @@ namespace FantasticSplines
     [System.Serializable]
     public struct SplinePosition
     {
-        public SplineComponent spline;
+        public SplineBehaviour spline;
         public SegmentPosition segmentPosition;
 
         public float DistanceOnSpline => spline.GetDistanceOnSpline( segmentPosition );
-        public Vector3 Position => spline.GetPositionAtDistance( DistanceOnSpline );
-        public Vector3 Tangent => spline.GetTangentAtDistance( DistanceOnSpline );
+        public Vector3 Position => spline.GetPosition( segmentPosition );
+        public Vector3 Tangent => spline.GetDirection( segmentPosition );
 
         public bool AtEnd { get; private set; }
         public bool AtStart { get; private set; }
 
-        public SplinePosition(SplineComponent spline, float distance)
+        public SplinePosition(SplineBehaviour spline, float distance)
         {
             this.spline = spline;
             this.segmentPosition = spline.GetSegmentAtDistance(distance);
             
             float length = spline.GetLength();
-            float inaccuracy = float.Epsilon * spline.PointCount;
+            float inaccuracy = float.Epsilon * spline.GetPointCount();
             this.AtEnd = distance >= length - inaccuracy;
             this.AtStart = distance < float.Epsilon;
         }

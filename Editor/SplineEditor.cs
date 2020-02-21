@@ -18,13 +18,8 @@ namespace FantasticSplines
         Insert
     }
 
-    [CustomEditor(typeof(Spline), true)]
-    public class SplineEditor2 : SplineEditor
-    {
-        
-    }
     
-    [CustomEditor( typeof( SplineComponent ) )]
+    [CustomEditor( typeof( SplineBehaviour ),true )]
     public class SplineEditor : Editor
     {
         static List<CurvePoint> clipboard = new List<CurvePoint>();
@@ -317,6 +312,7 @@ namespace FantasticSplines
             GUILayout.Label( "Edit Mode: " + editMode.ToString() );
             GUILayout.Label( "Add Point Mode: " + addPointMode.ToString() );
             GUILayout.Label( "Moving Point: " + Moving.ToString() );
+            GUILayout.Label( "Length: " + (spline as ISpline).GetLength(0f,1f) );
 
             DrawDefaultInspector();
         }
