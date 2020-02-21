@@ -27,12 +27,8 @@ namespace FantasticSplines
     public class FenceBuilderEditor : SplineEditor
     {
     }
-
-    [CustomEditor( typeof( SplineBehaviour ) )]
-    public class SplineBehaviourEditor : SplineEditor
-    {
-    }
-
+    
+    [CustomEditor( typeof( Spline ) )]
     public class SplineEditor : Editor
     {
         IEditableSpline GetSpline()

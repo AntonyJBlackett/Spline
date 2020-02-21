@@ -95,6 +95,16 @@ namespace FantasticSplines
             get { return curve.CurvePointCount; }
         }
 
+        Vector3 InverseTransformPosition(Vector3 position)
+        {
+            return transform.InverseTransformPoint(position);
+        }
+
+        Vector3 TransformPosition(Vector3 position)
+        {
+            return transform.TransformPoint(position);
+        }
+
         Vector3 InverseTransformPoint(Vector3 point)
         {
             return transform.InverseTransformPoint(point);
@@ -260,12 +270,12 @@ namespace FantasticSplines
 
         public override Vector3 GetPosition(SegmentPosition position)
         {
-            return curve.GetSegmentPointer(position).Position;
+            return TransformPosition( curve.GetSegmentPointer(position).Position );
         }
 
         public override Vector3 GetDirection(SegmentPosition position)
         {
-            return curve.GetSegmentPointer(position).Tangent;
+            return TransformVector( curve.GetSegmentPointer(position).Tangent );
         }
 
         public override SegmentPosition GetSegmentAtDistance(float distance)
