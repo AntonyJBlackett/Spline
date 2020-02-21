@@ -1116,7 +1116,12 @@ namespace FantasticSplines
             return planePoint + planeOffset;
         }
 
-        void DrawControlPointMovementGuides( IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2)
+        void DrawControlPointMovementGuides(IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2 )
+        {
+            DrawControlPointMovementGuides( spline, point, control1, control2, ControlPointEditColor, Color.white );
+        }
+
+        void DrawControlPointMovementGuides( IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2, Color controlColour, Color controlPlaneColour)
         {
             Camera camera = Camera.current;
             Transform transform = spline.GetTransform();
@@ -1124,7 +1129,7 @@ namespace FantasticSplines
             Vector3 controlPlane1 = GetPointOnPlaneY( point, transform.up, control1 );
             Vector3 controlPlane2 = GetPointOnPlaneY( point, transform.up, control2 );
             
-            Handles.color = ControlPointEditColor;
+            Handles.color = controlColour;
             // draw control placement GUI
             Handles.SphereHandleCap( 0, control1, Quaternion.identity, handleCapSize*0.5f, EventType.Repaint );
             Handles.SphereHandleCap( 0, control2, Quaternion.identity, handleCapSize*0.5f, EventType.Repaint );
@@ -1135,7 +1140,7 @@ namespace FantasticSplines
             Handles.DrawDottedLine( point, control1, 2 );
             Handles.DrawDottedLine( point, control2, 2 );
 
-            Handles.color = Color.white;
+            Handles.color = controlPlaneColour;
             DrawWireDisk( controlPlane1, transform.up, diskRadius*0.5f, camera.transform.position );
             DrawWireDisk( controlPlane2, transform.up, diskRadius*0.5f, camera.transform.position );
 
@@ -1164,6 +1169,7 @@ namespace FantasticSplines
             Camera camera = Camera.current;
 
             Vector3 connectingPoint = transform.position;
+
             if( spline.GetPointCount() > 0 )
             {
                 int adjoiningIndex = 0;
@@ -1192,7 +1198,6 @@ namespace FantasticSplines
 
                 DrawWireDisk( addPointPosition, transform.up, diskRadius, camera.transform.position );
                 DrawWireDisk( planePosition, transform.up, diskRadius, camera.transform.position );
-                Handles.DrawDottedLine( connectingPlanePoint, planePosition, 2 );
                 Handles.DrawDottedLine( planePosition, addPointPosition, 2 );
 
                 if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
@@ -1204,38 +1209,46 @@ namespace FantasticSplines
                     guiEvent.Use();
                 }
             }
+
+            Vector3 newControlPointPosition = addPointPosition;
+            Vector3 relativeControlPoint = newControlPointPosition - addPointPosition;
+            if( addPointMode == SplineAddPointMode.Prepend )
+            {
+                relativeControlPoint *= -1;
+            }
+
             if( addPointState == AddPointState.ControlPosition )
             {
-                Vector3 newControlPointPosition = GetPointPlacement( 
-                    camera, 
-                    guiEvent.mousePosition, 
-                    addPointPosition, 
-                    transform.up, 
-                    ref controlPlanePosition, 
-                    ref controlPlaneOffset, 
-                    guiEvent.shift && canShift, 
-                    guiEvent.command );
-            
-                Vector3 relativeControlPoint = newControlPointPosition - addPointPosition;
+                newControlPointPosition = GetPointPlacement( 
+                        camera, 
+                        guiEvent.mousePosition, 
+                        addPointPosition, 
+                        transform.up, 
+                        ref controlPlanePosition, 
+                        ref controlPlaneOffset, 
+                        guiEvent.shift && canShift, 
+                        guiEvent.command );
+                relativeControlPoint = newControlPointPosition - addPointPosition;
+                if( addPointMode == SplineAddPointMode.Prepend )
+                {
+                    relativeControlPoint *= -1;
+                }
 
-                Vector3 control1 = addPointPosition + relativeControlPoint;
-                Vector3 control2 = addPointPosition - relativeControlPoint;
-
-                DrawControlPointMovementGuides( spline, addPointPosition, control1, control2 );
+                Vector3 worldControl1 = addPointPosition - relativeControlPoint;
+                Vector3 worldControl2 = addPointPosition + relativeControlPoint;
+                DrawControlPointMovementGuides( spline, addPointPosition, worldControl1, worldControl2, Color.yellow, Color.white );
 
                 if( guiEvent.type == EventType.MouseUp && guiEvent.button == 0 )
                 {
                     canShift = false;
                     addPointState = AddPointState.PointPosition;
                     Undo.RecordObject( spline.GetUndoObject(), "Add Point" );
-                    Vector3 controlPosition = newControlPointPosition - addPointPosition;
 
                     CurvePoint newPoint = new CurvePoint( addPointPosition );
-                    if( controlPosition.magnitude > 0.01f )
+                    if( relativeControlPoint.magnitude > 0.01f )
                     {
-                        Vector3 control = newControlPointPosition - addPointPosition;
                         newPoint.SetPointType( PointType.Mirrored );
-                        newPoint.Control2 = control; // this sets control 1 as well as it's mirrored
+                        newPoint.Control2 = relativeControlPoint; // this sets control 1 as well as it's mirrored
                     }
 
                     switch( addPointMode )
@@ -1256,11 +1269,52 @@ namespace FantasticSplines
                 }
             }
             
-            // draw common new point GUI
+            // draw beziers new point GUI
             Handles.color = Color.yellow;
-            Handles.DrawDottedLine( connectingPoint, addPointPosition, 5 );
-            Handles.SphereHandleCap( 0, addPointPosition, Quaternion.identity, handleCapSize, guiEvent.type );
+            {
+                int pointCount = spline.GetPointCount();
+                if( pointCount > 0 )
+                {
+                    CurvePoint newPoint = new CurvePoint( addPointPosition );
+                    newPoint.Control1 = -relativeControlPoint; // this sets control 1 as well as it's mirrored
+                    if( relativeControlPoint.magnitude > 0.01f )
+                    {
+                        newPoint.SetPointType( PointType.Mirrored );
+                    }
+                    newPoint.Control2 = relativeControlPoint; // this sets control 1 as well as it's mirrored
+                    
 
+                    CurvePoint point1 = spline.GetPoint( pointCount - 1 );
+                    CurvePoint point2 = newPoint;
+                    if( addPointMode == SplineAddPointMode.Prepend )
+                    {
+                        point1 = newPoint;
+                        point2 = spline.GetPoint( 0 );
+                    }
+                    Bezier3 addSegment = new Bezier3( point1, point2 );
+                    Bezier3 projectedAddSegment = Bezier3.ProjectToPlane( addSegment, planePosition, transform.up );
+                    Handles.DrawBezier( projectedAddSegment.A, projectedAddSegment.D, projectedAddSegment.B, projectedAddSegment.C, Color.grey, null, 1 );
+                    Handles.DrawBezier( addSegment.A, addSegment.D, addSegment.B, addSegment.C, Color.yellow, null, 1 );
+
+
+                    if( spline.IsLoop() )
+                    {
+                        point1 = newPoint;
+                        point2 = spline.GetPoint( 0 );
+                        if( addPointMode == SplineAddPointMode.Prepend )
+                        {
+                            point1 = spline.GetPoint( pointCount - 1 );
+                            point2 = newPoint;
+                        }
+                        Bezier3 loopSegment = new Bezier3( point1, point2 );
+                        Bezier3 projectedLoopSegment = Bezier3.ProjectToPlane( loopSegment, planePosition, transform.up );
+                        Handles.DrawBezier( projectedLoopSegment.A, projectedLoopSegment.D, projectedLoopSegment.B, projectedLoopSegment.C, Color.grey, null, 1 );
+                        Handles.DrawBezier( loopSegment.A, loopSegment.D, loopSegment.B, loopSegment.C, Color.yellow, null, 1 );
+                    }
+                }
+            }
+
+            Handles.SphereHandleCap( 0, addPointPosition, Quaternion.identity, handleCapSize, guiEvent.type );
             Handles.color = Color.white;
         }
 
