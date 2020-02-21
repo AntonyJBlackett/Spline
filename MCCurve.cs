@@ -229,7 +229,7 @@ namespace FantasticSplines
 			}
 			else
 			{
-				int prevIndex = MathHelper.WrapIndex(index, SegmentCount);
+				int prevIndex = MathHelper.WrapIndex(index-1, SegmentCount);
 				Vector3 P = segments[index].bezier.start;
 				Vector3 leftControl = segments[prevIndex].bezier.endControl;
 				Vector3 rightControl = segments[index].bezier.startControl;
