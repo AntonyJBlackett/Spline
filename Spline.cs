@@ -8,10 +8,8 @@ using UnityEditor;
 
 namespace FantasticSplines
 {
-    public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
+    public class Spline : MonoBehaviour, ISpline, IEditableSpline
     {
-        public IEditableSpline GetEditableSpline() { return this; }
-        public Object GetUndoObject() { return this; }
 
 #if UNITY_EDITOR
         void OnDrawGizmos()
@@ -20,19 +18,15 @@ namespace FantasticSplines
             {
                 for (int i = 0; i < curve.SegmentCount; ++i)
                 {
-                    Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment(i), transform );
+                    Bezier3 bezier = Bezier3.Transform( curve.GetBezierForSegment(i), transform );
                     Handles.DrawBezier(bezier.start, bezier.end, bezier.B, bezier.C, Color.grey, null,
                         2);
                 }
-
-                // this stops selection of the spline when we're doing other things.
-                if( Selection.activeObject == null )
+                
+                Gizmos.color = Color.white;
+                for (int i = 0; i < PointCount; ++i)
                 {
-                    Gizmos.color = Color.white;
-                    for( int i = 0; i < PointCount; ++i )
-                    {
-                        Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
-                    }
+                    Gizmos.DrawSphere(GetPoint(i).position, 0.05f);
                 }
             }
         }
@@ -43,14 +37,14 @@ namespace FantasticSplines
 #if UNITY_EDITOR
             for (int i = 0; i < curve.SegmentCount; ++i)
             {
-                Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment(i), transform );
+                Bezier3 bezier = Bezier3.Transform( curve.GetBezierForSegment(i), transform );
                 Vector3 pos = bezier.GetPos(0.5f);
                 Handles.Label(pos, bezier.Length.ToString("N2"));
             }
 #endif
         }
 
-        public Curve curve; // spline in local space
+        public MCCurve curve = new MCCurve(); // spline in local space
 
         public bool Loop
         {
@@ -60,7 +54,7 @@ namespace FantasticSplines
 
         public int PointCount
         {
-            get { return curve.CurvePointCount; }
+            get { return curve.PointCount; }
         }
 
         Vector3 InverseTransformPoint(Vector3 point)
@@ -137,22 +131,22 @@ namespace FantasticSplines
 
         public void InsertPoint(float t)
         {
-            curve.InsertCurvePoint( t );
+            curve.InsertPoint( t );
         }
 
         public void AddPoint(CurvePoint point)
         {
-            curve.AddCurvePoint(point.InverseTransform(transform));
+            curve.AddPoint(point.InverseTransform(transform));
         }
 
         public void AddPointAt( int index, CurvePoint point)
         {
-            curve.AddCurvePointAt( index, point.InverseTransform(transform) );
+            curve.AddPointAt( index, point.InverseTransform(transform) );
         }
 
         public void RemovePoint(int index)
         {
-            curve.RemoveCurvePoint(index);
+            curve.RemovePoint(index);
         }
 
         public CurvePoint GetPoint(int index)
@@ -162,12 +156,12 @@ namespace FantasticSplines
                 return new CurvePoint(transform.position);
             }
 
-            return TransformPoint(curve.GetCurvePoint(index));
+            return TransformPoint(curve.GetPoint(index));
         }
 
         public void SetPoint(int index, CurvePoint point)
         {
-            curve.SetCurvePoint(index, point.InverseTransform(transform));
+            curve.SetPoint(index, point.InverseTransform(transform));
         }
 
         public bool IsLoop() => Loop;
@@ -223,13 +217,12 @@ namespace FantasticSplines
 
         public float GetDistanceOnSpline(SegmentPosition position)
         {
-            return curve.GetSegmentPointer(position).DistanceOnSpline;
+            return curve.GetDistance(position);
         }
 
         public SegmentPosition GetSegmentAtDistance(float distance)
         {
-            var pointer = curve.GetSegmentPointerAtDistance(distance);
-            return new SegmentPosition(pointer.segmentIndex, pointer.segmentT);
+            return curve.GetSegmentAtDistance(distance);
         }
 
         public float GetLength()
@@ -245,7 +238,7 @@ namespace FantasticSplines
         //TODO this will break when scaled
         public float GetLength(float fromNormalisedT, float toNormalisedT)
         {
-            return curve.GetDistance(toNormalisedT) - curve.GetDistance(fromNormalisedT);
+            return curve.GetLength(fromNormalisedT, toNormalisedT);
         }
 
         //TODO this will break when scaled

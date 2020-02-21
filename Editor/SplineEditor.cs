@@ -18,6 +18,12 @@ namespace FantasticSplines
         Insert
     }
 
+    [CustomEditor(typeof(Spline), true)]
+    public class SplineEditor2 : SplineEditor
+    {
+        
+    }
+    
     [CustomEditor( typeof( SplineComponent ) )]
     public class SplineComponentEditor : SplineEditor
     {
