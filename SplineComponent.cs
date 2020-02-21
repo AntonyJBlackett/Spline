@@ -10,6 +10,8 @@ namespace FantasticSplines
 {
     public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
     {
+        public IEditableSpline GetEditableSpline() { return this; }
+        public Object GetUndoObject() { return this; }
 
 #if UNITY_EDITOR
         void OnDrawGizmos()
@@ -22,11 +24,15 @@ namespace FantasticSplines
                     Handles.DrawBezier(bezier.start, bezier.end, bezier.startTargent, bezier.endTargent, Color.grey, null,
                         2);
                 }
-                
-                Gizmos.color = Color.white;
-                for (int i = 0; i < PointCount; ++i)
+
+                // this stops selection of the spline when we're doing other things.
+                if( Selection.activeObject == null )
                 {
-                    Gizmos.DrawSphere(GetPoint(i).position, 0.05f);
+                    Gizmos.color = Color.white;
+                    for( int i = 0; i < PointCount; ++i )
+                    {
+                        Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
+                    }
                 }
             }
         }

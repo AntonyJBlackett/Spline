@@ -2,8 +2,15 @@
 using UnityEngine;
 namespace FantasticSplines
 {
+    // Proxy interfact to enable tools to easily use the spline editor in their own editors
+    public interface IEditorSplineProxy
+    {
+        IEditableSpline GetEditableSpline();
+        Object GetUndoObject();
+    }
+
     // Interface for SplineEditor. Any component that implements this can be used with the editor
-    public interface IEditableSpline
+    public interface IEditableSpline : IEditorSplineProxy
     {
         Transform GetTransform();
         Component GetComponent(); // return component that is or stores this spline. So that the editor can inform unity of changes to the component

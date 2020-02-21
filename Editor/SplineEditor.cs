@@ -19,8 +19,22 @@ namespace FantasticSplines
     }
 
     [CustomEditor( typeof( SplineComponent ) )]
+    public class SplineComponentEditor : SplineEditor
+    {
+    }
+
+    [CustomEditor( typeof( FenceBuilder ) )]
+    public class FenceBuilderEditor : SplineEditor
+    {
+    }
+
     public class SplineEditor : Editor
     {
+        IEditableSpline GetSpline()
+        {
+            return (target as IEditorSplineProxy).GetEditableSpline();
+        }
+
         static List<CurvePoint> clipboard = new List<CurvePoint>();
 
         SplineEditMode editMode = SplineEditMode.None;
@@ -32,18 +46,28 @@ namespace FantasticSplines
         Vector3 controlPlanePosition;
         Vector3 controlPlaneOffset;
 
-        void OnEnable()
+        int registered = 0;
+        public void OnEnable()
         {
+            ++registered;
+            SceneView.duringSceneGui += DoSceneGUI;
             ResetEditMode();
         }
-        void OnDisable()
+        public void OnDisable()
         {
+            --registered;
+            SceneView.duringSceneGui -= DoSceneGUI;
             Tools.current = Tool.Move;
+
+            if( registered > 0 )
+            {
+                Debug.LogWarning( "Our editor is slowing down!" );
+            }
         }
 
         void SetSelectionPointType( IEditableSpline spline, PointType type)
         {
-            Undo.RecordObject( target, "Set Point Type" );
+            Undo.RecordObject( spline.GetUndoObject(), "Set Point Type" );
             for( int i = 0; i < pointSelection.Count; ++i )
             {
                 int index = pointSelection[i];
@@ -101,7 +125,7 @@ namespace FantasticSplines
 
         void FlattenSelection(IEditableSpline spline, PointType type)
         {
-            Undo.RecordObject( target, "Flatten Selection" );
+            Undo.RecordObject( spline.GetUndoObject(), "Flatten Selection" );
             for( int i = 0; i < pointSelection.Count; ++i )
             {
                 int index = pointSelection[i];
@@ -118,7 +142,7 @@ namespace FantasticSplines
 
         void SmoothSelection( IEditableSpline spline, PointType type )
         {
-            Undo.RecordObject( target, "Set Point Type" );
+            Undo.RecordObject( spline.GetUndoObject(), "Set Point Type" );
             for( int i = 0; i < pointSelection.Count; ++i )
             {
                 int index = pointSelection[i];
@@ -213,8 +237,8 @@ namespace FantasticSplines
             ResetEditMode();
             editMode = SplineEditMode.AddPoint;
             addPointMode = mode;
-            
-            IEditableSpline spline = target as IEditableSpline;
+
+            IEditableSpline spline = GetSpline();
             Transform transform = spline.GetTransform();
             Vector3 adjoiningPointPosition = transform.position;
 
@@ -249,8 +273,13 @@ namespace FantasticSplines
 
         public override void OnInspectorGUI()
         {
-            IEditableSpline spline = target as IEditableSpline;
+            IEditableSpline spline = GetSpline();
             ShowScriptGUI(spline as MonoBehaviour);
+            if( spline == null )
+            {
+                DrawDefaultInspector();
+                return;
+            }
 
             GUILayout.Label( "Edit Modes" );
             InspectorAddPointModeButton( SplineAddPointMode.Append );
@@ -262,7 +291,7 @@ namespace FantasticSplines
             bool loop = GUILayout.Toggle( spline.IsLoop(), "Loop" );
             if( EditorGUI.EndChangeCheck() )
             {
-                Undo.RecordObject( target, "Loop Toggle" );
+                Undo.RecordObject( spline.GetUndoObject(), "Loop Toggle" );
                 spline.SetLoop( loop );
                 EditorUtility.SetDirty( target );
             }
@@ -417,7 +446,7 @@ namespace FantasticSplines
 
                 if( guiEvent.command && guiEvent.keyCode == KeyCode.X )
                 {
-                    Undo.RecordObject( target, "Cut Points" );
+                    Undo.RecordObject( spline.GetUndoObject(), "Cut Points" );
                     CopyCurve( spline );
                     DeleteSelectedPoints( spline );
                     guiEvent.Use();
@@ -425,7 +454,7 @@ namespace FantasticSplines
 
                 if( guiEvent.command && guiEvent.keyCode == KeyCode.V )
                 {
-                    Undo.RecordObject( target, "Paste Points" );
+                    Undo.RecordObject( spline.GetUndoObject(), "Paste Points" );
                     PasteCurve( spline );
                     guiEvent.Use();
                 }
@@ -434,7 +463,7 @@ namespace FantasticSplines
                 if( pointSelection.Count > 0
                     && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace) )
                 {
-                    Undo.RecordObject( target, "Delete Points" );
+                    Undo.RecordObject( spline.GetUndoObject(), "Delete Points" );
                     DeleteSelectedPoints( spline );
                     guiEvent.Use();
                 }
@@ -480,10 +509,10 @@ namespace FantasticSplines
             }
         }
 
-        void OnSceneGUI()
+        void DoSceneGUI( SceneView view )
         {
             Event guiEvent = Event.current;
-            IEditableSpline spline = target as IEditableSpline;
+            IEditableSpline spline = GetSpline();
 
             SceneViewEventSetup( guiEvent );
 
@@ -1029,7 +1058,7 @@ namespace FantasticSplines
             }
             if( guiEvent.type == EventType.Used && (pointSelection.Count > 0 || hadSelectionOnMouseDown) )
             {
-                Selection.activeObject = spline.GetTransform().gameObject;
+                Selection.activeObject = (target as Component).gameObject;
             }
             else if( guiEvent.type != EventType.Repaint && guiEvent.type != EventType.Layout && guiEvent.type != EventType.Used && !IsMouseButtonEvent( guiEvent, 0 ) )
             {
@@ -1123,7 +1152,7 @@ namespace FantasticSplines
                 canShift = true;
             }
 
-            Selection.activeGameObject = spline.GetTransform().gameObject;
+            Selection.activeObject = (target as Component).gameObject;
             Transform handleTransform = spline.GetTransform();
             Transform transform = spline.GetTransform();
             Camera camera = Camera.current;
@@ -1192,7 +1221,7 @@ namespace FantasticSplines
                 {
                     canShift = false;
                     addPointState = AddPointState.PointPosition;
-                    Undo.RecordObject( target, "Add Point" );
+                    Undo.RecordObject( spline.GetUndoObject(), "Add Point" );
                     Vector3 controlPosition = newControlPointPosition - addPointPosition;
 
                     CurvePoint newPoint = new CurvePoint( addPointPosition );
@@ -1231,7 +1260,7 @@ namespace FantasticSplines
 
         void DoInsertPoint(IEditableSpline spline, Event guiEvent)
         {
-            Selection.activeGameObject = spline.GetTransform().gameObject;
+            Selection.activeObject = (target as Component).gameObject;
 
             Transform handleTransform = spline.GetTransform();
             Transform transform = spline.GetTransform();
@@ -1263,7 +1292,7 @@ namespace FantasticSplines
             {
                 float t = spline.GetClosestT( newPointPosition );
 
-                Undo.RecordObject( target, "Insert Point" );
+                Undo.RecordObject( spline.GetUndoObject(), "Insert Point" );
                 spline.InsertPoint( t );
                 EditorUtility.SetDirty( spline.GetComponent() );
                 guiEvent.Use();
@@ -1471,7 +1500,7 @@ namespace FantasticSplines
                 }
                 if( startMovementAccumulator.magnitude > startMovementThreshold && pointMovement.magnitude > 0 )
                 {
-                    Undo.RecordObject( target, "Move Points" );
+                    Undo.RecordObject( spline.GetUndoObject(), "Move Points" );
 
                     if( MovingControlPoint )
                     {
@@ -1563,7 +1592,7 @@ namespace FantasticSplines
 
         float DepthScale(Vector3 point, Vector3 cameraPosition)
         {
-            IEditableSpline spline = target as IEditableSpline;
+            IEditableSpline spline = GetSpline();
             return Vector3.Distance( spline.GetTransform().position, cameraPosition ) / Vector3.Distance( point, cameraPosition );
         }
 

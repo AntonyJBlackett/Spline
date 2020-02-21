@@ -6,8 +6,12 @@ using UnityEditor;
 #endif
 
 [ExecuteInEditMode]
-public class FenceBuilder : MonoBehaviour
+public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 {
+    // can now use the spline editor when this object is selected
+    public IEditableSpline GetEditableSpline() { return spline; }
+    public Object GetUndoObject() { return spline; }
+
     public SplineComponent spline;
     public GameObject post;
     public GameObject segment;
@@ -50,7 +54,7 @@ public class FenceBuilder : MonoBehaviour
             Clear();
         }
 
-        if( lastSpline != spline )
+        //if( lastSpline != spline )
         {
             AutoRegenerate();
         }
@@ -66,8 +70,11 @@ public class FenceBuilder : MonoBehaviour
 
     void Regenerate()
     {
+#if UNITY_EDITOR
+        Undo.RecordObject( gameObject, "Fence Generation" );
+#endif
         regenerate = false;
-        Clear();
+        DeactivateInstances();
 
         bool escape = false;
         if( spline == null )
@@ -97,28 +104,29 @@ public class FenceBuilder : MonoBehaviour
         {
             instanceBucket = new GameObject( gameObject.name + "-InstanceBucket" ).transform;
             instanceBucket.SetParent( transform );
-            ResetLocalTransform( instanceBucket );
         }
 
         SplinePosition post1Position = new SplinePosition( spline, 0 );
         separation = segment.transform.localScale.z;
-        float step = separation * 0.2f;
+        float step = separation * 0.5f;
 
         SplinePosition post2Position = post1Position.MoveUntilAtWorldDistance( separation, step );
         
         // first segment
         if( post != null )
         {
-            GameObject postInstance = InstantiatePrefabOrGameObject( post, instanceBucket );
+            GameObject postInstance = GetInstance( post, instanceBucket );
             postInstance.SetActive( true );
             postInstance.transform.position = post1Position.Position;
             postInstance.transform.rotation = Quaternion.LookRotation( post1Position.Tangent, Vector3.up );
         }
 
-        int limit = Mathf.CeilToInt(spline.GetLength() / separation); // we should never need more segments than a dead straight spline needs
-        while( post1Position.DistanceOnSpline < spline.GetLength() || Mathf.Abs(post1Position.DistanceOnSpline - post2Position.DistanceOnSpline) <= float.Epsilon )
+        float splineLength = spline.GetLength();
+
+        int limit = Mathf.CeilToInt(1 + spline.GetLength() / separation); // we should never need more segments than a dead straight spline needs
+        while( !post1Position.AtEnd )
         {
-            GameObject segmentInstance = InstantiatePrefabOrGameObject( segment, instanceBucket );
+            GameObject segmentInstance = GetInstance( segment, instanceBucket );
             segmentInstance.SetActive( true );
 
             Vector3 segmentDirection = (post2Position.Position - post1Position.Position).normalized;
@@ -130,7 +138,7 @@ public class FenceBuilder : MonoBehaviour
             if( post != null )
             {
                 Vector3 nextPostPosition = post1Position.Position + segmentDirection * separation;
-                GameObject postInstance = InstantiatePrefabOrGameObject( post, instanceBucket );
+                GameObject postInstance = GetInstance( post, instanceBucket );
                 postInstance.SetActive( true );
                 postInstance.transform.position = nextPostPosition;
                 postInstance.transform.rotation = Quaternion.LookRotation( post2Position.Tangent, Vector3.up );
@@ -146,13 +154,8 @@ public class FenceBuilder : MonoBehaviour
                 break;
             }
         }
-    }
 
-    static void ResetLocalTransform(Transform transform)
-    {
-        transform.localPosition = Vector3.zero;
-        transform.localRotation = Quaternion.identity;
-        transform.localScale = Vector3.one;
+        CleanUpUnusedInstances();
     }
 
     void Clear()
@@ -169,6 +172,23 @@ public class FenceBuilder : MonoBehaviour
         }
     }
 
+    void CleanUpUnusedInstances()
+    {
+        if( instanceBucket == null )
+        {
+            return;
+        }
+        int count = instanceBucket.childCount;
+        for( int i = count-1; i >= 0; --i )
+        {
+            GameObject child = instanceBucket.GetChild( i ).gameObject;
+            if( !child.activeSelf )
+            {
+                DestroyImmediate( child );
+            }
+        }
+    }
+
     void DeactivateInstances()
     {
         if( instanceBucket == null )
@@ -178,7 +198,7 @@ public class FenceBuilder : MonoBehaviour
         int count = instanceBucket.childCount;
         for( int i = 0; i < count; ++i )
         {
-            instanceBucket.GetChild( 0 ).gameObject.SetActive(false);
+            instanceBucket.GetChild( i ).gameObject.SetActive(false);
         }
     }
 
@@ -196,7 +216,7 @@ public class FenceBuilder : MonoBehaviour
         int count = instanceBucket.childCount;
         for( int i = 0; i < count; ++i )
         {
-            GameObject instance = instanceBucket.GetChild( 0 ).transform.gameObject;
+            GameObject instance = instanceBucket.GetChild( i ).transform.gameObject;
             if( instance.activeSelf )
             {
                 continue;
@@ -226,8 +246,8 @@ public class FenceBuilder : MonoBehaviour
         GameObject instance = FindUnusedInstanceInPool( prefabOrGameObject );
         if( instance != null )
         {
-            ResetLocalTransform( instance.transform );
             instance.SetActive( true );
+            instance.transform.SetSiblingIndex( instance.transform.parent.childCount-1 );
         }
 
         if( instance == null )
@@ -248,7 +268,7 @@ public class FenceBuilder : MonoBehaviour
         return InstantiatePrefabOrGameObject( prefabOrGameObject.gameObject, parent ).GetComponent<T>();
     }
 
-    static GameObject InstantiatePrefabOrGameObject(GameObject prefabOrGameObject, Transform parent)
+    static GameObject InstantiatePrefabOrGameObject( GameObject prefabOrGameObject, Transform parent )
     {
         if( prefabOrGameObject == null )
         {
