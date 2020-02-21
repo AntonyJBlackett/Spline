@@ -57,7 +57,7 @@ namespace FantasticSplines
 		public CurveSegment WithRightCurvePoint(CurvePoint point)
 		{
 			Bezier3 bez = bezier;
-			bez.C = point.Control1;
+			bez.C = point.Control1Position;
 			bez.D = point.position;
 			bezier = bez;
 			endPointType = point.PointType;
@@ -66,7 +66,7 @@ namespace FantasticSplines
 		public CurveSegment WithLeftCurvePoint(CurvePoint point)
 		{
 			Bezier3 bez = bezier;
-			bez.B = point.Control2;
+			bez.B = point.Control2Position;
 			bez.A = point.position;
 			bezier = bez;
 			startPointType = point.PointType;

@@ -147,5 +147,10 @@ namespace FantasticSplines
             result.control2 = transform.InverseTransformVector( result.control2 );
             return result;
         }
+
+        public override string ToString()
+        {
+            return string.Format("[{0}:{1}]", position, pointType);
+        }
     }
 }
