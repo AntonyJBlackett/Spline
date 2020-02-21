@@ -266,8 +266,9 @@ namespace FantasticSplines
 			PointType start = segments[seg.index].startPointType;
 			PointType end = segments[seg.index].endPointType;
 			segments[seg.index].bezier.SplitAt(seg.segmentT, out A, out B);
+			
 			segments.Insert(seg.index, new CurveSegment(A, start, PointType.Aligned));
-			segments[seg.index + 1].ReInitialise(B, PointType.Aligned, end);
+			segments[seg.index + 1] = segments[seg.index + 1].ReInitialise(B, PointType.Aligned, end);
 		}
 		
 		// appends a point to the end of the curve at position
