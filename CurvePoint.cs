@@ -34,7 +34,10 @@ namespace FantasticSplines
             switch( type )
             {
                 case PointType.Aligned:
-                    constrain = -master.normalized * constrain.magnitude;
+                    if( master.magnitude > 0 )
+                    {
+                        constrain = -master.normalized * constrain.magnitude;
+                    }
                     break;
                 case PointType.Mirrored:
                     constrain = -master;

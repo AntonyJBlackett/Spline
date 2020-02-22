@@ -20,7 +20,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     public bool regenerate = false;
     public bool autoRegenerate = false;
     
-    SplineComponent lastSpline = null;
+    //SplineComponent lastSpline = null;
 
     [SerializeField]
     Transform instanceBucket;
@@ -54,10 +54,15 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
             Clear();
         }
 
-        if( lastSpline != spline )
+        //if( lastSpline != spline )
         {
             AutoRegenerate();
         }
+    }
+
+    void OnDrawGizmos()
+    {
+        Update();
     }
 
     void AutoRegenerate()

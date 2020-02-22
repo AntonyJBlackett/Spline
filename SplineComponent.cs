@@ -12,6 +12,12 @@ namespace FantasticSplines
     {
         public IEditableSpline GetEditableSpline() { return this; }
         public Object GetUndoObject() { return this; }
+        [SerializeField][HideInInspector] Color color;
+        public Color GetColor() { return color;  }
+        public void SetColor(Color newColor) { color = newColor; }
+        [SerializeField][HideInInspector] bool zTest = false;
+        public bool GetZTest() { return zTest; }
+        public void SetZTest(bool test) { zTest = test; } 
 
         public abstract float GetSpeed(float t);
         public abstract Vector3 GetDirection(float t);
@@ -50,11 +56,13 @@ namespace FantasticSplines
         {
             if (Selection.activeObject != gameObject)
             {
+                Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
                 for (int i = 0; i < curve.SegmentCount; ++i)
                 {
                     Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment(i), transform );
-                    Handles.DrawBezier(bezier.start, bezier.end, bezier.B, bezier.C, Color.grey, null,
-                        2);
+
+                    Handles.DrawBezier(bezier.start, bezier.end, bezier.B, bezier.C, GetColor() * .9f, null,
+                        2f);
                 }
 
                 // this stops selection of the spline when we're doing other things.
@@ -66,6 +74,7 @@ namespace FantasticSplines
                         Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
                     }
                 }
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
             }
         }
 #endif

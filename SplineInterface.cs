@@ -14,6 +14,10 @@ namespace FantasticSplines
     {
         Transform GetTransform();
         Component GetComponent(); // return component that is or stores this spline. So that the editor can inform unity of changes to the component
+        Color GetColor();
+        void SetColor(Color newColor);
+        bool GetZTest();
+        void SetZTest( bool test );
 
         //CurvePoint[] GetPoints();
         int GetPointCount();

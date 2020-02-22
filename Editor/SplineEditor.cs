@@ -338,8 +338,11 @@ namespace FantasticSplines
             SnapToGridZ = GUILayout.Toggle( SnapToGridZ, "Z" );
             GUILayout.EndHorizontal();
             SnapToGridScale = EditorGUILayout.Vector3Field( "Grid Snap Scale", SnapToGridScale );
+            SnapToHalfGrid = GUILayout.Toggle( SnapToHalfGrid, "Snap To Half Grid Size" );
 
             GUILayout.Label( "Gizmos" );
+            spline.SetColor( EditorGUILayout.ColorField( spline.GetColor() ) );
+            spline.SetZTest( GUILayout.Toggle( spline.GetZTest(), "ZTest" ) );
             ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
             ShowCurvePointControls = GUILayout.Toggle( ShowCurvePointControls, "Show Point Controls" );
 
@@ -352,7 +355,7 @@ namespace FantasticSplines
             GUILayout.Label( "Debug" );
             GUILayout.Label( "Edit Mode: " + editMode.ToString() );
             GUILayout.Label( "Add Point Mode: " + addPointMode.ToString() );
-            GUILayout.Label( "Moving Point: " + Moving.ToString() );
+            GUILayout.Label( "Moving Point: " + movePointState.Moving.ToString() );
             GUILayout.Label( "Length: " + (spline as ISpline).GetLength(0f,1f) );
 
             DrawDefaultInspector();
@@ -392,6 +395,12 @@ namespace FantasticSplines
         {
             get => EditorPrefs.GetBool("FantasticSplinesSnapToGridZ", true);
             set => EditorPrefs.SetBool("FantasticSplinesSnapToGridZ", value);
+        }
+
+        public static bool SnapToHalfGrid
+        {
+            get => EditorPrefs.GetBool("FantasticSplinesSnapToHalfGrid", false);
+            set => EditorPrefs.SetBool("FantasticSplinesSnapToHalfGrid", value);
         }
 
         public static Vector3 SnapToGridScale
@@ -582,6 +591,8 @@ namespace FantasticSplines
             {
                 return;
             }
+            Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+                
 
             SceneViewEventSetup( guiEvent );
 
@@ -609,14 +620,14 @@ namespace FantasticSplines
                     }
                     break;
             }
-
-            // draw things
-            DrawSpline( spline );
             
-            if( ShowGrid || guiEvent.alt )
+            if( !movePointState.MovingControlPoint && (ShowGrid || guiEvent.alt) )
             {
                 DrawGrid( spline, guiEvent );
             }
+
+            // draw things
+            DrawSpline( spline );
 
             if( guiEvent.isMouse || doRepaint )
             {
@@ -635,15 +646,22 @@ namespace FantasticSplines
                     guiEvent.Use();
                 }
             }
+            
+            Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
         }
 
-        Color horizontalGridColour = new Color( 1, 1, 1, .2f );
+        Color horizontalGridColour = new Color( .7f, .7f, 1, .2f );
         void DrawGrid( IEditableSpline spline, Event guiEvent )
         {
             Transform transform = spline.GetTransform();
+            DrawGrid( transform.position, transform.forward, transform.right, 1, 10, guiEvent );
+            DrawGrid( transform.position, transform.forward, transform.right, 1, 10, guiEvent );
+        }
 
-            DrawGridLines( transform.position, transform.forward, transform.right, 1, 50, 50, horizontalGridColour );
-            DrawGridLines( transform.position, transform.forward, transform.right, 10, 5, 5, horizontalGridColour );
+        void DrawGrid( Vector3 origin, Vector3 forward, Vector3 right, float scale, int largeGridInterval, Event guiEvent )
+        {
+            DrawGridLines( origin, forward, right, 1f*scale, 50, 50, horizontalGridColour );
+            DrawGridLines( origin, forward, right, largeGridInterval*scale, 5, 5, horizontalGridColour );
         }
 
         void DrawGridLines( Vector3 origin, Vector3 forward, Vector3 right, float spacing, int halfLength, int halfWidth, Color color )
@@ -745,9 +763,9 @@ namespace FantasticSplines
             }
         }
 
-        static void DrawBezierSegment( CurvePoint point1, CurvePoint point2 )
+        static void DrawBezierSegment( CurvePoint point1, CurvePoint point2, Color color )
         {
-            Handles.DrawBezier( point1.position, point2.position, point1.position + point1.Control2, point2.position + point2.Control1, Color.white, null, 2 );
+            Handles.DrawBezier( point1.position, point2.position, point1.position + point1.Control2, point2.position + point2.Control1, color, null, 3 );
         }
 
         static void DrawBezierSegmentOnPlane( Vector3 planeOrigin, Vector3 planeNormal, CurvePoint point1, CurvePoint point2 )
@@ -758,19 +776,19 @@ namespace FantasticSplines
             Vector3 tangentFlat1 = GetPointOnPlaneY( planeOrigin, planeNormal, point1.position + point1.Control2 );
             Vector3 tangentFlat2 = GetPointOnPlaneY( planeOrigin, planeNormal, point2.position + point2.Control1 );
 
-            Handles.DrawBezier( pointOnPlane1, pointOnPlane2, tangentFlat1, tangentFlat2, Color.grey, null, 2 );
+            Handles.DrawBezier( pointOnPlane1, pointOnPlane2, tangentFlat1, tangentFlat2, Color.grey, null, 2.5f );
         }
 
         void DrawBezierSplineLines(IEditableSpline spline)
         {
             for( int i = 1; i < spline.GetPointCount(); ++i )
             {
-                DrawBezierSegment( spline.GetPoint( i-1 ), spline.GetPoint( i ) );
+                DrawBezierSegment( spline.GetPoint( i-1 ), spline.GetPoint( i ), spline.GetColor() );
             }
         
             if( spline.IsLoop() && spline.GetPointCount() > 1)
             {
-                DrawBezierSegment( spline.GetPoint( spline.GetPointCount()-1 ), spline.GetPoint( 0 ) );
+                DrawBezierSegment( spline.GetPoint( spline.GetPointCount()-1 ), spline.GetPoint( 0 ), spline.GetColor() );
             }
         }
 
@@ -886,15 +904,15 @@ namespace FantasticSplines
 
         void DrawSpline(IEditableSpline spline)
         {
-            DrawBezierSplineLines( spline );
-            DrawSplinePlaneProjectionLines( spline );
             DrawBezierPlaneProjectedSplineLines( spline );
+            DrawSplinePlaneProjectionLines( spline );
+;
             DrawSplineSelectionDisks( spline );
-
-            DrawSplinePoints( spline );
-            DrawSplineSelectionControlPoint( spline );
+            DrawBezierSplineLines( spline );
 
             DrawSegmentLengths( spline );
+            DrawSplinePoints( spline );
+            DrawSplineSelectionControlPoint( spline );
         }
 
         void DrawSegmentLengths( IEditableSpline spline )
@@ -1259,17 +1277,19 @@ namespace FantasticSplines
             Handles.color = Color.white;
         }
 
-        static Vector3 SnapWorldPointToGrid( Vector3 worldSpacePoint, Vector3 origin )
+        static Vector3 SnapWorldPointToGrid( Vector3 worldSpacePoint, Vector3 origin, float scale = 1 )
         {
-            return SnapLocalPointToGrid( worldSpacePoint - origin, Vector3.one ) + origin;
+            return SnapLocalPointToGrid( worldSpacePoint - origin, Vector3.one, scale ) + origin;
         }
 
-        static Vector3 SnapWorldPointToGrid( Vector3 worldSpacePoint, Vector3 origin, Vector3 filter )
+        static Vector3 SnapWorldPointToGrid( Vector3 worldSpacePoint, Vector3 origin, Vector3 filter, float scale = 1 )
         {
-            return SnapLocalPointToGrid( worldSpacePoint - origin, filter ) + origin;
+            float globalScale = SnapToHalfGrid ? 0.5f : 1;
+            scale *= globalScale;
+            return SnapLocalPointToGrid( worldSpacePoint - origin, filter, scale ) + origin;
         }
 
-        static Vector3 SnapLocalPointToGrid( Vector3 point, Vector3 filter )
+        static Vector3 SnapLocalPointToGrid( Vector3 point, Vector3 filter, float scale = 1 )
         {
             Vector3 result = point;
 
@@ -1278,7 +1298,7 @@ namespace FantasticSplines
             if( SnapToGridY && Mathf.Abs(filter.y) > 0 ) snapAxis |= SnapAxis.Y;
             if( SnapToGridZ && Mathf.Abs(filter.z) > 0 ) snapAxis |= SnapAxis.Z;
 
-            result = Snapping.Snap( result, SnapToGridScale, snapAxis );
+            result = Snapping.Snap( result, SnapToGridScale * scale, snapAxis );
 
             return result;
         }
@@ -1509,10 +1529,6 @@ namespace FantasticSplines
             return Vector3.Distance( screenPoint, mouseScreenPoint ) < Vector3.Distance( screenPoint, screenPoint2 );
         }
 
-        bool Moving { get { return movePointCurvePointIndex != -1; } }
-        bool MovingControlPoint { get { return movePointCurvePointIndex != -1 && movePointControlPointId != MoveControlPointId.None; } }
-        int movePointCurvePointIndex = -1;
-
         enum MoveControlPointId
         {
             None,
@@ -1521,95 +1537,113 @@ namespace FantasticSplines
             Unknown
         }
 
-        MoveControlPointId movePointControlPointId = MoveControlPointId.None;
-        Vector2 startMovementAccumulator = Vector2.zero;
-        Vector3 movementPoint = Vector3.zero;
-        Vector3 movementStartPoint = Vector3.zero;
-        Vector3 lastSnappedMovement = Vector3.zero;
+
+        struct MovePointState
+        {
+            public int CurvePointIndex { get; private set; }
+            public MoveControlPointId ControlPointId { get; set; }
+
+            public Vector2 StartMovementAccumulator { get; set; }
+            public Vector3 LastSnappedMovement { get; set; }
+
+            public Vector3 CurrentPosition { get; set; }
+            public Vector3 StartPosition { get; private set; }
+            
+            public bool Moving { get; private set; }
+            public bool MovingControlPoint { get { return CurvePointIndex != -1 && ControlPointId != MoveControlPointId.None; } }
+
+            public bool WasSnapping { get; set; }
+
+            public MovePointState( int curvePointIndex, MoveControlPointId controlPointId, Vector3 startPosition )
+            {
+                Moving = true;
+                StartMovementAccumulator = Vector2.zero;
+                LastSnappedMovement = Vector3.zero;
+                WasSnapping = false;
+                WasSnapping = false;
+                this.ControlPointId = controlPointId;
+                this.CurvePointIndex = curvePointIndex;
+                this.StartPosition = CurrentPosition = startPosition;
+            }
+        }
+
+        MovePointState movePointState;
+
         const float startMovementThreshold = 5;
+
+        void DetectPointToMove( IEditableSpline spline, Event guiEvent )
+        {
+            for( int i = 0; i < pointSelection.Count; ++i )
+            {
+                int index = pointSelection[i];
+                CurvePoint point = spline.GetPoint( index );
+                Vector3 worldControl1 = point.Control1 + point.position;
+                Vector3 worldControl2 = point.Control2 + point.position;
+                
+                bool overControl1 = IsMouseOverPoint( Camera.current, worldControl1, guiEvent.mousePosition );
+                bool overControl2 = IsMouseOverPoint( Camera.current, worldControl2, guiEvent.mousePosition );
+
+                bool control1Interactable = spline.IsLoop() || index > 0;
+                bool control2Interactable = spline.IsLoop() || index < spline.GetPointCount()-1;
+
+                bool control1Detected = overControl1 && control1Interactable && point.PointType != PointType.Point;
+                bool control2Detected = overControl2 && control2Interactable && point.PointType != PointType.Point;
+
+                if( control1Detected
+                    && control2Detected
+                    && Vector3.Distance( worldControl1, worldControl2 ) <= handleCapSize )
+                {
+                    // if control points are ontop of eachother 
+                    // we need to determin which to move later on when we know the drag direction
+                    controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl2 );
+                    controlPlaneOffset = worldControl2 - controlPlanePosition;
+
+                    movePointState = new MovePointState( index, MoveControlPointId.Unknown, worldControl2 );
+                }
+                else if( control1Detected )
+                {
+                    controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl1 );
+                    controlPlaneOffset = worldControl1 - controlPlanePosition;
+                    movePointState = new MovePointState( index, MoveControlPointId.Control1, worldControl1 );
+                }
+                else if( control2Detected )
+                {
+                    controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl2 );
+                    controlPlaneOffset = worldControl2 - controlPlanePosition;
+                    movePointState = new MovePointState( index, MoveControlPointId.Control2, worldControl2 );
+                }
+                // curve point
+                else if( IsMouseOverPoint( Camera.current, point.position, guiEvent.mousePosition ) )
+                {
+                    movePointState = new MovePointState( index, MoveControlPointId.None, point.position );
+                }
+
+                if( movePointState.Moving )
+                {
+                    planePosition = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point.position );
+                    planeOffset = point.position - planePosition;
+                    break;
+                }
+            }
+        }
+
         void DoMovePoint(IEditableSpline spline, Event guiEvent)
         {
             Transform transform = spline.GetTransform();
 
-            if( !Moving )
+            if( !movePointState.Moving )
             {
                 DoPointSelection( spline, guiEvent );
             }
 
-            if( !Moving && guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
+            if( !movePointState.Moving && guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
             {
-                startMovementAccumulator = Vector2.zero;
-                for( int i = 0; i < pointSelection.Count; ++i )
-                {
-                    int index = pointSelection[i];
-                    CurvePoint point = spline.GetPoint( index );
-                    // control points
-                    Vector3 worldControl1 = point.Control1 + point.position;
-                    Vector3 worldControl2 = point.Control2 + point.position;
-                    
-                    bool overControl1 = IsMouseOverPoint( Camera.current, worldControl1, guiEvent.mousePosition );
-                    bool overControl2 = IsMouseOverPoint( Camera.current, worldControl2, guiEvent.mousePosition );
-
-                    bool control1Interactable = spline.IsLoop() || index > 0;
-                    bool control2Interactable = spline.IsLoop() || index < spline.GetPointCount()-1;
-
-                    bool control1Detected = overControl1 && control1Interactable;
-                    bool control2Detected = overControl2 && control2Interactable;
-
-                    if( point.PointType != PointType.Point && control1Detected
-                        && point.PointType != PointType.Point && control2Detected
-                        && Vector3.Distance( worldControl1, worldControl2 ) <= handleCapSize )
-                    {
-                        // if control points are ontop of eachother 
-                        // we need to determin which to move later on when we know the drag direction
-                        controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl2 );
-                        controlPlaneOffset = worldControl2 - controlPlanePosition;
-                        movementStartPoint = worldControl2;
-
-                        movePointCurvePointIndex = index;
-                        movePointControlPointId = MoveControlPointId.Unknown;
-                    }
-                    else if( point.PointType != PointType.Point && control1Detected )
-                    {
-                        controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl1 );
-                        controlPlaneOffset = worldControl1 - controlPlanePosition;
-                        movementStartPoint = worldControl1;
-
-                        movePointCurvePointIndex = index;
-                        movePointControlPointId = MoveControlPointId.Control1;
-                    }
-                    else if( point.PointType != PointType.Point && control2Detected )
-                    {
-                        controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl2 );
-                        controlPlaneOffset = worldControl2 - controlPlanePosition;
-                        movementStartPoint = worldControl2;
-
-                        movePointCurvePointIndex = index;
-                        movePointControlPointId = MoveControlPointId.Control2;
-                    }
-                    // actual points
-                    else if( IsMouseOverPoint( Camera.current, point.position, guiEvent.mousePosition ) )
-                    {
-                        movementStartPoint = point.position;
-                        movePointCurvePointIndex = index;
-                        movePointControlPointId = MoveControlPointId.None;
-                    }
-
-                    if( Moving )
-                    {
-                        movementPoint = movementStartPoint;
-                        lastSnappedMovement = Vector3.zero;
-                        planePosition = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point.position );
-                        planeOffset = point.position - planePosition;
-                        break;
-                    }
-                }
+                DetectPointToMove( spline, guiEvent );
             }
-            else if( Moving && (guiEvent.type == EventType.MouseDrag || guiEvent.type == EventType.MouseUp) && guiEvent.button == 0 )
+            else if( movePointState.Moving && (guiEvent.type == EventType.MouseDrag || guiEvent.type == EventType.MouseUp) && guiEvent.button == 0 )
             {
                 Vector2 screenDelta = TransformMouseDeltaToScreenDelta( guiEvent.delta );
-
-                Vector3 newPoint = movementPoint;
+                Vector3 newPoint = movePointState.CurrentPosition;
 
                 bool physicsHit = false;
                 if( guiEvent.command )
@@ -1629,99 +1663,94 @@ namespace FantasticSplines
                     if( guiEvent.shift )
                     {
                         // move along up axis
-                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( movementPoint ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
+                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( movePointState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
                         Ray projectionRay = Camera.current.ScreenPointToRay( screenPoint );
                         Vector3 verticalPlaneNormal = Vector3.Cross( transform.up, Vector3.Cross( transform.up, projectionRay.direction ) );
-                        Vector3 screenWorldPosition = MathHelper.LinePlaneIntersection( projectionRay, movementPoint, verticalPlaneNormal );
-                        newPoint = movementPoint + transform.up * Vector3.Dot( transform.up, screenWorldPosition - movementPoint );
+                        Vector3 screenWorldPosition = MathHelper.LinePlaneIntersection( projectionRay, movePointState.CurrentPosition, verticalPlaneNormal );
+                        newPoint = movePointState.CurrentPosition + transform.up * Vector3.Dot( transform.up, screenWorldPosition - movePointState.CurrentPosition );
                     }
                     else
                     {
                         // relative pointer tracking
-                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( movementPoint ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
-                        newPoint = MathHelper.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), movementPoint, transform.up );
+                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( movePointState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
+                        newPoint = MathHelper.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), movePointState.CurrentPosition, transform.up );
                     }
                 }
 
-                planePosition = GetPointOnPlaneY( transform.position, transform.up, newPoint );
-                planeOffset = newPoint - planePosition;
-                movementPoint = newPoint;
+                movePointState.CurrentPosition = newPoint;
                 
-                Vector3 movementAccumulator = newPoint - movementStartPoint;
-                if( Mathf.Abs(startMovementAccumulator.x) < startMovementThreshold )
-                {
-                    startMovementAccumulator.x += guiEvent.delta.x;
-                    movementAccumulator.x = 0;
-                }
-                if( Mathf.Abs(startMovementAccumulator.y) < startMovementThreshold )
-                {
-                    startMovementAccumulator.y += guiEvent.delta.y;
-                    movementAccumulator.y = 0;
-                    movementAccumulator.z = 0;
-                }
+                Vector3 totalMovement = newPoint - movePointState.StartPosition;
 
-                if( movementAccumulator.magnitude > 0 )
+                if( Mathf.Abs(movePointState.StartMovementAccumulator.magnitude) < startMovementThreshold )
                 {
-                    Vector3 snappedMovement = movementAccumulator;
+                    movePointState.StartMovementAccumulator += guiEvent.delta;
+                }
+                else if( totalMovement.magnitude > 0 )
+                {
+                    Vector3 snappedMovement = totalMovement;
 
                     if( guiEvent.alt )
                     {
-                        Vector3 newWorldPoint = movementAccumulator + movementStartPoint;
+                        Vector3 newWorldPoint = totalMovement + movePointState.StartPosition;
 
                         Vector3 origin = transform.position;
-                        if( MovingControlPoint )
+                        if( movePointState.MovingControlPoint )
                         {
-                            CurvePoint point = spline.GetPoint( movePointCurvePointIndex );
-                            origin = point.position;
+                            origin = spline.GetPoint( movePointState.CurvePointIndex ).position;
                         }
 
                         Vector3 filter = Vector3.one;
-                        if( Mathf.Abs(snappedMovement.x) <= 0 || guiEvent.shift )
+                        /*if( Mathf.Abs(snappedMovement.x) <= 0 || guiEvent.shift )
                         {
                             filter.x = 0;
-                        }
-                        if( Mathf.Abs(snappedMovement.y) <= 0 || !guiEvent.shift )
-                        {
-                            filter.y = 0;
                         }
                         if( Mathf.Abs(snappedMovement.z) <= 0 || guiEvent.shift )
                         {
                             filter.z = 0;
                         }
 
-                        Vector3 newSnappedWorldPoint = SnapWorldPointToGrid( newWorldPoint, origin, filter );
-                        snappedMovement = newSnappedWorldPoint - movementStartPoint;
+                        if( Mathf.Abs(snappedMovement.y) <= 0 || !guiEvent.shift )
+                        {
+                            filter.y = 0;
+                        }*/
+
+                        float gridScale = ( movePointState.MovingControlPoint ) ? 0.2f : 1.0f;
+
+                        Vector3 newSnappedWorldPoint = SnapWorldPointToGrid( newWorldPoint, origin, filter, gridScale );
+                        snappedMovement = newSnappedWorldPoint - movePointState.StartPosition;
                     }
 
-                    Vector3 worldMoveDelta = snappedMovement - lastSnappedMovement;
+                    Vector3 snappedDelta = snappedMovement - movePointState.LastSnappedMovement;
 
                     Undo.RecordObject( spline.GetUndoObject(), "Move Points" );
-                    if( MovingControlPoint )
+                    if( movePointState.MovingControlPoint )
                     {
-                        CurvePoint curvePoint = spline.GetPoint( movePointCurvePointIndex );
-                        if( movePointControlPointId == MoveControlPointId.Unknown )
+                        CurvePoint curvePoint = spline.GetPoint( movePointState.CurvePointIndex );
+                        if( movePointState.ControlPointId == MoveControlPointId.Unknown )
                         {
                             Vector3 worldControl = curvePoint.position + curvePoint.Control2;
-                            float directionTestForward = -1;
-                            float directionTestBackward = -1;
-                            if( spline.GetPointCount() > movePointCurvePointIndex + 1 )
+                            float directionTestForward = 0;
+                            float directionTestBackward = 0;
+                            if( spline.GetPointCount() > movePointState.CurvePointIndex + 1 || spline.IsLoop() )
                             {
-                                directionTestForward = Vector3.Dot( movementAccumulator.normalized, (spline.GetPoint( movePointCurvePointIndex + 1 ).position - curvePoint.position).normalized );
+                                int nextIndex = MathHelper.WrapIndex(movePointState.CurvePointIndex + 1, spline.GetPointCount());
+                                directionTestForward = Vector3.Dot( totalMovement.normalized, (spline.GetPoint( nextIndex ).position - curvePoint.position).normalized );
                             }
 
-                            if( movePointCurvePointIndex - 1 >= 0 )
+                            if( movePointState.CurvePointIndex - 1 >= 0 || spline.IsLoop() )
                             {
-                                directionTestBackward = Vector3.Dot( movementAccumulator.normalized, (spline.GetPoint( movePointCurvePointIndex - 1 ).position - curvePoint.position).normalized );
+                                int nextIndex = MathHelper.WrapIndex(movePointState.CurvePointIndex - 1, spline.GetPointCount());
+                                directionTestBackward = Vector3.Dot( totalMovement.normalized, (spline.GetPoint( movePointState.CurvePointIndex - 1 ).position - curvePoint.position).normalized );
                             }
 
                             if( directionTestForward >= directionTestBackward )
                             {
-                                movePointControlPointId = MoveControlPointId.Control2;
+                                movePointState.ControlPointId = MoveControlPointId.Control2;
                                 worldControl = curvePoint.position + curvePoint.Control2;
                             }
                             else
                             {
-                                movePointControlPointId = MoveControlPointId.Control1;
+                                movePointState.ControlPointId = MoveControlPointId.Control1;
                                 worldControl = curvePoint.position + curvePoint.Control1;
                             }
                             
@@ -1729,15 +1758,15 @@ namespace FantasticSplines
                             controlPlaneOffset = worldControl - controlPlanePosition;
                         }
 
-                        if( movePointControlPointId == MoveControlPointId.Control1 )
+                        if( movePointState.ControlPointId == MoveControlPointId.Control1 )
                         {
-                            curvePoint.Control1 = curvePoint.Control1 + worldMoveDelta;
+                            curvePoint.Control1 = curvePoint.Control1 + snappedDelta;
                         }
                         else
                         {
-                            curvePoint.Control2 = curvePoint.Control2 + worldMoveDelta;
+                            curvePoint.Control2 = curvePoint.Control2 + snappedDelta;
                         }
-                        spline.SetPoint( movePointCurvePointIndex, curvePoint );
+                        spline.SetPoint( movePointState.CurvePointIndex, curvePoint );
                     }
                     else
                     {
@@ -1745,28 +1774,36 @@ namespace FantasticSplines
                         {
                             int index = pointSelection[i];
                             CurvePoint curvePoint = spline.GetPoint( index );
-                            curvePoint.position = curvePoint.position + worldMoveDelta;
+                            curvePoint.position = curvePoint.position + snappedDelta;
                             spline.SetPoint( index, curvePoint );
                         }
                     }
                     
-                    lastSnappedMovement = snappedMovement;
+                    movePointState.LastSnappedMovement = snappedMovement;
+
+                    CurvePoint latestCurvePoint = spline.GetPoint( movePointState.CurvePointIndex );
+                    planePosition = GetPointOnPlaneY( transform.position, transform.up, latestCurvePoint.position );
+                    planeOffset = latestCurvePoint.position - planePosition;
                 }
 
                 if( guiEvent.type == EventType.MouseUp )
                 {
-                    movePointCurvePointIndex = -1;
+                    movePointState = new MovePointState();
                 }
             }
 
-            if( Moving )
+            if( movePointState.Moving )
             {
                 useEvent = true;
             }
 
-            if( MovingControlPoint )
+            if( movePointState.MovingControlPoint )
             {
-                CurvePoint curvePoint = spline.GetPoint( movePointCurvePointIndex );
+                CurvePoint curvePoint = spline.GetPoint( movePointState.CurvePointIndex );
+                if( ShowGrid || guiEvent.alt )
+                {
+                    DrawGrid( curvePoint.position, transform.forward, transform.right, 0.2f, 5, guiEvent );
+                }
                 DrawControlPointMovementGuides( spline, curvePoint.position, curvePoint.Control1 + curvePoint.position, curvePoint.Control2 + curvePoint.position );
             }
         }
