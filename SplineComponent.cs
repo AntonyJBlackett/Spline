@@ -313,12 +313,12 @@ namespace FantasticSplines
 
         public override Vector3 GetClosestPoint(Vector3 point)
         {
-            return TransformPoint(curve.GetClosestPoint(InverseTransformPoint(point)));
+            return TransformPoint( curve.GetClosestPoint( InverseTransformPoint(point) ) );
         }
 
         public override Vector3 GetClosestPoint(Ray ray)
         {
-            return TransformPoint(curve.GetClosestPoint(InverseTransformRay(ray)));
+            return TransformPoint( curve.GetClosestPoint( InverseTransformRay(ray) ) );
         }
 
         //TODO this will break when scaled
