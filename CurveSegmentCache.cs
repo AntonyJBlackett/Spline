@@ -74,12 +74,12 @@ namespace FantasticSplines
             mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 8
             mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 4 
             mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 2
+            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 1
 
             #if DEBUG
             Debug.Assert(ACCURACY == 16);
-            Debug.Assert(low + 1 == high - 1);
+            Debug.Assert(low + 1 == high);
             #endif
-            high -= 1;
 
             return MathHelper.Remap(d, tdMapping[low].d, tdMapping[high].d, tdMapping[low].t, tdMapping[high].t);
         }
@@ -90,15 +90,16 @@ namespace FantasticSplines
             int high = ACCURACY;
             int mid = (low + high) / 2;
 
-            mid = Split(ref low, ref high, mid, t < tdMapping[mid].d); // 8
-            mid = Split(ref low, ref high, mid, t < tdMapping[mid].d); // 4 
-            mid = Split(ref low, ref high, mid, t < tdMapping[mid].d); // 2
+            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 8
+            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 4 
+            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 2
+            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 1
 
             #if DEBUG
             Debug.Assert(ACCURACY == 16);
-            Debug.Assert(low + 1 == high - 1);
+            Debug.Assert(low + 1 == high);
             #endif
-            high -= 1;
+
             return MathHelper.Remap(t, tdMapping[low].t, tdMapping[high].t, tdMapping[low].d, tdMapping[high].d);
         }
     }
@@ -119,7 +120,7 @@ namespace FantasticSplines
             {
                 curve = c;
                 segmentIndex = c.LoopSegementIndex( segPos.index );
-                segmentDistance = curve._segments[segmentIndex].GetDistance(segPos.segmentT);
+                segmentDistance = (curve._segments.Length > 0 ) ? curve._segments[segmentIndex].GetDistance(segPos.segmentT) : 1;
             }
 
             public Curve curve;
@@ -127,10 +128,10 @@ namespace FantasticSplines
             public float segmentDistance;
             public float segmentT => curve._segments[segmentIndex].GetT(segmentDistance);
 
-            public Vector3 Position => curve._segments[segmentIndex].GetPositionAtDistance(segmentDistance);
-            public Vector3 Tangent => curve._segments[segmentIndex].GetTangentAtDistance(segmentDistance);
+            public Vector3 Position => (curve._segments.Length > 0 ) ? curve._segments[segmentIndex].GetPositionAtDistance(segmentDistance) : Vector3.zero;
+            public Vector3 Tangent => (curve._segments.Length > 0 ) ? curve._segments[segmentIndex].GetTangentAtDistance(segmentDistance) : Vector3.forward;
 
-            public float DistanceOnSpline => curve._segments[segmentIndex].startDistanceInSpline + segmentDistance;
+            public float DistanceOnSpline => (curve._segments.Length > 0 ) ? curve._segments[segmentIndex].startDistanceInSpline + segmentDistance : 1;
         }
 
         
