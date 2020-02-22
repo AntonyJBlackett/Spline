@@ -123,11 +123,6 @@ namespace FantasticSplines
             return ray;
         }
 
-        public bool IsIndexInRange(int index)
-        {
-            return index >= 0 && index < PointCount;
-        }
-
         public override void InsertPoint(float t)
         {
             curve.InsertPoint( t );
@@ -285,7 +280,7 @@ namespace FantasticSplines
         public override List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true,
             bool includeSplinePoints = false)
         {
-            return TransformPoints(GetPoints(worldSpacing, includeEndPoint, includeSplinePoints));
+            throw new System.NotImplementedException();
         }
     }
 }

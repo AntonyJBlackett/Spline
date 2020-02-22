@@ -237,11 +237,6 @@ namespace FantasticSplines
             return points;
         }
 
-        public int GetClosestSegmentIndex(Ray ray)
-        {
-            throw new System.NotImplementedException();
-        }
-
         public override List<CurvePoint> GetPoints()
         {
             return TransformPoints(curve.GetPoints());
@@ -327,16 +322,16 @@ namespace FantasticSplines
         }
 
         //TODO this will break when scaled
-        public override float Step(float currentT, float worldDistance)
+        public override float Step(float t, float worldDistance)
         {
-            return curve.Step(currentT, worldDistance);
+            return curve.Step(t, worldDistance);
         }
 
         //TODO this will break when scaled
         public override List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true,
             bool includeSplinePoints = false)
         {
-            return TransformPoints(GetPoints(worldSpacing, includeEndPoint, includeSplinePoints));
+            throw new System.NotImplementedException();
         }
     }
 }

@@ -357,7 +357,14 @@ namespace FantasticSplines
             bool foundPointInFront = false;
             for (int i = 0; i < SegmentCount; i++)
             {
-                Bezier3 curve = _segments[i].bezier;
+                int index1 = i - 1;
+                int index2 = i;
+                if( index1 < 0 )
+                {
+                    index1 = CurvePointCount;
+                }
+
+                Bezier3 curve = new Bezier3( GetCurvePoint(index1), GetCurvePoint(index2) );
                 Bezier3 projected = Bezier3.ProjectToPlane( curve, ray.origin, ray.direction );
 
                 float curveClosestParam = projected.GetClosestT(ray.origin, paramThreshold);
@@ -419,8 +426,58 @@ namespace FantasticSplines
         }
 
         public Vector3 GetClosestPoint(Ray ray)
+        { 
+            return GetClosestPoint( ray, 0.000001f );
+        }
+
+        public Vector3 GetClosestPoint(Ray ray, float paramThreshold )
         {
-            return GetClosestSegmentPointer(ray).Position;
+            float minDistSqWorld = float.MaxValue;
+            float minDistSqProjected = float.MaxValue;
+            Vector3 bestPoint = Vector3.zero;
+            bool foundPointInFront = false;
+            for (int i = 1; i < CurvePointCount; i++)
+            {
+                int index1 = i - 1;
+                int index2 = i;
+                if( index1 < 0 )
+                {
+                    index1 = CurvePointCount-1;
+                }
+
+                Bezier3 curve = new Bezier3( GetCurvePoint(index1), GetCurvePoint(index2) );
+                Bezier3 projected = Bezier3.ProjectToPlane( curve, ray.origin, ray.direction );
+
+                float curveClosestParam = projected.GetClosestT(ray.origin, paramThreshold);
+
+                Vector3 projectedPos = projected.GetPos(curveClosestParam);
+                Vector3 pos = curve.GetPos(curveClosestParam);
+
+                bool infront = Vector3.Dot( ray.direction, pos - ray.origin ) >= 0;
+                if( infront || !foundPointInFront )
+                {
+                    if( !foundPointInFront )
+                    {
+                        minDistSqWorld = float.MaxValue;
+                        minDistSqProjected = float.MaxValue;
+                        foundPointInFront = true;
+                    }
+
+                    float distSqProjected = (projectedPos - ray.origin).sqrMagnitude;
+                    float distSqWorld = (pos - ray.origin).sqrMagnitude;
+                    if( 
+                        ( distSqProjected < minDistSqProjected )
+                        || ( Mathf.Abs( distSqProjected - minDistSqProjected ) < float.Epsilon && distSqWorld < minDistSqWorld )  
+                    )
+                    {
+                        minDistSqProjected = distSqProjected;
+                        minDistSqWorld = distSqWorld;
+                        bestPoint = pos;
+                    }
+                }
+            }
+
+            return bestPoint;
         }
 
         public float Step(float t, float worldDistance)
