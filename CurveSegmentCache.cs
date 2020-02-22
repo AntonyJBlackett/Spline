@@ -8,7 +8,8 @@ namespace FantasticSplines
     public struct TDMap
     {
         // MUST BE POWER OF 2
-        private const int ACCURACY = 16;
+        private const int SQRT_ACCURACY = 4;
+        private static int ACCURACY = SQRT_ACCURACY^2;
 
         private struct TD
         {
@@ -68,18 +69,27 @@ namespace FantasticSplines
         public float GetT(float d)
         {
             int low = 0;
-            int high = ACCURACY;
+            int high = ACCURACY-1;
             int mid = (low + high) / 2;
 
-            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 8
-            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 4 
-            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 2
-            mid = Split(ref low, ref high, mid, d < tdMapping[mid].d); // 1
+            for( int i = 0; i < SQRT_ACCURACY; ++i )
+            {
+                mid = Split( ref low, ref high, mid, d < tdMapping[mid].d );
+            }
 
             #if DEBUG
-            Debug.Assert(ACCURACY == 16);
+            Debug.Assert( (SQRT_ACCURACY^2) == ACCURACY );
             Debug.Assert(low + 1 == high);
-            #endif
+#endif
+
+            if( low < 0 )
+            {
+                Debug.Break();
+            }
+            if( high >= tdMapping.Length )
+            {
+                Debug.Break();
+            }
 
             return MathHelper.Remap(d, tdMapping[low].d, tdMapping[high].d, tdMapping[low].t, tdMapping[high].t);
         }
@@ -87,16 +97,16 @@ namespace FantasticSplines
         public float GetDistance(float t)
         {
             int low = 0;
-            int high = ACCURACY;
+            int high = ACCURACY-1;
             int mid = (low + high) / 2;
 
-            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 8
-            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 4 
-            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 2
-            mid = Split(ref low, ref high, mid, t < tdMapping[mid].t); // 1
+            for( int i = 0; i < SQRT_ACCURACY; ++i )
+            {
+                mid = Split(ref low, ref high, mid, t < tdMapping[mid].t);
+            }
 
             #if DEBUG
-            Debug.Assert(ACCURACY == 16);
+            Debug.Assert( (SQRT_ACCURACY^2) == ACCURACY );
             Debug.Assert(low + 1 == high);
             #endif
 
