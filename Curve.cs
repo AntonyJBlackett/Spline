@@ -231,7 +231,7 @@ namespace FantasticSplines
 
         int LoopSegementIndex( int segment )
         {
-            if( loop && SegmentCount > 0)
+            if( loop )
             {
                 return segment % SegmentCount;
             }
