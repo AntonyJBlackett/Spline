@@ -54,7 +54,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
             Clear();
         }
 
-        //if( lastSpline != spline )
+        if( lastSpline != spline )
         {
             AutoRegenerate();
         }
@@ -70,9 +70,6 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 
     void Regenerate()
     {
-#if UNITY_EDITOR
-        Undo.RecordObject( gameObject, "Fence Generation" );
-#endif
         regenerate = false;
         DeactivateInstances();
 
@@ -204,10 +201,12 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 
     GameObject FindUnusedInstanceInPool( GameObject prefabOrGameObject )
     {
+#if UNITY_EDITOR
         if( instanceBucket == null )
         {
             return null;
         }
+
         if( !PrefabUtility.IsPartOfAnyPrefab( prefabOrGameObject ) )
         {
             return null;
@@ -231,7 +230,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
                 return instance;
             }
         }
-
+#endif
         return null;
     }
 
