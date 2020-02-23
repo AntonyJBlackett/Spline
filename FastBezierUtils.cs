@@ -210,7 +210,7 @@ namespace FantasticSplines
         /// <summary>
         /// Creates a cubic Bézier curve.
         /// </summary>
-        public Bezier3(CurvePoint start, CurvePoint end)
+        public Bezier3(SplineNode start, SplineNode end)
         {
             A = start.position;
             B = start.position + start.Control2;

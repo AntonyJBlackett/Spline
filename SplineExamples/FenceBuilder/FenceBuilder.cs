@@ -125,35 +125,43 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 
         float splineLength = spline.GetLength();
 
-        int limit = Mathf.CeilToInt( 1 + splineLength / separation ); // we should never need more segments than a dead straight spline needs
-        while( !post1Position.AtEnd )
+        if( splineLength > 0 )
         {
-            GameObject segmentInstance = GetInstance( segment, instanceBucket );
-            segmentInstance.SetActive( true );
-
-            Vector3 segmentDirection = (post2Position.position - post1Position.position).normalized;
-            Vector3 segmentPosition = post1Position.position + segmentDirection * separation * 0.5f;
-
-            segmentInstance.transform.position = segmentPosition;
-            segmentInstance.transform.rotation = Quaternion.LookRotation( segmentDirection, Vector3.up );
-
-            if( post != null )
+            int limit = Mathf.CeilToInt( 1 + splineLength / separation ); // we should never need more segments than a dead straight spline needs
+            while( !post1Position.AtEnd )
             {
-                Vector3 nextPostPosition = post1Position.position + segmentDirection * separation;
-                GameObject postInstance = GetInstance( post, instanceBucket );
-                postInstance.SetActive( true );
-                postInstance.transform.position = nextPostPosition;
-                postInstance.transform.rotation = Quaternion.LookRotation( post2Position.tangent, Vector3.up );
-            }
+                GameObject segmentInstance = GetInstance( segment, instanceBucket );
+                segmentInstance.SetActive( true );
 
-            post1Position = post2Position;
-            post2Position = spline.GetResultAtWorldDistanceFrom( post2Position.splineDistance, separation, step );
+                Vector3 segmentDirection = (post2Position.position - post1Position.position).normalized;
+                Vector3 segmentPosition = post1Position.position + segmentDirection * separation * 0.5f;
 
-            --limit;
-            if( limit < 0 )
-            {
-                Debug.LogWarning( "Segment limit reached" );
-                break;
+                if( Mathf.Approximately( segmentDirection.sqrMagnitude, 0 ) )
+                {
+                    segmentDirection = post1Position.tangent;
+                }
+
+                segmentInstance.transform.position = segmentPosition;
+                segmentInstance.transform.rotation = Quaternion.LookRotation( segmentDirection, Vector3.up );
+
+                if( post != null )
+                {
+                    Vector3 nextPostPosition = post1Position.position + segmentDirection * separation;
+                    GameObject postInstance = GetInstance( post, instanceBucket );
+                    postInstance.SetActive( true );
+                    postInstance.transform.position = nextPostPosition;
+                    postInstance.transform.rotation = Quaternion.LookRotation( post2Position.tangent, Vector3.up );
+                }
+
+                post1Position = post2Position;
+                post2Position = spline.GetResultAtWorldDistanceFrom( post2Position.splineDistance, separation, step );
+
+                --limit;
+                if( limit < 0 )
+                {
+                    Debug.LogWarning( "Segment limit reached" );
+                    break;
+                }
             }
         }
 

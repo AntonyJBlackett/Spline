@@ -19,9 +19,9 @@ namespace FantasticSplines
         /// <remarks>
         /// (De Casteljau's algorithm, see: http://caffeineowl.com/graphics/2d/vectorial/bezierintro.html)
         /// </remarks>
-        public static CurvePoint SplitAt(ref CurvePoint point1, ref CurvePoint point2, float t)
+        public static SplineNode SplitAt(ref SplineNode node1, ref SplineNode node2, float t)
         {
-            Bezier3 bezier = new Bezier3( point1, point2 );
+            Bezier3 bezier = new Bezier3( node1, node2 );
 
             Vector3 a = Vector3.Lerp( bezier.A, bezier.B, t );
             Vector3 b = Vector3.Lerp( bezier.B, bezier.C, t );
@@ -30,20 +30,20 @@ namespace FantasticSplines
             Vector3 n = Vector3.Lerp( b, c, t );
             Vector3 p = bezier.GetPosition( t );
 
-            if( point1.PointType == PointType.Mirrored )
+            if( node1.PointType == PointType.Mirrored )
             {
-                point1.SetPointType( PointType.Aligned );
+                node1.SetPointType( PointType.Aligned );
             }
-            point1.Control2 = a - point1.position;
+            node1.Control2 = a - node1.position;
 
-            if( point2.PointType == PointType.Mirrored )
+            if( node2.PointType == PointType.Mirrored )
             {
-                point2.SetPointType( PointType.Aligned );
+                node2.SetPointType( PointType.Aligned );
             }
-            point2.Control1 = c - point2.position;
+            node2.Control1 = c - node2.position;
 
-            CurvePoint newCurvePoint = new CurvePoint( p, m - p, n - p, PointType.Free );
-            return newCurvePoint;
+            SplineNode newNode = new SplineNode( p, m - p, n - p, PointType.Free );
+            return newNode;
         }
     }
 
@@ -56,7 +56,7 @@ namespace FantasticSplines
         [System.NonSerialized] private SegmentCache[] segments;
 
         [SerializeField]
-        private List<CurvePoint> curvePoints = new List<CurvePoint>();
+        private List<SplineNode> nodes = new List<SplineNode>();
 
         [SerializeField]
         private bool loop = false;
@@ -76,16 +76,16 @@ namespace FantasticSplines
             }
         }
 
-        public int CurvePointCount { get { return curvePoints.Count; } }
+        public int NodeCount { get { return nodes.Count; } }
         public int SegmentCount
         {
             get
             {
                 if( loop )
                 {
-                    return Mathf.Max( 0, curvePoints.Count );
+                    return Mathf.Max( 0, nodes.Count );
                 }
-                return Mathf.Max( 0, curvePoints.Count - 1 );
+                return Mathf.Max( 0, nodes.Count - 1 );
             }
         }
 
@@ -116,9 +116,9 @@ namespace FantasticSplines
             return length * InverseLength;
         }
 
-        bool IsCurvePointIndexInRange(int index)
+        bool IsNodeIndexInRange(int index)
         {
-            return MathHelper.IsInArrayRange( index, CurvePointCount );
+            return MathHelper.IsInArrayRange( index, NodeCount );
         }
 
         void UpdateCachedData()
@@ -160,35 +160,35 @@ namespace FantasticSplines
             }
         }
 
-        public CurvePoint GetCurvePoint(int index)
+        public SplineNode GetNode(int index)
         {
-            return curvePoints[index];
+            return nodes[index];
         }
 
-        public void AddCurvePoint(CurvePoint point)
+        public void AddNode(SplineNode node)
         {
-            curvePoints.Add( point );
+            nodes.Add( node );
             isDirty = true;
         }
 
-        public void AddCurvePointAt(int index, CurvePoint point)
+        public void AddNodeAt(int index, SplineNode node)
         {
-            Debug.Assert( IsCurvePointIndexInRange( index ) );
+            Debug.Assert( IsNodeIndexInRange( index ) );
 
-            curvePoints.Insert( index, point );
+            nodes.Insert( index, node );
             isDirty = true;
         }
 
-        public bool RemoveCurvePoint(int index)
+        public bool RemoveNode(int index)
         {
-            Debug.Assert( IsCurvePointIndexInRange( index ) );
+            Debug.Assert( IsNodeIndexInRange( index ) );
 
-            curvePoints.RemoveAt( index );
+            nodes.RemoveAt( index );
             isDirty = true;
             return true;
         }
 
-        public void InsertCurvePoint(float normalisedT)
+        public void InsertNode(float normalisedT)
         {
             SplineResult result = GetResultAtDistance( normalisedT * Length );
             int segment = result.segmentIndex;
@@ -200,28 +200,28 @@ namespace FantasticSplines
             }
 
             int index1 = segment;
-            int index2 = (segment + 1) % CurvePointCount;
+            int index2 = (segment + 1) % NodeCount;
 
-            CurvePoint point1 = curvePoints[index1];
-            CurvePoint point2 = curvePoints[index2];
+            SplineNode node1 = nodes[index1];
+            SplineNode node2 = nodes[index2];
 
-            CurvePoint split = BezierCalculator.SplitAt( ref point1, ref point2, segmentT );
-            curvePoints[index1] = point1;
-            curvePoints[index2] = point2;
+            SplineNode split = BezierCalculator.SplitAt( ref node1, ref node2, segmentT );
+            nodes[index1] = node1;
+            nodes[index2] = node2;
 
-            if( point1.PointType == PointType.Point && point2.PointType == PointType.Point )
+            if( node1.PointType == PointType.Point && node2.PointType == PointType.Point )
             {
                 split.SetPointType( PointType.Point );
             }
 
-            curvePoints.Insert( segment + 1, split );
+            nodes.Insert( segment + 1, split );
             isDirty = true;
         }
 
-        public void SetCurvePoint(int index, CurvePoint point)
+        public void SetNode(int index, SplineNode node)
         {
-            Debug.Assert( IsCurvePointIndexInRange( index ) );
-            curvePoints[index] = point;
+            Debug.Assert( IsNodeIndexInRange( index ) );
+            nodes[index] = node;
             isDirty = true;
         }
 
@@ -229,8 +229,8 @@ namespace FantasticSplines
         {
             segment = LoopSegementIndex( segment );
             int index1 = segment;
-            int index2 = LoopCurvePointIndex( segment + 1 );
-            return new Bezier3( curvePoints[index1], curvePoints[index2] );
+            int index2 = LoopNodeIndex( segment + 1 );
+            return new Bezier3( nodes[index1], nodes[index2] );
         }
 
         int LoopSegementIndex(int segment)
@@ -243,9 +243,9 @@ namespace FantasticSplines
             return Mathf.Clamp( segment, 0, SegmentCount - 1 );
         }
 
-        int LoopCurvePointIndex(int index)
+        int LoopNodeIndex(int index)
         {
-            return index % CurvePointCount;
+            return index % NodeCount;
         }
 
         float LoopNormalisedT(float normalisedT)
@@ -283,7 +283,7 @@ namespace FantasticSplines
         private SplineResult GetSplineResult(SegmentPointer pointer)
         {
             float splineDistance = segments[pointer.index].startDistanceInSpline + pointer.distance;
-            return new SplineResult()
+            SplineResult result = new SplineResult()
             {
                 splineDistance = splineDistance,
                 splineT = splineDistance * inverseSplineLength,
@@ -296,10 +296,22 @@ namespace FantasticSplines
                 segmentIndex = pointer.index,
                 segmentLength = segments[pointer.index].Length
             };
+
+            if( Mathf.Approximately( result.tangent.sqrMagnitude, 0 ) )
+            {
+                result.tangent = Vector3.forward;
+            }
+
+            return result;
         }
 
         public SplineResult GetResultAtDistance(float distance)
         {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
             EnsureCacheIsUpdated();
 
             float distanceRemain = LoopDistance( distance );
@@ -319,6 +331,11 @@ namespace FantasticSplines
 
         public SplineResult GetResultClosestTo(Vector3 point, float paramThreshold = 0.000001f)
         {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
             EnsureCacheIsUpdated();
 
             float minDistSq = float.MaxValue;
@@ -343,6 +360,11 @@ namespace FantasticSplines
 
         public SplineResult GetResultClosestTo(Ray ray, float paramThreshold = 0.000001f)
         {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
             EnsureCacheIsUpdated();
 
             float minDistSqWorld = float.MaxValue;
@@ -353,12 +375,12 @@ namespace FantasticSplines
             {
                 int index1 = i;
                 int index2 = i + 1;
-                if( index2 >= CurvePointCount )
+                if( index2 >= NodeCount )
                 {
                     index2 = 0;
                 }
 
-                Bezier3 curve = new Bezier3( GetCurvePoint( index1 ), GetCurvePoint( index2 ) );
+                Bezier3 curve = new Bezier3( GetNode( index1 ), GetNode( index2 ) );
                 Bezier3 projected = Bezier3.ProjectToPlane( curve, ray.origin, ray.direction );
 
                 float curveClosestParam = projected.GetClosestT( ray.origin, paramThreshold );

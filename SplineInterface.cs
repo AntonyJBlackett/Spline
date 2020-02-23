@@ -20,6 +20,26 @@ namespace FantasticSplines
 
         public bool AtSegmentEnd => Mathf.Approximately( segmentT, 1 );
         public bool AtSegmentStart => Mathf.Approximately( segmentT, 0 );
+
+        public static SplineResult Default
+        {
+            get
+            {
+                return new SplineResult()
+                {
+                    position = Vector3.zero,
+                    tangent = Vector3.forward,
+
+                    splineT = 0,
+                    splineDistance = 0,
+
+                    segmentIndex = 0,
+                    segmentT = 0,
+                    segmentDistance = 0,
+                    segmentLength = 0
+                };
+            }
+        }
     }
 
     // Proxy interfact to enable tools to easily use the spline editor in their own editors
@@ -37,17 +57,17 @@ namespace FantasticSplines
         // componenet that has the spline, used for undo/redo
         Component GetComponent();
 
-        int GetCurvePointCount();
+        int GetNodeCount();
         bool IsLoop();
         void SetLoop(bool loop);
         float GetLength();
 
-        CurvePoint GetCurvePoint(int index);
-        void SetCurvePoint(int index, CurvePoint point);
-        void AppendCurvePoint(CurvePoint point); // adds the given CurvePoint to the end of the curve
-        void PrependCurvePoint(CurvePoint point); // adds the given CurvePoint to the start of the curve
-        void InsertCurvePoint(float t); // inserts a point on the curve without changing its shape
-        void RemoveCurvePoint(int index); // removes a Curve Point at index
+        SplineNode GetNode(int index);
+        void SetNode(int index, SplineNode node);
+        void AppendNode(SplineNode node); // adds the given CurvePoint to the end of the curve
+        void PrependNode(SplineNode node); // adds the given CurvePoint to the start of the curve
+        void InsertNode(float t); // inserts a point on the curve without changing its shape
+        void RemoveNode(int index); // removes a Curve Point at index
 
         SplineResult GetResultClosestTo(Vector3 point);
         SplineResult GetResultClosestTo(Ray ray);

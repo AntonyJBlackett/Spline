@@ -18,24 +18,14 @@ namespace FantasticSplines
         public bool IsLoop() { return curve.Loop; }
         public void SetLoop(bool loop) { curve.Loop = loop; }
 
-        public int GetCurvePointCount()
+        public int GetNodeCount()
         {
-            return curve.CurvePointCount;
+            return curve.NodeCount;
         }
 
-        bool IsCurvePointIndexInRange(int index)
+        bool IsNodeIndexInRange(int index)
         {
-            return MathHelper.IsInArrayRange( index, GetCurvePointCount() );
-        }
-
-        Vector3 InverseTransformPosition(Vector3 position)
-        {
-            return transform.InverseTransformPoint( position );
-        }
-
-        Vector3 TransformPosition(Vector3 position)
-        {
-            return transform.TransformPoint( position );
+            return MathHelper.IsInArrayRange( index, GetNodeCount() );
         }
 
         Vector3 InverseTransformPoint(Vector3 point)
@@ -68,14 +58,14 @@ namespace FantasticSplines
             return transform.TransformDirection( direction );
         }
 
-        CurvePoint TransformPoint(CurvePoint point)
+        SplineNode TransformNode(SplineNode node)
         {
-            return point.Transform( transform );
+            return node.Transform( transform );
         }
 
-        CurvePoint InverseTransformPoint(CurvePoint point)
+        SplineNode InverseTransformNode(SplineNode node)
         {
-            return point.InverseTransform( transform );
+            return node.InverseTransform( transform );
         }
 
         List<Vector3> TransformPoints(List<Vector3> points)
@@ -88,11 +78,11 @@ namespace FantasticSplines
             return points;
         }
 
-        List<CurvePoint> TransformPoints(List<CurvePoint> points)
+        List<SplineNode> TransformPoints(List<SplineNode> points)
         {
             for( int i = 0; i < points.Count; ++i )
             {
-                points[i] = TransformPoint( points[i] );
+                points[i] = TransformNode( points[i] );
             }
 
             return points;
@@ -113,39 +103,39 @@ namespace FantasticSplines
             return result;
         }
 
-        public void AppendCurvePoint(CurvePoint point)
+        public void AppendNode(SplineNode node)
         {
-            curve.AddCurvePoint( point.InverseTransform( transform ) );
+            curve.AddNode( node.InverseTransform( transform ) );
         }
 
-        public void PrependCurvePoint(CurvePoint point)
+        public void PrependNode(SplineNode node)
         {
-            curve.AddCurvePointAt( 0, point.InverseTransform( transform ) );
+            curve.AddNodeAt( 0, node.InverseTransform( transform ) );
         }
 
-        public void InsertCurvePoint(float t)
+        public void InsertNode(float t)
         {
-            curve.InsertCurvePoint( t );
+            curve.InsertNode( t );
         }
 
-        public void RemoveCurvePoint(int index)
+        public void RemoveNode(int index)
         {
-            curve.RemoveCurvePoint( index );
+            curve.RemoveNode( index );
         }
 
-        public CurvePoint GetCurvePoint(int index)
+        public SplineNode GetNode(int index)
         {
-            if( !IsCurvePointIndexInRange( index ) )
+            if( !IsNodeIndexInRange( index ) )
             {
-                return new CurvePoint( transform.position );
+                return new SplineNode( transform.position );
             }
 
-            return TransformPoint( curve.GetCurvePoint( index ) );
+            return TransformNode( curve.GetNode( index ) );
         }
 
-        public void SetCurvePoint(int index, CurvePoint point)
+        public void SetNode(int index, SplineNode node)
         {
-            curve.SetCurvePoint( index, point.InverseTransform( transform ) );
+            curve.SetNode( index, node.InverseTransform( transform ) );
         }
 
         public SplineResult GetResultAtT(float t)
@@ -165,6 +155,18 @@ namespace FantasticSplines
                 Debug.LogWarning( "Step is too small." );
                 return GetResultAtDistance( startDistance );
             }
+            if( GetLength() < worldDistance )
+            {
+                // early out for short splines
+                if( stepDistance > 0 )
+                {
+                    return GetResultAtDistance( 1 );
+                }
+                else
+                {
+                    return GetResultAtDistance( 0 );
+                }
+            }
 
             int maxIterations = Mathf.CeilToInt( worldDistance * 5f / stepDistance );
             if( maxIterations > 10 )
@@ -182,7 +184,11 @@ namespace FantasticSplines
             do
             {
                 // early out, there's no more spline
-                if( currentPosition.AtEnd )
+                if( currentPosition.AtEnd && stepDistance > 0 )
+                {
+                    return currentPosition;
+                }
+                if( currentPosition.AtStart && stepDistance < 0 )
                 {
                     return currentPosition;
                 }
@@ -246,9 +252,9 @@ namespace FantasticSplines
                 if( Selection.activeObject == null )
                 {
                     Gizmos.color = Color.white;
-                    for( int i = 0; i < GetCurvePointCount(); ++i )
+                    for( int i = 0; i < GetNodeCount(); ++i )
                     {
-                        Gizmos.DrawSphere( GetCurvePoint( i ).position, 0.05f );
+                        Gizmos.DrawSphere( GetNode( i ).position, 0.05f );
                     }
                 }
                 Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;

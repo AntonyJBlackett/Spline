@@ -11,7 +11,7 @@ namespace FantasticSplines
     }
 
     [System.Serializable]
-    public struct CurvePoint
+    public struct SplineNode
     {
         public Vector3 position;
 
@@ -107,7 +107,7 @@ namespace FantasticSplines
             }
         }
 
-        public CurvePoint(Vector3 position)
+        public SplineNode(Vector3 position)
         {
             pointType = PointType.Point;
             this.position = position;
@@ -115,7 +115,7 @@ namespace FantasticSplines
             lastChangedControl = 0;
         }
 
-        public CurvePoint(Vector3 position, Vector3 control1, Vector3 control2, PointType type)
+        public SplineNode(Vector3 position, Vector3 control1, Vector3 control2, PointType type)
         {
             this.position = position;
             this.control1 = control1;
@@ -124,7 +124,7 @@ namespace FantasticSplines
             lastChangedControl = 0;
         }
 
-        public CurvePoint(CurvePoint other)
+        public SplineNode(SplineNode other)
         {
             position = other.position;
             control1 = other.control1;
@@ -133,18 +133,18 @@ namespace FantasticSplines
             lastChangedControl = other.lastChangedControl;
         }
 
-        public CurvePoint Transform(Transform transform)
+        public SplineNode Transform(Transform transform)
         {
-            CurvePoint result = this;
+            SplineNode result = this;
             result.position = transform.TransformPoint( result.position );
             result.control1 = transform.TransformVector( result.control1 );
             result.control2 = transform.TransformVector( result.control2 );
             return result;
         }
 
-        public CurvePoint InverseTransform(Transform transform)
+        public SplineNode InverseTransform(Transform transform)
         {
-            CurvePoint result = this;
+            SplineNode result = this;
             result.position = transform.InverseTransformPoint( result.position );
             result.control1 = transform.InverseTransformVector( result.control1 );
             result.control2 = transform.InverseTransformVector( result.control2 );
@@ -153,7 +153,7 @@ namespace FantasticSplines
 
         public override string ToString()
         {
-            return string.Format("[{0}:{1}]", position, pointType);
+            return string.Format( "[{0}:{1}]", position, pointType );
         }
     }
 }
