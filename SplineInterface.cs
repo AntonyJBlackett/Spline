@@ -13,6 +13,7 @@ namespace FantasticSplines
         public int segmentIndex;
         public float segmentT;
         public float segmentDistance;
+        public float segmentLength;
 
         public bool AtEnd => Mathf.Approximately( splineT, 1 );
         public bool AtStart => Mathf.Approximately( splineT, 0 );

@@ -291,9 +291,10 @@ namespace FantasticSplines
                 position = segments[pointer.index].GetPositionAtDistance( pointer.distance ),
                 tangent = segments[pointer.index].GetTangentAtDistance( pointer.distance ),
 
-                segmentT = pointer.distance / segments[pointer.index].Length,
+                segmentT = segments[pointer.index].GetT( pointer.distance ),
                 segmentDistance = pointer.distance,
                 segmentIndex = pointer.index,
+                segmentLength = segments[pointer.index].Length
             };
         }
 
