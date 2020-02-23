@@ -127,8 +127,9 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 
         if( splineLength > 0 )
         {
+            float lengthLeft = splineLength;
             int limit = Mathf.CeilToInt( 1 + splineLength / separation ); // we should never need more segments than a dead straight spline needs
-            while( !post1Position.AtEnd )
+            while( post1Position.splineT < post2Position.splineT )
             {
                 GameObject segmentInstance = GetInstance( segment, instanceBucket );
                 segmentInstance.SetActive( true );

@@ -30,19 +30,19 @@ namespace FantasticSplines
             Vector3 n = Vector3.Lerp( b, c, t );
             Vector3 p = bezier.GetPosition( t );
 
-            if( node1.PointType == PointType.Mirrored )
+            if( node1.NodeType == NodeType.Mirrored )
             {
-                node1.SetPointType( PointType.Aligned );
+                node1.SetNodeType( NodeType.Aligned );
             }
             node1.Control2 = a - node1.position;
 
-            if( node2.PointType == PointType.Mirrored )
+            if( node2.NodeType == NodeType.Mirrored )
             {
-                node2.SetPointType( PointType.Aligned );
+                node2.SetNodeType( NodeType.Aligned );
             }
             node2.Control1 = c - node2.position;
 
-            SplineNode newNode = new SplineNode( p, m - p, n - p, PointType.Free );
+            SplineNode newNode = new SplineNode( p, m - p, n - p, NodeType.Free );
             return newNode;
         }
     }
@@ -209,9 +209,9 @@ namespace FantasticSplines
             nodes[index1] = node1;
             nodes[index2] = node2;
 
-            if( node1.PointType == PointType.Point && node2.PointType == PointType.Point )
+            if( node1.NodeType == NodeType.Point && node2.NodeType == NodeType.Point )
             {
-                split.SetPointType( PointType.Point );
+                split.SetNodeType( NodeType.Point );
             }
 
             nodes.Insert( segment + 1, split );

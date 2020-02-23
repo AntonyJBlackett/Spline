@@ -7,11 +7,11 @@ namespace FantasticSplines
     public enum SplineEditMode
     {
         None,
-        AddPoint,
-        MovePoint
+        AddNode,
+        MoveNode
     }
 
-    public enum SplineAddPointMode
+    public enum SplineAddNodeMode
     {
         Append,
         Prepend,
@@ -38,7 +38,7 @@ namespace FantasticSplines
         static List<SplineNode> clipboard = new List<SplineNode>();
 
         SplineEditMode editMode = SplineEditMode.None;
-        SplineAddPointMode addPointMode = SplineAddPointMode.Append;
+        SplineAddNodeMode addNodeMode = SplineAddNodeMode.Append;
         float diskRadius = 0.2f;
         float handleCapSize = 0.1f;
         float HandleCapSize => handleCapSize * HandleCapScale;
@@ -66,14 +66,14 @@ namespace FantasticSplines
             }
         }
 
-        void SetSelectionPointType(IEditableSpline spline, PointType type)
+        void SetSelectionPointType(IEditableSpline spline, NodeType type)
         {
             Undo.RecordObject( spline.GetUndoObject(), "Set Point Type" );
-            for( int i = 0; i < pointSelection.Count; ++i )
+            for( int i = 0; i < nodeSelection.Count; ++i )
             {
-                int index = pointSelection[i];
+                int index = nodeSelection[i];
                 SplineNode point = spline.GetNode( index );
-                point.SetPointType( type );
+                point.SetNodeType( type );
                 spline.SetNode( index, point );
             }
             EditorUtility.SetDirty( target );
@@ -81,15 +81,15 @@ namespace FantasticSplines
 
         Bounds GetSelectionBounds(IEditableSpline spline)
         {
-            if( pointSelection.Count == 0 )
+            if( nodeSelection.Count == 0 )
             {
                 return GetBounds( spline );
             }
 
-            Bounds bounds = new Bounds( spline.GetNode( pointSelection[0] ).position, Vector3.one * 0.1f );
-            for( int i = 1; i < pointSelection.Count; ++i )
+            Bounds bounds = new Bounds( spline.GetNode( nodeSelection[0] ).position, Vector3.one * 0.1f );
+            for( int i = 1; i < nodeSelection.Count; ++i )
             {
-                bounds.Encapsulate( spline.GetNode( pointSelection[i] ).position );
+                bounds.Encapsulate( spline.GetNode( nodeSelection[i] ).position );
             }
 
             if( bounds.size.magnitude < 1 )
@@ -113,7 +113,7 @@ namespace FantasticSplines
         public void FrameCamera(IEditableSpline spline)
         {
             Bounds bounds;
-            if( pointSelection.Count > 0 )
+            if( nodeSelection.Count > 0 )
             {
                 bounds = GetSelectionBounds( spline );
             }
@@ -124,12 +124,12 @@ namespace FantasticSplines
             SceneView.lastActiveSceneView.Frame( bounds, false );
         }
 
-        void FlattenSelection(IEditableSpline spline, PointType type)
+        void FlattenSelection(IEditableSpline spline, NodeType type)
         {
             Undo.RecordObject( spline.GetUndoObject(), "Flatten Selection" );
-            for( int i = 0; i < pointSelection.Count; ++i )
+            for( int i = 0; i < nodeSelection.Count; ++i )
             {
-                int index = pointSelection[i];
+                int index = nodeSelection[i];
                 SplineNode point = spline.GetNode( index );
 
                 point.position = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point.position );
@@ -141,12 +141,12 @@ namespace FantasticSplines
             EditorUtility.SetDirty( target );
         }
 
-        void SmoothSelection(IEditableSpline spline, PointType type)
+        void SmoothSelection(IEditableSpline spline, NodeType type)
         {
             Undo.RecordObject( spline.GetUndoObject(), "Set Point Type" );
-            for( int i = 0; i < pointSelection.Count; ++i )
+            for( int i = 0; i < nodeSelection.Count; ++i )
             {
-                int index = pointSelection[i];
+                int index = nodeSelection[i];
                 SplineNode point = spline.GetNode( index );
                 SplineNode before = point;
                 SplineNode after = point;
@@ -165,7 +165,7 @@ namespace FantasticSplines
                 float dist1 = Mathf.Min( (point.position - before.position).magnitude, direction.magnitude );
                 float dist2 = Mathf.Min( (point.position - after.position).magnitude, direction.magnitude );
 
-                point.SetPointType( PointType.Aligned );
+                point.SetNodeType( NodeType.Aligned );
                 point.Control1 = -direction.normalized * dist1 * 0.4f;
                 point.Control2 = direction.normalized * dist2 * 0.4f;
 
@@ -173,7 +173,7 @@ namespace FantasticSplines
                 {
                     if( index == 0 || index == spline.GetNodeCount() - 1 )
                     {
-                        point.SetPointType( PointType.Point );
+                        point.SetNodeType( NodeType.Point );
                     }
                 }
 
@@ -182,37 +182,37 @@ namespace FantasticSplines
             EditorUtility.SetDirty( target );
         }
 
-        public void DeleteSelectedPoints(IEditableSpline spline)
+        public void DeleteSelectedNodes(IEditableSpline spline)
         {
-            int removePoints = pointSelection.Count;
+            int removePoints = nodeSelection.Count;
             for( int i = 0; i < removePoints; ++i )
             {
-                RemovePoint( spline, pointSelection[0] );
+                RemoveNode( spline, nodeSelection[0] );
             }
-            ClearPointSelection();
+            ClearNodeSelection();
             EditorUtility.SetDirty( target );
         }
 
         void PasteCurve(IEditableSpline spline)
         {
-            DeleteSelectedPoints( spline );
+            DeleteSelectedNodes( spline );
             int oldPointCount = spline.GetNodeCount();
             for( int i = 0; i < clipboard.Count; i++ )
             {
                 spline.AppendNode( clipboard[i] );
             }
 
-            pointSelection.Clear();
+            nodeSelection.Clear();
             for( int i = oldPointCount; i < spline.GetNodeCount(); i++ )
             {
-                pointSelection.Add( i );
+                nodeSelection.Add( i );
             }
         }
 
         public void CopyCurve(IEditableSpline spline)
         {
             clipboard.Clear();
-            List<int> copyIndicies = new List<int>( pointSelection );
+            List<int> copyIndicies = new List<int>( nodeSelection );
             copyIndicies.Sort();
             for( int i = 0; i < copyIndicies.Count; i++ )
             {
@@ -233,11 +233,11 @@ namespace FantasticSplines
             }
         }
 
-        void StartAddPointMode(SplineAddPointMode mode)
+        void StartAddPointMode(SplineAddNodeMode mode)
         {
             ResetEditMode();
-            editMode = SplineEditMode.AddPoint;
-            addPointMode = mode;
+            editMode = SplineEditMode.AddNode;
+            addNodeMode = mode;
 
             IEditableSpline spline = GetSpline();
             Transform transform = spline.GetTransform();
@@ -246,7 +246,7 @@ namespace FantasticSplines
             if( spline.GetNodeCount() > 0 )
             {
                 int adjoiningIndex = 0;
-                if( addPointMode == SplineAddPointMode.Append )
+                if( addNodeMode == SplineAddNodeMode.Append )
                 {
                     adjoiningIndex = spline.GetNodeCount() - 1;
                 }
@@ -257,9 +257,9 @@ namespace FantasticSplines
             planeOffset = adjoiningPointPosition - planePosition;
         }
 
-        void InspectorAddPointModeButton(SplineAddPointMode mode)
+        void InspectorAddPointModeButton(SplineAddNodeMode mode)
         {
-            if( editMode == SplineEditMode.AddPoint && addPointMode == mode )
+            if( editMode == SplineEditMode.AddNode && addNodeMode == mode )
             {
                 if( GUILayout.Button( "Cancel " + mode.ToString() + " Point" ) )
                 {
@@ -272,101 +272,119 @@ namespace FantasticSplines
             }
         }
 
+        static bool foldoutSplineEditor = true;
+        static bool foldoutGizmos = true;
+        static bool foldoutDebug = false;
         public override void OnInspectorGUI()
         {
+            DrawDefaultInspector();
+
             IEditableSpline spline = GetSpline();
-            ShowScriptGUI( spline as MonoBehaviour );
             if( spline == null )
             {
-                DrawDefaultInspector();
                 return;
             }
 
-            GUILayout.Label( "Edit Modes" );
-            InspectorAddPointModeButton( SplineAddPointMode.Append );
-            InspectorAddPointModeButton( SplineAddPointMode.Prepend );
-            InspectorAddPointModeButton( SplineAddPointMode.Insert );
+            GUILayout.Space( 20 );
+            foldoutSplineEditor = EditorGUILayout.Foldout( foldoutSplineEditor, "Spline Editor" );
 
-
-            EditorGUI.BeginChangeCheck();
-            bool loop = GUILayout.Toggle( spline.IsLoop(), "Loop" );
-            if( EditorGUI.EndChangeCheck() )
+            if( foldoutSplineEditor )
             {
-                Undo.RecordObject( spline.GetUndoObject(), "Loop Toggle" );
-                spline.SetLoop( loop );
-                EditorUtility.SetDirty( target );
+                GUILayout.Label( "Spline Settings" );
+                EditorGUI.BeginChangeCheck();
+                bool loop = GUILayout.Toggle( spline.IsLoop(), "Loop" );
+                if( EditorGUI.EndChangeCheck() )
+                {
+                    Undo.RecordObject( spline.GetUndoObject(), "Loop Toggle" );
+                    spline.SetLoop( loop );
+                    EditorUtility.SetDirty( target );
+                }
+                GUILayout.Space( 10 );
+
+                GUILayout.Label( "Edit Modes" );
+                InspectorAddPointModeButton( SplineAddNodeMode.Append );
+                InspectorAddPointModeButton( SplineAddNodeMode.Prepend );
+                InspectorAddPointModeButton( SplineAddNodeMode.Insert );
+
+
+                GUILayout.Space( 10 );
+                GUILayout.Label( "Point Types" );
+                if( GUILayout.Button( "Linear Points" ) )
+                {
+                    SetSelectionPointType( spline, NodeType.Point );
+                }
+                if( GUILayout.Button( "Mirror Control Points" ) )
+                {
+                    SetSelectionPointType( spline, NodeType.Mirrored );
+                }
+                if( GUILayout.Button( "Aligned Control Points" ) )
+                {
+                    SetSelectionPointType( spline, NodeType.Aligned );
+                }
+                if( GUILayout.Button( "Free Control Points" ) )
+                {
+                    SetSelectionPointType( spline, NodeType.Free );
+                }
+
+                GUILayout.Space( 10 );
+                GUILayout.Label( "Tools" );
+                if( GUILayout.Button( "Smooth Selection" ) )
+                {
+                    SmoothSelection( spline, NodeType.Free );
+                }
+                if( GUILayout.Button( "Flatten Selection" ) )
+                {
+                    FlattenSelection( spline, NodeType.Free );
+                }
+                GUILayout.Space( 10 );
+
+                EditorGUI.BeginChangeCheck();
+                // grid
+                {
+                    GUILayout.Label( "Snap to Grid (hold alt)" );
+                    ShowGrid = GUILayout.Toggle( ShowGrid, "Show Grid" );
+                    SnapToHalfGrid = GUILayout.Toggle( SnapToHalfGrid, "Snap To Half Grid Size" );
+                    SnapToGridScale = EditorGUILayout.Vector3Field( "Grid Snap Scale", SnapToGridScale );
+                    GUILayout.BeginHorizontal();
+                    GUILayout.Label( "Snap Axies" );
+                    SnapToGridX = GUILayout.Toggle( SnapToGridX, "X" );
+                    SnapToGridY = GUILayout.Toggle( SnapToGridY, "Y" );
+                    SnapToGridZ = GUILayout.Toggle( SnapToGridZ, "Z" );
+                    GUILayout.EndHorizontal();
+                    GUILayout.Space( 10 );
+                }
+
+                foldoutGizmos = EditorGUILayout.Foldout( foldoutGizmos, "Gizmos" );
+                if( foldoutGizmos )
+                {
+                    HandleCapScale = EditorGUILayout.FloatField( "Editor Point Scale", HandleCapScale );
+                    spline.SetColor( EditorGUILayout.ColorField( "Spline Colour", spline.GetColor() ) );
+                    spline.SetZTest( GUILayout.Toggle( spline.GetZTest(), "ZTest" ) );
+                    ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
+                    ShowNodeControls = GUILayout.Toggle( ShowNodeControls, "Show Point Controls" );
+                    GUILayout.Space( 10 );
+                }
+
+                if( EditorGUI.EndChangeCheck() )
+                {
+                    EditorUtility.SetDirty( target );
+                }
+
+                foldoutDebug = EditorGUILayout.Foldout( foldoutDebug, "Debug" );
+                if( foldoutDebug )
+                {
+                    GUILayout.Label( "Editor State" );
+                    GUILayout.Label( "Edit Mode: " + editMode.ToString() );
+                    GUILayout.Label( "Add Point Mode: " + addNodeMode.ToString() );
+                    GUILayout.Label( "Moving Point: " + moveNodeState.Moving.ToString() );
+
+
+                    GUILayout.Space( 10 );
+                    GUILayout.Label( "Spline Info" );
+                    GUILayout.Label( "Length: " + spline.GetLength() );
+                    GUILayout.Label( "Node Count: " + spline.GetNodeCount() );
+                }
             }
-
-            GUILayout.Space( 10 );
-            GUILayout.Label( "Point Types" );
-            if( GUILayout.Button( "Linear Points" ) )
-            {
-                SetSelectionPointType( spline, PointType.Point );
-            }
-            if( GUILayout.Button( "Mirror Control Points" ) )
-            {
-                SetSelectionPointType( spline, PointType.Mirrored );
-            }
-            if( GUILayout.Button( "Aligned Control Points" ) )
-            {
-                SetSelectionPointType( spline, PointType.Aligned );
-            }
-            if( GUILayout.Button( "Free Control Points" ) )
-            {
-                SetSelectionPointType( spline, PointType.Free );
-            }
-
-            GUILayout.Space( 10 );
-            GUILayout.Label( "Tools" );
-            if( GUILayout.Button( "Smooth Selection" ) )
-            {
-                SmoothSelection( spline, PointType.Free );
-            }
-            if( GUILayout.Button( "Flatten Selection" ) )
-            {
-                FlattenSelection( spline, PointType.Free );
-            }
-            GUILayout.Space( 10 );
-            EditorGUI.BeginChangeCheck();
-
-            GUILayout.Label( "Grid" );
-            ShowGrid = GUILayout.Toggle( ShowGrid, "Show Grid" );
-            SnapToHalfGrid = GUILayout.Toggle( SnapToHalfGrid, "Snap To Half Grid Size" );
-            SnapToGridScale = EditorGUILayout.Vector3Field( "Grid Snap Scale", SnapToGridScale );
-            GUILayout.BeginHorizontal();
-            GUILayout.Label( "Snap Axies (hold alt)" );
-            SnapToGridX = GUILayout.Toggle( SnapToGridX, "X" );
-            SnapToGridY = GUILayout.Toggle( SnapToGridY, "Y" );
-            SnapToGridZ = GUILayout.Toggle( SnapToGridZ, "Z" );
-            GUILayout.EndHorizontal();
-
-            GUILayout.Space( 10 );
-            GUILayout.Label( "Gizmos" );
-            HandleCapScale = EditorGUILayout.FloatField( "Editor Point Scale", HandleCapScale );
-            spline.SetColor( EditorGUILayout.ColorField( "Spline Colour", spline.GetColor() ) );
-            spline.SetZTest( GUILayout.Toggle( spline.GetZTest(), "ZTest" ) );
-            ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
-            ShowCurvePointControls = GUILayout.Toggle( ShowCurvePointControls, "Show Point Controls" );
-
-            if( EditorGUI.EndChangeCheck() )
-            {
-                EditorUtility.SetDirty( target );
-            }
-
-            GUILayout.Space( 10 );
-            GUILayout.Label( "Debug" );
-            GUILayout.Label( "Edit Mode: " + editMode.ToString() );
-            GUILayout.Label( "Add Point Mode: " + addPointMode.ToString() );
-            GUILayout.Label( "Moving Point: " + movePointState.Moving.ToString() );
-
-
-            GUILayout.Space( 10 );
-            GUILayout.Label( "Info" );
-            GUILayout.Label( "Length: " + spline.GetLength() );
-            GUILayout.Label( "Point Count: " + spline.GetNodeCount() );
-
-            GUILayout.Space( 10 );
-            DrawDefaultInspector();
         }
 
         public static bool ShowSegmentLengths
@@ -375,10 +393,10 @@ namespace FantasticSplines
             set => EditorPrefs.SetBool( "FantasticSplinesShowSegmentLengths", value );
         }
 
-        public static bool ShowCurvePointControls
+        public static bool ShowNodeControls
         {
-            get => EditorPrefs.GetBool( "FantasticSplinesShowCurvePointControls", true );
-            set => EditorPrefs.SetBool( "FantasticSplinesShowCurvePointControls", value );
+            get => EditorPrefs.GetBool( "FantasticSplinesShowNodeControls", true );
+            set => EditorPrefs.SetBool( "FantasticSplinesShowNodeControls", value );
         }
 
         public static bool ShowGrid
@@ -452,7 +470,7 @@ namespace FantasticSplines
         void SetTool(Tool newTool)
         {
             lastTool = newTool;
-            if( pointSelection.Count == 0 )
+            if( nodeSelection.Count == 0 )
             {
                 Tools.current = lastTool;
             }
@@ -518,10 +536,10 @@ namespace FantasticSplines
 
                 if( guiEvent.command && guiEvent.keyCode == KeyCode.A )
                 {
-                    pointSelection.Clear();
+                    nodeSelection.Clear();
                     for( int i = 0; i < spline.GetNodeCount(); ++i )
                     {
-                        pointSelection.Add( i );
+                        nodeSelection.Add( i );
                     }
                     guiEvent.Use();
                 }
@@ -534,44 +552,44 @@ namespace FantasticSplines
 
                 if( guiEvent.command && guiEvent.keyCode == KeyCode.X )
                 {
-                    Undo.RecordObject( spline.GetUndoObject(), "Cut Points" );
+                    Undo.RecordObject( spline.GetUndoObject(), "Cut Nodes" );
                     CopyCurve( spline );
-                    DeleteSelectedPoints( spline );
+                    DeleteSelectedNodes( spline );
                     guiEvent.Use();
                 }
 
                 if( guiEvent.command && guiEvent.keyCode == KeyCode.V )
                 {
-                    Undo.RecordObject( spline.GetUndoObject(), "Paste Points" );
+                    Undo.RecordObject( spline.GetUndoObject(), "Paste Nodes" );
                     PasteCurve( spline );
                     guiEvent.Use();
                 }
 
 
-                if( pointSelection.Count > 0
+                if( nodeSelection.Count > 0
                     && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace) )
                 {
-                    Undo.RecordObject( spline.GetUndoObject(), "Delete Points" );
-                    DeleteSelectedPoints( spline );
+                    Undo.RecordObject( spline.GetUndoObject(), "Delete Nodes" );
+                    DeleteSelectedNodes( spline );
                     guiEvent.Use();
                 }
             }
         }
 
-        void RemovePoint(IEditableSpline spline, int index)
+        void RemoveNode(IEditableSpline spline, int index)
         {
             spline.RemoveNode( index );
-            for( int i = pointSelection.Count - 1; i >= 0; --i )
+            for( int i = nodeSelection.Count - 1; i >= 0; --i )
             {
-                if( pointSelection[i] == index )
+                if( nodeSelection[i] == index )
                 {
-                    pointSelection.RemoveAt( i );
+                    nodeSelection.RemoveAt( i );
                     continue;
                 }
 
-                if( pointSelection[i] > index )
+                if( nodeSelection[i] > index )
                 {
-                    pointSelection[i]--;
+                    nodeSelection[i]--;
                 }
             }
         }
@@ -586,11 +604,11 @@ namespace FantasticSplines
                 SceneView.currentDrawingSceneView.Focus();
             }
 
-            if( pointSelection.Count > 0 )
+            if( nodeSelection.Count > 0 )
             {
                 lastTool = Tools.current;
                 Tools.current = Tool.None;
-                editMode = SplineEditMode.MovePoint;
+                editMode = SplineEditMode.MoveNode;
             }
             else
             {
@@ -618,25 +636,25 @@ namespace FantasticSplines
             switch( editMode )
             {
                 case SplineEditMode.None:
-                    DoMovePoint( spline, guiEvent );
+                    DoMoveNode( spline, guiEvent );
                     break;
-                case SplineEditMode.MovePoint:
-                    DoMovePoint( spline, guiEvent );
+                case SplineEditMode.MoveNode:
+                    DoMoveNode( spline, guiEvent );
                     break;
-                case SplineEditMode.AddPoint:
-                    if( addPointMode == SplineAddPointMode.Insert
+                case SplineEditMode.AddNode:
+                    if( addNodeMode == SplineAddNodeMode.Insert
                         && spline.GetNodeCount() >= 2 )
                     {
-                        DoInsertPoint( spline, guiEvent );
+                        DoInsertNode( spline, guiEvent );
                     }
                     else
                     {
-                        DoAddPoint( spline, guiEvent );
+                        DoAddNode( spline, guiEvent );
                     }
                     break;
             }
 
-            if( !movePointState.MovingControlPoint && (ShowGrid || guiEvent.alt) )
+            if( !moveNodeState.MovingNodeControlPoint && (ShowGrid || guiEvent.alt) )
             {
                 DrawGrid( spline, guiEvent );
             }
@@ -653,7 +671,7 @@ namespace FantasticSplines
             Vector3 handlePosition = Camera.current.transform.position + Camera.current.transform.forward * 10;
             float handleSize = HandleUtility.GetHandleSize( handlePosition ) * 15;
             if( useEvent
-                || (editMode == SplineEditMode.AddPoint && guiEvent.button == 0)
+                || (editMode == SplineEditMode.AddNode && guiEvent.button == 0)
                 || (guiEvent.shift && (guiEvent.type == EventType.Layout || guiEvent.type == EventType.Repaint)) )
             {
                 if( Handles.Button( handlePosition, Camera.current.transform.rotation, 0, handleSize, Handles.DotHandleCap ) )
@@ -724,22 +742,22 @@ namespace FantasticSplines
         {
             lastTool = Tool.Move;
             Tools.current = Tool.Move;
-            ClearPointSelection();
+            ClearNodeSelection();
             editMode = SplineEditMode.None;
             planeOffset = Vector3.zero;
             controlPlanePosition = Vector3.zero;
-            addPointState = AddPointState.PointPosition;
+            addNodeState = AddNodeState.NodePosition;
             EditorUtility.SetDirty( target );
         }
 
-        void DrawSplinePoints(IEditableSpline spline)
+        void DrawSplineNodes(IEditableSpline spline)
         {
-            List<int> sortedPoints = GetPointIndiciesSelectedFirst( spline );
-            sortedPoints.Reverse(); // draw selected on top
-            for( int sortedI = 0; sortedI < sortedPoints.Count; ++sortedI )
+            List<int> sortedNodeIndicies = GetNodeIndiciesSelectedFirst( spline );
+            sortedNodeIndicies.Reverse(); // draw selected on top
+            for( int sortedI = 0; sortedI < sortedNodeIndicies.Count; ++sortedI )
             {
-                int i = sortedPoints[sortedI];
-                if( pointSelection.Contains( i ) )
+                int i = sortedNodeIndicies[sortedI];
+                if( nodeSelection.Contains( i ) )
                 {
                     Handles.color = Color.green;
                 }
@@ -778,18 +796,18 @@ namespace FantasticSplines
             }
         }
 
-        static void DrawBezierSegment(SplineNode point1, SplineNode point2, Color color)
+        static void DrawBezierSegment(SplineNode node1, SplineNode node2, Color color)
         {
-            Handles.DrawBezier( point1.position, point2.position, point1.position + point1.Control2, point2.position + point2.Control1, color, null, 3 );
+            Handles.DrawBezier( node1.position, node2.position, node1.position + node1.Control2, node2.position + node2.Control1, color, null, 3 );
         }
 
-        static void DrawBezierSegmentOnPlane(Vector3 planeOrigin, Vector3 planeNormal, SplineNode point1, SplineNode point2)
+        static void DrawBezierSegmentOnPlane(Vector3 planeOrigin, Vector3 planeNormal, SplineNode node1, SplineNode node2)
         {
-            Vector3 pointOnPlane1 = GetPointOnPlaneY( planeOrigin, planeNormal, point1.position );
-            Vector3 pointOnPlane2 = GetPointOnPlaneY( planeOrigin, planeNormal, point2.position );
+            Vector3 pointOnPlane1 = GetPointOnPlaneY( planeOrigin, planeNormal, node1.position );
+            Vector3 pointOnPlane2 = GetPointOnPlaneY( planeOrigin, planeNormal, node2.position );
 
-            Vector3 tangentFlat1 = GetPointOnPlaneY( planeOrigin, planeNormal, point1.position + point1.Control2 );
-            Vector3 tangentFlat2 = GetPointOnPlaneY( planeOrigin, planeNormal, point2.position + point2.Control1 );
+            Vector3 tangentFlat1 = GetPointOnPlaneY( planeOrigin, planeNormal, node1.position + node1.Control2 );
+            Vector3 tangentFlat2 = GetPointOnPlaneY( planeOrigin, planeNormal, node2.position + node2.Control1 );
 
             Handles.DrawBezier( pointOnPlane1, pointOnPlane2, tangentFlat1, tangentFlat2, Color.grey, null, 2.5f );
         }
@@ -837,12 +855,12 @@ namespace FantasticSplines
 
         void DrawSplineSelectionDisks(IEditableSpline spline)
         {
-            ValidatePointSelection( spline );
+            ValidateNodeSelection( spline );
             Transform transform = spline.GetTransform();
             Handles.color = Color.grey;
-            for( int i = 0; i < pointSelection.Count; ++i )
+            for( int i = 0; i < nodeSelection.Count; ++i )
             {
-                int index = pointSelection[i];
+                int index = nodeSelection[i];
 
                 Vector3 point = spline.GetNode( index ).position;
                 Vector3 planePoint = GetPointOnPlaneY( transform.position, transform.up, point );
@@ -861,15 +879,15 @@ namespace FantasticSplines
 
         Color ControlPointEditColor => (Color.cyan + Color.grey + Color.grey) * 0.33f;
 
-        void DrawControlPoints(IEditableSpline spline, int index)
+        void DrawNodeControlPoints(IEditableSpline spline, int index)
         {
-            SplineNode point = spline.GetNode( index );
-            if( point.PointType == PointType.Point )
+            SplineNode node = spline.GetNode( index );
+            if( node.NodeType == NodeType.Point )
             {
                 return;
             }
 
-            if( pointSelection.Contains( index ) )
+            if( nodeSelection.Contains( index ) )
             {
                 Handles.color = ControlPointEditColor;
             }
@@ -878,41 +896,41 @@ namespace FantasticSplines
                 Handles.color = Color.grey;
             }
 
-            Vector3 control1 = point.position + point.Control1;
-            Vector3 control2 = point.position + point.Control2;
+            Vector3 control1 = node.position + node.Control1;
+            Vector3 control2 = node.position + node.Control2;
 
             if( index > 0 || spline.IsLoop() )
             {
                 Handles.SphereHandleCap( 0, control1, Quaternion.identity, HandleCapSize, EventType.Repaint );
-                Handles.DrawLine( point.position, control1 );
+                Handles.DrawLine( node.position, control1 );
             }
 
             if( index < spline.GetNodeCount() - 1 || spline.IsLoop() )
             {
                 Handles.SphereHandleCap( 0, control2, Quaternion.identity, HandleCapSize, EventType.Repaint );
-                Handles.DrawLine( point.position, control2 );
+                Handles.DrawLine( node.position, control2 );
             }
         }
 
-        void DrawSplineSelectionControlPoint(IEditableSpline spline)
+        void DrawSplineSelectionNodeControlPoints(IEditableSpline spline)
         {
-            if( !ShowCurvePointControls )
+            if( !ShowNodeControls )
             {
                 return;
             }
 
-            if( pointSelection.Count > 0 )
+            if( nodeSelection.Count > 0 )
             {
-                for( int i = 0; i < pointSelection.Count; ++i )
+                for( int i = 0; i < nodeSelection.Count; ++i )
                 {
-                    DrawControlPoints( spline, pointSelection[i] );
+                    DrawNodeControlPoints( spline, nodeSelection[i] );
                 }
             }
             else
             {
                 for( int i = 0; i < spline.GetNodeCount(); ++i )
                 {
-                    DrawControlPoints( spline, i );
+                    DrawNodeControlPoints( spline, i );
                 }
             }
         }
@@ -926,8 +944,8 @@ namespace FantasticSplines
             DrawBezierSplineLines( spline );
 
             DrawSegmentLengths( spline );
-            DrawSplinePoints( spline );
-            DrawSplineSelectionControlPoint( spline );
+            DrawSplineNodes( spline );
+            DrawSplineSelectionNodeControlPoints( spline );
         }
 
         void DrawSegmentLengths(IEditableSpline spline)
@@ -943,62 +961,62 @@ namespace FantasticSplines
             return index >= 0 && index < spline.GetNodeCount();
         }
 
-        List<int> pointSelection = new List<int>();
-        void SelectionAddPoint(IEditableSpline spline, int index)
+        List<int> nodeSelection = new List<int>();
+        void SelectionAddNode(IEditableSpline spline, int index)
         {
-            ValidatePointSelection( spline );
+            ValidateNodeSelection( spline );
             if( !IsIndexInRange( spline, index ) )
             {
                 return;
             }
 
-            if( pointSelection.Contains( index ) )
+            if( nodeSelection.Contains( index ) )
             {
                 return;
             }
-            pointSelection.Add( index );
+            nodeSelection.Add( index );
         }
 
-        void ValidatePointSelection(IEditableSpline spline)
+        void ValidateNodeSelection(IEditableSpline spline)
         {
-            for( int i = pointSelection.Count - 1; i >= 0; i-- )
+            for( int i = nodeSelection.Count - 1; i >= 0; i-- )
             {
-                if( !IsIndexInRange( spline, pointSelection[i] ) )
+                if( !IsIndexInRange( spline, nodeSelection[i] ) )
                 {
-                    pointSelection.RemoveAt( i );
+                    nodeSelection.RemoveAt( i );
                 }
             }
         }
 
-        void ClearPointSelection()
+        void ClearNodeSelection()
         {
-            pointSelection.Clear();
+            nodeSelection.Clear();
             editMode = SplineEditMode.None;
         }
 
-        List<int> GetPointIndiciesSelectedFirst(IEditableSpline spline)
+        List<int> GetNodeIndiciesSelectedFirst(IEditableSpline spline)
         {
-            List<int> pointIndicies = new List<int>();
+            List<int> nodeIndicies = new List<int>();
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
-                pointIndicies.Add( i );
+                nodeIndicies.Add( i );
             }
 
             // selected points take priority
-            pointIndicies.Sort( (int one, int two) =>
+            nodeIndicies.Sort( (int one, int two) =>
             {
-                if( pointSelection.Contains( one ) == pointSelection.Contains( two ) )
+                if( nodeSelection.Contains( one ) == nodeSelection.Contains( two ) )
                 {
                     return 0;
                 }
-                if( pointSelection.Contains( one ) && !pointSelection.Contains( two ) )
+                if( nodeSelection.Contains( one ) && !nodeSelection.Contains( two ) )
                 {
                     return -1;
                 }
                 return 1;
             } );
 
-            return pointIndicies;
+            return nodeIndicies;
         }
 
         bool IsMouseButtonEvent(Event guiEvent, int button)
@@ -1006,29 +1024,30 @@ namespace FantasticSplines
             return guiEvent.button == button && guiEvent.isMouse && (guiEvent.type == EventType.MouseDown || guiEvent.type == EventType.MouseDrag || guiEvent.type == EventType.MouseUp);
         }
 
-        bool DoClickSelection(IEditableSpline spline, Event guiEvent)
+        struct DetectClickSelectionResult
         {
-            bool clearSelection = IsMouseButtonEvent( guiEvent, 0 ) && !guiEvent.shift && !guiEvent.command;
-            bool hasSelection = pointSelection.Count > 0;
+            public bool Detected => nodeIndex >= 0;
+            public int nodeIndex;
+            public MoveControlPointId selectedType;
 
-            List<int> sortedPoints = GetPointIndiciesSelectedFirst( spline );
-            for( int s = 0; s < sortedPoints.Count; ++s )
+            public DetectClickSelectionResult(int nodeIndex, MoveControlPointId selectedType)
             {
-                int index = sortedPoints[s];
+                this.nodeIndex = nodeIndex;
+                this.selectedType = selectedType;
+            }
+        }
 
-                if( pointSelection.Contains( index ) )
-                {
-                    Handles.color = Color.green;
-                }
-                else
-                {
-                    Handles.color = Color.white;
-                }
+        DetectClickSelectionResult DetectClickSelection(IEditableSpline spline, Event guiEvent)
+        {
+            List<int> sortedNodes = GetNodeIndiciesSelectedFirst( spline );
+            for( int s = 0; s < sortedNodes.Count; ++s )
+            {
+                int index = sortedNodes[s];
 
-                SplineNode curvePoint = spline.GetNode( index );
+                SplineNode node = spline.GetNode( index );
 
-                bool overControl1 = IsMouseOverPoint( Camera.current, curvePoint.position + curvePoint.Control1, guiEvent.mousePosition );
-                bool overControl2 = IsMouseOverPoint( Camera.current, curvePoint.position + curvePoint.Control2, guiEvent.mousePosition );
+                bool overControl1 = IsMouseOverPoint( Camera.current, node.Control1Position, guiEvent.mousePosition );
+                bool overControl2 = IsMouseOverPoint( Camera.current, node.Control2Position, guiEvent.mousePosition );
 
                 bool control1Interactable = spline.IsLoop() || index > 0;
                 bool control2Interactable = spline.IsLoop() || index < spline.GetNodeCount() - 1;
@@ -1036,58 +1055,76 @@ namespace FantasticSplines
                 bool control1Detected = overControl1 && control1Interactable;
                 bool control2Detected = overControl2 && control2Interactable;
 
-                bool controlsEnabled = ShowCurvePointControls && (pointSelection.Contains( index ) || pointSelection.Count == 0);
+                bool controlsEnabled = ShowNodeControls && (nodeSelection.Contains( index ) || nodeSelection.Count == 0);
 
                 if( controlsEnabled &&
-                    curvePoint.PointType != PointType.Point &&
+                    node.NodeType != NodeType.Point &&
                     (control1Detected || control2Detected) )
                 {
-                    useEvent = true;
-                    if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
+                    if( control1Detected )
                     {
-                        clearSelection = false;
-                        if( pointSelection.Count == 0 )
-                        {
-                            SelectionAddPoint( spline, index );
-                            editMode = SplineEditMode.MovePoint;
-                        }
-                        break;
+                        return new DetectClickSelectionResult( index, MoveControlPointId.Control1 );
+                    }
+                    if( control2Detected )
+                    {
+                        return new DetectClickSelectionResult( index, MoveControlPointId.Control2 );
                     }
                 }
-                else if( IsMouseOverPoint( Camera.current, curvePoint.position, guiEvent.mousePosition ) )
+                else if( IsMouseOverPoint( Camera.current, node.position, guiEvent.mousePosition ) )
+                {
+                    return new DetectClickSelectionResult( index, MoveControlPointId.None );
+                }
+            }
+
+            return new DetectClickSelectionResult()
+            {
+                nodeIndex = -1,
+                selectedType = MoveControlPointId.None,
+            };
+        }
+
+        bool DoClickSelection(IEditableSpline spline, Event guiEvent)
+        {
+            DetectClickSelectionResult result = DetectClickSelection( spline, guiEvent );
+            if( result.Detected )
+            {
+                if( result.selectedType != MoveControlPointId.None )
                 {
                     useEvent = true;
                     if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
                     {
-                        clearSelection = false;
-                        if( pointSelection.Contains( index ) && guiEvent.command )
+                        if( nodeSelection.Count == 0 )
                         {
-                            pointSelection.Remove( index );
+                            SelectionAddNode( spline, result.nodeIndex );
+                            editMode = SplineEditMode.MoveNode;
                         }
-                        else if( !pointSelection.Contains( index ) )
+                        return false;
+                    }
+                }
+                else
+                {
+                    useEvent = true;
+                    if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
+                    {
+                        if( nodeSelection.Contains( result.nodeIndex ) && guiEvent.command )
+                        {
+                            nodeSelection.Remove( result.nodeIndex );
+                        }
+                        else if( !nodeSelection.Contains( result.nodeIndex ) )
                         {
                             if( !guiEvent.shift && !guiEvent.command )
                             {
-                                ClearPointSelection();
+                                ClearNodeSelection();
                             }
-                            SelectionAddPoint( spline, index );
-                            editMode = SplineEditMode.MovePoint;
+                            SelectionAddNode( spline, result.nodeIndex );
+                            editMode = SplineEditMode.MoveNode;
                         }
-                        break;
+                        return false;
                     }
                 }
             }
 
-            Handles.color = Color.white;
-            return clearSelection;
-        }
-
-        void DebugLogEvent(Event guiEvent)
-        {
-            if( guiEvent.type != EventType.Layout && guiEvent.type != EventType.Repaint )
-            {
-                Debug.Log( guiEvent.type );
-            }
+            return IsMouseButtonEvent( guiEvent, 0 ) && !guiEvent.shift && !guiEvent.command;
         }
 
         Vector2 mouseDragSelectionStart;
@@ -1102,18 +1139,18 @@ namespace FantasticSplines
 
                 for( int i = 0; i < spline.GetNodeCount(); ++i )
                 {
-                    SplineNode curvePoint = spline.GetNode( i );
-                    if( IsMouseOverPoint( Camera.current, curvePoint.position + curvePoint.Control1, guiEvent.mousePosition ) )
+                    SplineNode node = spline.GetNode( i );
+                    if( IsMouseOverPoint( Camera.current, node.position + node.Control1, guiEvent.mousePosition ) )
                     {
                         dragSelectActive = false;
                         break;
                     }
-                    if( IsMouseOverPoint( Camera.current, curvePoint.position + curvePoint.Control2, guiEvent.mousePosition ) )
+                    if( IsMouseOverPoint( Camera.current, node.position + node.Control2, guiEvent.mousePosition ) )
                     {
                         dragSelectActive = false;
                         break;
                     }
-                    if( IsMouseOverPoint( Camera.current, curvePoint.position, guiEvent.mousePosition ) )
+                    if( IsMouseOverPoint( Camera.current, node.position, guiEvent.mousePosition ) )
                     {
                         dragSelectActive = false;
                         break;
@@ -1168,8 +1205,8 @@ namespace FantasticSplines
                     if( dragBounds.Contains( pointScreenPosition ) )
                     {
                         ++pointsInDragBounds;
-                        SelectionAddPoint( spline, i );
-                        editMode = SplineEditMode.MovePoint;
+                        SelectionAddNode( spline, i );
+                        editMode = SplineEditMode.MoveNode;
                     }
                 }
 
@@ -1189,13 +1226,13 @@ namespace FantasticSplines
         }
 
         bool hadSelectionOnMouseDown = false;
-        void DoPointSelection(IEditableSpline spline, Event guiEvent)
+        void DoNodeSelection(IEditableSpline spline, Event guiEvent)
         {
             if( guiEvent.type == EventType.MouseDown )
             {
-                hadSelectionOnMouseDown = pointSelection.Count > 0;
+                hadSelectionOnMouseDown = nodeSelection.Count > 0;
             }
-            if( guiEvent.type == EventType.Used && (pointSelection.Count > 0 || hadSelectionOnMouseDown) )
+            if( guiEvent.type == EventType.Used && (nodeSelection.Count > 0 || hadSelectionOnMouseDown) )
             {
                 Selection.activeObject = (target as Component).gameObject;
             }
@@ -1210,13 +1247,13 @@ namespace FantasticSplines
 
             if( clearSelection )
             {
-                ClearPointSelection();
+                ClearNodeSelection();
             }
         }
 
-        enum AddPointState
+        enum AddNodeState
         {
-            PointPosition,
+            NodePosition,
             ControlPosition
         }
 
@@ -1255,12 +1292,12 @@ namespace FantasticSplines
             return planePoint + planeOffset;
         }
 
-        void DrawControlPointMovementGuides(IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2)
+        void DrawNodeControlPointMovementGuides(IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2)
         {
-            DrawControlPointMovementGuides( spline, point, control1, control2, ControlPointEditColor, Color.white );
+            DrawNodeControlPointMovementGuides( spline, point, control1, control2, ControlPointEditColor, Color.white );
         }
 
-        void DrawControlPointMovementGuides(IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2, Color controlColour, Color controlPlaneColour)
+        void DrawNodeControlPointMovementGuides(IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2, Color controlColour, Color controlPlaneColour)
         {
             Camera camera = Camera.current;
             Transform transform = spline.GetTransform();
@@ -1318,10 +1355,10 @@ namespace FantasticSplines
             return result;
         }
 
-        AddPointState addPointState = AddPointState.PointPosition;
-        Vector3 addPointPosition;
+        AddNodeState addNodeState = AddNodeState.NodePosition;
+        Vector3 addNodePosition;
         bool canShift = false;
-        void DoAddPoint(IEditableSpline spline, Event guiEvent)
+        void DoAddNode(IEditableSpline spline, Event guiEvent)
         {
             if( !guiEvent.shift )
             {
@@ -1333,23 +1370,23 @@ namespace FantasticSplines
             Transform transform = spline.GetTransform();
             Camera camera = Camera.current;
 
-            Vector3 connectingPoint = transform.position;
+            Vector3 connectingNodePosition = transform.position;
 
             if( spline.GetNodeCount() > 0 )
             {
                 int adjoiningIndex = 0;
-                if( addPointMode == SplineAddPointMode.Append )
+                if( addNodeMode == SplineAddNodeMode.Append )
                 {
                     adjoiningIndex = spline.GetNodeCount() - 1;
                 }
-                connectingPoint = spline.GetNode( adjoiningIndex ).position;
+                connectingNodePosition = spline.GetNode( adjoiningIndex ).position;
             }
 
-            Vector3 connectingPlanePoint = GetPointOnPlaneY( transform.position, transform.up, connectingPoint );
+            Vector3 connectingPlanePoint = GetPointOnPlaneY( transform.position, transform.up, connectingNodePosition );
 
-            if( addPointState == AddPointState.PointPosition )
+            if( addNodeState == AddNodeState.NodePosition )
             {
-                addPointPosition = GetPointPlacement(
+                addNodePosition = GetPointPlacement(
                     camera,
                     guiEvent.mousePosition,
                     transform.position,
@@ -1363,79 +1400,100 @@ namespace FantasticSplines
                 // draw point placement GUI
                 Handles.color = Color.yellow;
                 RaycastHit hitDown;
-                Ray down = new Ray( addPointPosition, -transform.up );
+                Ray down = new Ray( addNodePosition, -transform.up );
                 if( Physics.Raycast( down, out hitDown ) )
                 {
                     DrawWireDisk( hitDown.point, hitDown.normal, diskRadius, camera.transform.position );
                     Handles.DrawDottedLine( planePosition, hitDown.point, 2 );
                 }
 
-                DrawWireDisk( addPointPosition, transform.up, diskRadius, camera.transform.position );
+                DrawWireDisk( addNodePosition, transform.up, diskRadius, camera.transform.position );
                 DrawWireDisk( planePosition, transform.up, diskRadius, camera.transform.position );
-                Handles.DrawDottedLine( planePosition, addPointPosition, 2 );
+                Handles.DrawDottedLine( planePosition, addNodePosition, 2 );
 
                 if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
                 {
+                    DetectClickSelectionResult result = DetectClickSelection( spline, guiEvent );
+                    if( result.Detected && !spline.IsLoop() )
+                    {
+                        if( addNodeMode == SplineAddNodeMode.Append && result.nodeIndex == 0 )
+                        {
+                            spline.SetLoop( true );
+                            guiEvent.Use();
+                            editMode = SplineEditMode.None;
+                            return;
+                        }
+                        if( addNodeMode == SplineAddNodeMode.Prepend && result.nodeIndex == spline.GetNodeCount() - 1 )
+                        {
+                            spline.SetLoop( true );
+                            guiEvent.Use();
+                            editMode = SplineEditMode.None;
+                            return;
+                        }
+                    }
+
                     canShift = false;
-                    addPointState = AddPointState.ControlPosition;
-                    controlPlanePosition = addPointPosition;
+                    addNodeState = AddNodeState.ControlPosition;
+                    controlPlanePosition = addNodePosition;
                     controlPlaneOffset = Vector3.zero;
                     guiEvent.Use();
                 }
             }
 
-            Vector3 newControlPointPosition = addPointPosition;
-            Vector3 relativeControlPoint = newControlPointPosition - addPointPosition;
-            if( addPointMode == SplineAddPointMode.Prepend )
+            Vector3 newControlPointPosition = addNodePosition;
+            Vector3 relativeControlPoint = newControlPointPosition - addNodePosition;
+            if( addNodeMode == SplineAddNodeMode.Prepend )
             {
                 relativeControlPoint *= -1;
             }
 
-            if( addPointState == AddPointState.ControlPosition )
+            if( addNodeState == AddNodeState.ControlPosition )
             {
                 newControlPointPosition = GetPointPlacement(
                         camera,
                         guiEvent.mousePosition,
-                        addPointPosition,
+                        addNodePosition,
                         transform.up,
                         ref controlPlanePosition,
                         ref controlPlaneOffset,
                         guiEvent.shift && canShift,
                         guiEvent.command,
                         guiEvent.alt );
-                relativeControlPoint = newControlPointPosition - addPointPosition;
-                if( addPointMode == SplineAddPointMode.Prepend )
+                relativeControlPoint = newControlPointPosition - addNodePosition;
+                if( addNodeMode == SplineAddNodeMode.Prepend )
                 {
                     relativeControlPoint *= -1;
                 }
 
-                Vector3 worldControl1 = addPointPosition - relativeControlPoint;
-                Vector3 worldControl2 = addPointPosition + relativeControlPoint;
-                DrawControlPointMovementGuides( spline, addPointPosition, worldControl1, worldControl2, Color.yellow, Color.white );
+                Vector3 worldControl1 = addNodePosition - relativeControlPoint;
+                Vector3 worldControl2 = addNodePosition + relativeControlPoint;
+                DrawNodeControlPointMovementGuides( spline, addNodePosition, worldControl1, worldControl2, Color.yellow, Color.white );
 
                 if( guiEvent.type == EventType.MouseUp && guiEvent.button == 0 )
                 {
-                    canShift = false;
-                    addPointState = AddPointState.PointPosition;
-                    Undo.RecordObject( spline.GetUndoObject(), "Add Point" );
 
-                    SplineNode newPoint = new SplineNode( addPointPosition );
+
+                    canShift = false;
+                    addNodeState = AddNodeState.NodePosition;
+                    Undo.RecordObject( spline.GetUndoObject(), "Add Node" );
+
+                    SplineNode newNode = new SplineNode( addNodePosition );
                     if( relativeControlPoint.magnitude > 0.01f )
                     {
-                        newPoint.SetPointType( PointType.Mirrored );
-                        newPoint.Control2 = relativeControlPoint; // this sets control 1 as well as it's mirrored
+                        newNode.SetNodeType( NodeType.Mirrored );
+                        newNode.Control2 = relativeControlPoint; // this sets control 1 as well as it's mirrored
                     }
 
-                    switch( addPointMode )
+                    switch( addNodeMode )
                     {
-                        case SplineAddPointMode.Append:
-                            spline.AppendNode( newPoint );
+                        case SplineAddNodeMode.Append:
+                            spline.AppendNode( newNode );
                             break;
-                        case SplineAddPointMode.Prepend:
-                            spline.PrependNode( newPoint );
+                        case SplineAddNodeMode.Prepend:
+                            spline.PrependNode( newNode );
                             break;
                         default:
-                            spline.AppendNode( newPoint );
+                            spline.AppendNode( newNode );
                             break;
                     }
 
@@ -1447,26 +1505,26 @@ namespace FantasticSplines
             // draw beziers new point GUI
             Handles.color = Color.yellow;
             {
-                int pointCount = spline.GetNodeCount();
-                if( pointCount > 0 )
+                int nodeCount = spline.GetNodeCount();
+                if( nodeCount > 0 )
                 {
-                    SplineNode newPoint = new SplineNode( addPointPosition );
-                    newPoint.Control1 = -relativeControlPoint; // this sets control 1 as well as it's mirrored
+                    SplineNode newNode = new SplineNode( addNodePosition );
+                    newNode.Control1 = -relativeControlPoint; // this sets control 1 as well as it's mirrored
                     if( relativeControlPoint.magnitude > 0.01f )
                     {
-                        newPoint.SetPointType( PointType.Mirrored );
+                        newNode.SetNodeType( NodeType.Mirrored );
                     }
-                    newPoint.Control2 = relativeControlPoint; // this sets control 1 as well as it's mirrored
+                    newNode.Control2 = relativeControlPoint; // this sets control 1 as well as it's mirrored
 
 
-                    SplineNode point1 = spline.GetNode( pointCount - 1 );
-                    SplineNode point2 = newPoint;
-                    if( addPointMode == SplineAddPointMode.Prepend )
+                    SplineNode node1 = spline.GetNode( nodeCount - 1 );
+                    SplineNode node2 = newNode;
+                    if( addNodeMode == SplineAddNodeMode.Prepend )
                     {
-                        point1 = newPoint;
-                        point2 = spline.GetNode( 0 );
+                        node1 = newNode;
+                        node2 = spline.GetNode( 0 );
                     }
-                    Bezier3 addSegment = new Bezier3( point1, point2 );
+                    Bezier3 addSegment = new Bezier3( node1, node2 );
                     Bezier3 projectedAddSegment = Bezier3.ProjectToPlane( addSegment, planePosition, transform.up );
                     Handles.DrawBezier( projectedAddSegment.A, projectedAddSegment.D, projectedAddSegment.B, projectedAddSegment.C, Color.grey, null, 1 );
                     Handles.DrawBezier( addSegment.A, addSegment.D, addSegment.B, addSegment.C, Color.yellow, null, 1 );
@@ -1474,14 +1532,14 @@ namespace FantasticSplines
 
                     if( spline.IsLoop() )
                     {
-                        point1 = newPoint;
-                        point2 = spline.GetNode( 0 );
-                        if( addPointMode == SplineAddPointMode.Prepend )
+                        node1 = newNode;
+                        node2 = spline.GetNode( 0 );
+                        if( addNodeMode == SplineAddNodeMode.Prepend )
                         {
-                            point1 = spline.GetNode( pointCount - 1 );
-                            point2 = newPoint;
+                            node1 = spline.GetNode( nodeCount - 1 );
+                            node2 = newNode;
                         }
-                        Bezier3 loopSegment = new Bezier3( point1, point2 );
+                        Bezier3 loopSegment = new Bezier3( node1, node2 );
                         Bezier3 projectedLoopSegment = Bezier3.ProjectToPlane( loopSegment, planePosition, transform.up );
                         Handles.DrawBezier( projectedLoopSegment.A, projectedLoopSegment.D, projectedLoopSegment.B, projectedLoopSegment.C, Color.grey, null, 1 );
                         Handles.DrawBezier( loopSegment.A, loopSegment.D, loopSegment.B, loopSegment.C, Color.yellow, null, 1 );
@@ -1489,11 +1547,11 @@ namespace FantasticSplines
                 }
             }
 
-            Handles.SphereHandleCap( 0, addPointPosition, Quaternion.identity, HandleCapSize, guiEvent.type );
+            Handles.SphereHandleCap( 0, addNodePosition, Quaternion.identity, HandleCapSize, guiEvent.type );
             Handles.color = Color.white;
         }
 
-        void DoInsertPoint(IEditableSpline spline, Event guiEvent)
+        void DoInsertNode(IEditableSpline spline, Event guiEvent)
         {
             Selection.activeObject = (target as Component).gameObject;
 
@@ -1503,21 +1561,21 @@ namespace FantasticSplines
 
             Ray mouseRay = MousePositionToRay( camera, guiEvent.mousePosition );
             SplineResult closestToRay = spline.GetResultClosestTo( mouseRay );
-            Vector3 newPointPosition = closestToRay.position;
+            Vector3 newNodePosition = closestToRay.position;
 
-            planePosition = MathHelper.LinePlaneIntersection( newPointPosition, transform.up, transform.position, transform.up );
-            planeOffset = newPointPosition - planePosition;
+            planePosition = MathHelper.LinePlaneIntersection( newNodePosition, transform.up, transform.position, transform.up );
+            planeOffset = newNodePosition - planePosition;
 
             // new point
             Handles.color = Color.yellow;
-            Handles.SphereHandleCap( 0, newPointPosition, transform.rotation, HandleCapSize, guiEvent.type );
-            DrawWireDisk( newPointPosition, transform.up, diskRadius, camera.transform.position );
+            Handles.SphereHandleCap( 0, newNodePosition, transform.rotation, HandleCapSize, guiEvent.type );
+            DrawWireDisk( newNodePosition, transform.up, diskRadius, camera.transform.position );
             DrawWireDisk( planePosition, transform.up, diskRadius, camera.transform.position );
-            Handles.DrawLine( planePosition, newPointPosition );
+            Handles.DrawLine( planePosition, newNodePosition );
             Handles.color = Color.white;
 
             RaycastHit hitDown;
-            Ray down = new Ray( newPointPosition, -transform.up );
+            Ray down = new Ray( newNodePosition, -transform.up );
             if( Physics.Raycast( down, out hitDown ) )
             {
                 DrawWireDisk( hitDown.point, hitDown.normal, diskRadius, camera.transform.position );
@@ -1526,7 +1584,7 @@ namespace FantasticSplines
 
             if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
             {
-                Undo.RecordObject( spline.GetUndoObject(), "Insert Point" );
+                Undo.RecordObject( spline.GetUndoObject(), "Insert Node" );
                 spline.InsertNode( closestToRay.splineT );
                 EditorUtility.SetDirty( spline.GetComponent() );
                 guiEvent.Use();
@@ -1552,9 +1610,9 @@ namespace FantasticSplines
         }
 
 
-        struct MovePointState
+        struct MoveNodeState
         {
-            public int CurvePointIndex { get; private set; }
+            public int NodeIndex { get; private set; }
             public MoveControlPointId ControlPointId { get; set; }
 
             public Vector2 StartMovementAccumulator { get; set; }
@@ -1564,11 +1622,11 @@ namespace FantasticSplines
             public Vector3 StartPosition { get; private set; }
 
             public bool Moving { get; private set; }
-            public bool MovingControlPoint { get { return CurvePointIndex != -1 && ControlPointId != MoveControlPointId.None; } }
+            public bool MovingNodeControlPoint { get { return NodeIndex != -1 && ControlPointId != MoveControlPointId.None; } }
 
             public bool WasSnapping { get; set; }
 
-            public MovePointState(int curvePointIndex, MoveControlPointId controlPointId, Vector3 startPosition)
+            public MoveNodeState(int nodeIndex, MoveControlPointId controlPointId, Vector3 startPosition)
             {
                 Moving = true;
                 StartMovementAccumulator = Vector2.zero;
@@ -1576,88 +1634,66 @@ namespace FantasticSplines
                 WasSnapping = false;
                 WasSnapping = false;
                 this.ControlPointId = controlPointId;
-                this.CurvePointIndex = curvePointIndex;
+                this.NodeIndex = nodeIndex;
                 this.StartPosition = CurrentPosition = startPosition;
             }
         }
 
-        MovePointState movePointState;
-
+        MoveNodeState moveNodeState;
         const float startMovementThreshold = 5;
 
-        void DetectPointToMove(IEditableSpline spline, Event guiEvent)
+        void DetectNodeToMove(IEditableSpline spline, Event guiEvent)
         {
-            for( int i = 0; i < pointSelection.Count; ++i )
+            DetectClickSelectionResult result = DetectClickSelection( spline, guiEvent );
+
+            if( result.Detected )
             {
-                int index = pointSelection[i];
-                SplineNode point = spline.GetNode( index );
-                Vector3 worldControl1 = point.Control1 + point.position;
-                Vector3 worldControl2 = point.Control2 + point.position;
+                SplineNode node = spline.GetNode( result.nodeIndex );
 
-                bool overControl1 = IsMouseOverPoint( Camera.current, worldControl1, guiEvent.mousePosition );
-                bool overControl2 = IsMouseOverPoint( Camera.current, worldControl2, guiEvent.mousePosition );
-
-                bool control1Interactable = spline.IsLoop() || index > 0;
-                bool control2Interactable = spline.IsLoop() || index < spline.GetNodeCount() - 1;
-
-                bool control1Detected = overControl1 && control1Interactable && point.PointType != PointType.Point;
-                bool control2Detected = overControl2 && control2Interactable && point.PointType != PointType.Point;
-
-                if( control1Detected
-                    && control2Detected
-                    && Vector3.Distance( worldControl1, worldControl2 ) <= HandleCapSize )
+                if( result.selectedType == MoveControlPointId.Control2
+                    || result.selectedType == MoveControlPointId.Unknown )
                 {
-                    // if control points are ontop of eachother 
-                    // we need to determin which to move later on when we know the drag direction
-                    controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl2 );
-                    controlPlaneOffset = worldControl2 - controlPlanePosition;
+                    controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, node.Control2Position );
+                    controlPlaneOffset = node.Control2Position - controlPlanePosition;
 
-                    movePointState = new MovePointState( index, MoveControlPointId.Unknown, worldControl2 );
+                    moveNodeState = new MoveNodeState( result.nodeIndex, MoveControlPointId.Unknown, node.Control2Position );
                 }
-                else if( control1Detected )
+                else if( result.selectedType == MoveControlPointId.Control1 )
                 {
-                    controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl1 );
-                    controlPlaneOffset = worldControl1 - controlPlanePosition;
-                    movePointState = new MovePointState( index, MoveControlPointId.Control1, worldControl1 );
+                    controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, node.Control1Position );
+                    controlPlaneOffset = node.Control1Position - controlPlanePosition;
+                    moveNodeState = new MoveNodeState( result.nodeIndex, MoveControlPointId.Control1, node.Control1Position );
                 }
-                else if( control2Detected )
+                else
                 {
-                    controlPlanePosition = GetPointOnPlaneY( point.position, spline.GetTransform().up, worldControl2 );
-                    controlPlaneOffset = worldControl2 - controlPlanePosition;
-                    movePointState = new MovePointState( index, MoveControlPointId.Control2, worldControl2 );
-                }
-                // curve point
-                else if( IsMouseOverPoint( Camera.current, point.position, guiEvent.mousePosition ) )
-                {
-                    movePointState = new MovePointState( index, MoveControlPointId.None, point.position );
+                    moveNodeState = new MoveNodeState( result.nodeIndex, MoveControlPointId.None, node.position );
                 }
 
-                if( movePointState.Moving )
+                if( moveNodeState.Moving )
                 {
-                    planePosition = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point.position );
-                    planeOffset = point.position - planePosition;
-                    break;
+                    planePosition = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, node.position );
+                    planeOffset = node.position - planePosition;
                 }
             }
         }
 
-        void DoMovePoint(IEditableSpline spline, Event guiEvent)
+        void DoMoveNode(IEditableSpline spline, Event guiEvent)
         {
             Transform transform = spline.GetTransform();
 
-            if( !movePointState.Moving )
+            if( !moveNodeState.Moving )
             {
-                DoPointSelection( spline, guiEvent );
+                DoNodeSelection( spline, guiEvent );
             }
 
-            if( !movePointState.Moving && guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
+            if( !moveNodeState.Moving && guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
             {
-                DetectPointToMove( spline, guiEvent );
+                DetectNodeToMove( spline, guiEvent );
             }
-            else if( movePointState.Moving && (guiEvent.type == EventType.MouseDrag || guiEvent.type == EventType.MouseUp) && guiEvent.button == 0 )
+            else if( moveNodeState.Moving && (guiEvent.type == EventType.MouseDrag || guiEvent.type == EventType.MouseUp) && guiEvent.button == 0 )
             {
                 Vector2 screenDelta = TransformMouseDeltaToScreenDelta( guiEvent.delta );
-                Vector3 newPoint = movePointState.CurrentPosition;
+                Vector3 newPoint = moveNodeState.CurrentPosition;
 
                 bool physicsHit = false;
                 if( guiEvent.command )
@@ -1677,27 +1713,27 @@ namespace FantasticSplines
                     if( guiEvent.shift )
                     {
                         // move along up axis
-                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( movePointState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
+                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( moveNodeState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
                         Ray projectionRay = Camera.current.ScreenPointToRay( screenPoint );
                         Vector3 verticalPlaneNormal = Vector3.Cross( transform.up, Vector3.Cross( transform.up, projectionRay.direction ) );
-                        Vector3 screenWorldPosition = MathHelper.LinePlaneIntersection( projectionRay, movePointState.CurrentPosition, verticalPlaneNormal );
-                        newPoint = movePointState.CurrentPosition + transform.up * Vector3.Dot( transform.up, screenWorldPosition - movePointState.CurrentPosition );
+                        Vector3 screenWorldPosition = MathHelper.LinePlaneIntersection( projectionRay, moveNodeState.CurrentPosition, verticalPlaneNormal );
+                        newPoint = moveNodeState.CurrentPosition + transform.up * Vector3.Dot( transform.up, screenWorldPosition - moveNodeState.CurrentPosition );
                     }
                     else
                     {
                         // relative pointer tracking
-                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( movePointState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
-                        newPoint = MathHelper.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), movePointState.CurrentPosition, transform.up );
+                        Vector3 screenPoint = Camera.current.WorldToScreenPoint( moveNodeState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
+                        newPoint = MathHelper.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), moveNodeState.CurrentPosition, transform.up );
                     }
                 }
 
-                movePointState.CurrentPosition = newPoint;
+                moveNodeState.CurrentPosition = newPoint;
 
-                Vector3 totalMovement = newPoint - movePointState.StartPosition;
+                Vector3 totalMovement = newPoint - moveNodeState.StartPosition;
 
-                if( Mathf.Abs( movePointState.StartMovementAccumulator.magnitude ) < startMovementThreshold )
+                if( Mathf.Abs( moveNodeState.StartMovementAccumulator.magnitude ) < startMovementThreshold )
                 {
-                    movePointState.StartMovementAccumulator += guiEvent.delta;
+                    moveNodeState.StartMovementAccumulator += guiEvent.delta;
                 }
                 else if( totalMovement.magnitude > 0 )
                 {
@@ -1705,120 +1741,106 @@ namespace FantasticSplines
 
                     if( guiEvent.alt )
                     {
-                        Vector3 newWorldPoint = totalMovement + movePointState.StartPosition;
+                        Vector3 newWorldPoint = totalMovement + moveNodeState.StartPosition;
 
                         Vector3 origin = transform.position;
-                        if( movePointState.MovingControlPoint )
+                        if( moveNodeState.MovingNodeControlPoint )
                         {
-                            origin = spline.GetNode( movePointState.CurvePointIndex ).position;
+                            origin = spline.GetNode( moveNodeState.NodeIndex ).position;
                         }
 
                         Vector3 filter = Vector3.one;
-                        /*if( Mathf.Abs(snappedMovement.x) <= 0 || guiEvent.shift )
-                        {
-                            filter.x = 0;
-                        }
-                        if( Mathf.Abs(snappedMovement.z) <= 0 || guiEvent.shift )
-                        {
-                            filter.z = 0;
-                        }
-
-                        if( Mathf.Abs(snappedMovement.y) <= 0 || !guiEvent.shift )
-                        {
-                            filter.y = 0;
-                        }*/
-
-                        float gridScale = (movePointState.MovingControlPoint) ? 0.2f : 1.0f;
+                        float gridScale = (moveNodeState.MovingNodeControlPoint) ? 0.2f : 1.0f;
 
                         Vector3 newSnappedWorldPoint = SnapWorldPointToGrid( newWorldPoint, origin, filter, gridScale );
-                        snappedMovement = newSnappedWorldPoint - movePointState.StartPosition;
+                        snappedMovement = newSnappedWorldPoint - moveNodeState.StartPosition;
                     }
 
-                    Vector3 snappedDelta = snappedMovement - movePointState.LastSnappedMovement;
+                    Vector3 snappedDelta = snappedMovement - moveNodeState.LastSnappedMovement;
 
-                    Undo.RecordObject( spline.GetUndoObject(), "Move Points" );
-                    if( movePointState.MovingControlPoint )
+                    Undo.RecordObject( spline.GetUndoObject(), "Move Nodes" );
+                    if( moveNodeState.MovingNodeControlPoint )
                     {
-                        SplineNode curvePoint = spline.GetNode( movePointState.CurvePointIndex );
-                        if( movePointState.ControlPointId == MoveControlPointId.Unknown )
+                        SplineNode node = spline.GetNode( moveNodeState.NodeIndex );
+                        if( moveNodeState.ControlPointId == MoveControlPointId.Unknown )
                         {
-                            Vector3 worldControl = curvePoint.position + curvePoint.Control2;
+                            Vector3 worldControl = node.position + node.Control2;
                             float directionTestForward = 0;
                             float directionTestBackward = 0;
-                            if( spline.GetNodeCount() > movePointState.CurvePointIndex + 1 || spline.IsLoop() )
+                            if( spline.GetNodeCount() > moveNodeState.NodeIndex + 1 || spline.IsLoop() )
                             {
-                                int nextIndex = MathHelper.WrapIndex( movePointState.CurvePointIndex + 1, spline.GetNodeCount() );
-                                directionTestForward = Vector3.Dot( totalMovement.normalized, (spline.GetNode( nextIndex ).position - curvePoint.position).normalized );
+                                int nextIndex = MathHelper.WrapIndex( moveNodeState.NodeIndex + 1, spline.GetNodeCount() );
+                                directionTestForward = Vector3.Dot( totalMovement.normalized, (spline.GetNode( nextIndex ).position - node.position).normalized );
                             }
 
-                            if( movePointState.CurvePointIndex - 1 >= 0 || spline.IsLoop() )
+                            if( moveNodeState.NodeIndex - 1 >= 0 || spline.IsLoop() )
                             {
-                                int nextIndex = MathHelper.WrapIndex( movePointState.CurvePointIndex - 1, spline.GetNodeCount() );
-                                directionTestBackward = Vector3.Dot( totalMovement.normalized, (spline.GetNode( movePointState.CurvePointIndex - 1 ).position - curvePoint.position).normalized );
+                                int nextIndex = MathHelper.WrapIndex( moveNodeState.NodeIndex - 1, spline.GetNodeCount() );
+                                directionTestBackward = Vector3.Dot( totalMovement.normalized, (spline.GetNode( moveNodeState.NodeIndex - 1 ).position - node.position).normalized );
                             }
 
                             if( directionTestForward >= directionTestBackward )
                             {
-                                movePointState.ControlPointId = MoveControlPointId.Control2;
-                                worldControl = curvePoint.position + curvePoint.Control2;
+                                moveNodeState.ControlPointId = MoveControlPointId.Control2;
+                                worldControl = node.position + node.Control2;
                             }
                             else
                             {
-                                movePointState.ControlPointId = MoveControlPointId.Control1;
-                                worldControl = curvePoint.position + curvePoint.Control1;
+                                moveNodeState.ControlPointId = MoveControlPointId.Control1;
+                                worldControl = node.position + node.Control1;
                             }
 
-                            controlPlanePosition = GetPointOnPlaneY( curvePoint.position, spline.GetTransform().up, worldControl );
+                            controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, worldControl );
                             controlPlaneOffset = worldControl - controlPlanePosition;
                         }
 
-                        if( movePointState.ControlPointId == MoveControlPointId.Control1 )
+                        if( moveNodeState.ControlPointId == MoveControlPointId.Control1 )
                         {
-                            curvePoint.Control1 = curvePoint.Control1 + snappedDelta;
+                            node.Control1 = node.Control1 + snappedDelta;
                         }
                         else
                         {
-                            curvePoint.Control2 = curvePoint.Control2 + snappedDelta;
+                            node.Control2 = node.Control2 + snappedDelta;
                         }
-                        spline.SetNode( movePointState.CurvePointIndex, curvePoint );
+                        spline.SetNode( moveNodeState.NodeIndex, node );
                     }
                     else
                     {
-                        for( int i = 0; i < pointSelection.Count; ++i )
+                        for( int i = 0; i < nodeSelection.Count; ++i )
                         {
-                            int index = pointSelection[i];
-                            SplineNode curvePoint = spline.GetNode( index );
-                            curvePoint.position = curvePoint.position + snappedDelta;
-                            spline.SetNode( index, curvePoint );
+                            int index = nodeSelection[i];
+                            SplineNode node = spline.GetNode( index );
+                            node.position = node.position + snappedDelta;
+                            spline.SetNode( index, node );
                         }
                     }
 
-                    movePointState.LastSnappedMovement = snappedMovement;
+                    moveNodeState.LastSnappedMovement = snappedMovement;
 
-                    SplineNode latestCurvePoint = spline.GetNode( movePointState.CurvePointIndex );
-                    planePosition = GetPointOnPlaneY( transform.position, transform.up, latestCurvePoint.position );
-                    planeOffset = latestCurvePoint.position - planePosition;
+                    SplineNode latestNode = spline.GetNode( moveNodeState.NodeIndex );
+                    planePosition = GetPointOnPlaneY( transform.position, transform.up, latestNode.position );
+                    planeOffset = latestNode.position - planePosition;
                 }
 
                 if( guiEvent.type == EventType.MouseUp )
                 {
-                    movePointState = new MovePointState();
+                    moveNodeState = new MoveNodeState();
                 }
             }
 
-            if( movePointState.Moving )
+            if( moveNodeState.Moving )
             {
                 useEvent = true;
             }
 
-            if( movePointState.MovingControlPoint )
+            if( moveNodeState.MovingNodeControlPoint )
             {
-                SplineNode curvePoint = spline.GetNode( movePointState.CurvePointIndex );
+                SplineNode node = spline.GetNode( moveNodeState.NodeIndex );
                 if( ShowGrid || guiEvent.alt )
                 {
-                    DrawGrid( curvePoint.position, transform.forward, transform.right, 0.2f, 5, guiEvent );
+                    DrawGrid( node.position, transform.forward, transform.right, 0.2f, 5, guiEvent );
                 }
-                DrawControlPointMovementGuides( spline, curvePoint.position, curvePoint.Control1 + curvePoint.position, curvePoint.Control2 + curvePoint.position );
+                DrawNodeControlPointMovementGuides( spline, node.position, node.Control1 + node.position, node.Control2 + node.position );
             }
         }
 
@@ -1846,6 +1868,14 @@ namespace FantasticSplines
         void DrawWireDisk(Vector3 point, Vector3 normal, float radius, Vector3 cameraPosition)
         {
             Handles.DrawWireDisc( point, normal, radius * DepthScale( point, cameraPosition ) );
+        }
+
+        void DebugLogEvent(Event guiEvent)
+        {
+            if( guiEvent.type != EventType.Layout && guiEvent.type != EventType.Repaint )
+            {
+                Debug.Log( guiEvent.type );
+            }
         }
     }
 }

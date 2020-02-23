@@ -2,7 +2,7 @@
 
 namespace FantasticSplines
 {
-    public enum PointType
+    public enum NodeType
     {
         Point, // control points ignored
         Free, // free moving control points
@@ -24,22 +24,22 @@ namespace FantasticSplines
         int lastChangedControl;
 
         [SerializeField]
-        PointType pointType;
+        NodeType nodeType;
 
         public Vector3 Control1Position => position + control1;
         public Vector3 Control2Position => position + control2;
 
-        public static Vector3 ConstrainControlPoint(Vector3 master, Vector3 constrain, PointType type)
+        public static Vector3 ConstrainControlPoint(Vector3 master, Vector3 constrain, NodeType type)
         {
             switch( type )
             {
-                case PointType.Aligned:
+                case NodeType.Aligned:
                     if( master.magnitude > 0 )
                     {
                         constrain = -master.normalized * constrain.magnitude;
                     }
                     break;
-                case PointType.Mirrored:
+                case NodeType.Mirrored:
                     constrain = -master;
                     break;
             }
@@ -51,7 +51,7 @@ namespace FantasticSplines
         {
             get
             {
-                if( pointType == PointType.Point )
+                if( nodeType == NodeType.Point )
                 {
                     return Vector3.zero;
                 }
@@ -61,7 +61,7 @@ namespace FantasticSplines
             set
             {
                 control1 = value;
-                control2 = ConstrainControlPoint( control1, control2, pointType );
+                control2 = ConstrainControlPoint( control1, control2, nodeType );
                 lastChangedControl = 1;
             }
         }
@@ -70,7 +70,7 @@ namespace FantasticSplines
         {
             get
             {
-                if( pointType == PointType.Point )
+                if( nodeType == NodeType.Point )
                 {
                     return Vector3.zero;
                 }
@@ -80,22 +80,22 @@ namespace FantasticSplines
             set
             {
                 control2 = value;
-                control1 = ConstrainControlPoint( control2, control1, pointType );
+                control1 = ConstrainControlPoint( control2, control1, nodeType );
                 lastChangedControl = 2;
             }
         }
 
-        public PointType PointType
+        public NodeType NodeType
         {
             get
             {
-                return pointType;
+                return nodeType;
             }
         }
 
-        public void SetPointType(PointType type)
+        public void SetNodeType(NodeType type)
         {
-            pointType = type;
+            nodeType = type;
 
             if( lastChangedControl == 2 )
             {
@@ -109,18 +109,18 @@ namespace FantasticSplines
 
         public SplineNode(Vector3 position)
         {
-            pointType = PointType.Point;
+            nodeType = NodeType.Point;
             this.position = position;
             control1 = control2 = Vector3.zero;
             lastChangedControl = 0;
         }
 
-        public SplineNode(Vector3 position, Vector3 control1, Vector3 control2, PointType type)
+        public SplineNode(Vector3 position, Vector3 control1, Vector3 control2, NodeType type)
         {
             this.position = position;
             this.control1 = control1;
             this.control2 = control2;
-            pointType = type;
+            nodeType = type;
             lastChangedControl = 0;
         }
 
@@ -129,7 +129,7 @@ namespace FantasticSplines
             position = other.position;
             control1 = other.control1;
             control2 = other.control2;
-            pointType = other.pointType;
+            nodeType = other.nodeType;
             lastChangedControl = other.lastChangedControl;
         }
 
@@ -153,7 +153,7 @@ namespace FantasticSplines
 
         public override string ToString()
         {
-            return string.Format( "[{0}:{1}]", position, pointType );
+            return string.Format( "[{0}:{1}]", position, nodeType );
         }
     }
 }

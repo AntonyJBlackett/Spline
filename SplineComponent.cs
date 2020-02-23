@@ -11,7 +11,9 @@ namespace FantasticSplines
 {
     public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
     {
-        public Curve curve; // spline in local space
+        [HideInInspector]
+        [SerializeField]
+        Curve curve; // spline in local space
 
         public float GetLength() { return curve.Length; }
 
