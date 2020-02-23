@@ -41,6 +41,7 @@ namespace FantasticSplines
         SplineAddPointMode addPointMode = SplineAddPointMode.Append;
         float diskRadius = 0.2f;
         float handleCapSize = 0.1f;
+        float HandleCapSize => handleCapSize * HandleCapScale;
         Vector3 planePosition;
         Vector3 planeOffset;
         Vector3 controlPlanePosition;
@@ -330,17 +331,19 @@ namespace FantasticSplines
 
             GUILayout.Label( "Grid" );
             ShowGrid = GUILayout.Toggle( ShowGrid, "Show Grid" );
+            SnapToHalfGrid = GUILayout.Toggle( SnapToHalfGrid, "Snap To Half Grid Size" );
+            SnapToGridScale = EditorGUILayout.Vector3Field( "Grid Snap Scale", SnapToGridScale );
             GUILayout.BeginHorizontal();
             GUILayout.Label( "Snap Axies (hold alt)" );
             SnapToGridX = GUILayout.Toggle( SnapToGridX, "X" );
             SnapToGridY = GUILayout.Toggle( SnapToGridY, "Y" );
             SnapToGridZ = GUILayout.Toggle( SnapToGridZ, "Z" );
             GUILayout.EndHorizontal();
-            SnapToGridScale = EditorGUILayout.Vector3Field( "Grid Snap Scale", SnapToGridScale );
-            SnapToHalfGrid = GUILayout.Toggle( SnapToHalfGrid, "Snap To Half Grid Size" );
 
+            GUILayout.Space( 10 );
             GUILayout.Label( "Gizmos" );
-            spline.SetColor( EditorGUILayout.ColorField( spline.GetColor() ) );
+            HandleCapScale = EditorGUILayout.FloatField( "Editor Point Scale", HandleCapScale );
+            spline.SetColor( EditorGUILayout.ColorField( "Spline Colour", spline.GetColor() ) );
             spline.SetZTest( GUILayout.Toggle( spline.GetZTest(), "ZTest" ) );
             ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
             ShowCurvePointControls = GUILayout.Toggle( ShowCurvePointControls, "Show Point Controls" );
@@ -355,8 +358,14 @@ namespace FantasticSplines
             GUILayout.Label( "Edit Mode: " + editMode.ToString() );
             GUILayout.Label( "Add Point Mode: " + addPointMode.ToString() );
             GUILayout.Label( "Moving Point: " + movePointState.Moving.ToString() );
-            GUILayout.Label( "Length: " + spline.GetLength() );
 
+
+            GUILayout.Space( 10 );
+            GUILayout.Label( "Info" );
+            GUILayout.Label( "Length: " + spline.GetLength() );
+            GUILayout.Label( "Point Count: " + spline.GetCurvePointCount() );
+
+            GUILayout.Space( 10 );
             DrawDefaultInspector();
         }
 
@@ -400,6 +409,12 @@ namespace FantasticSplines
         {
             get => EditorPrefs.GetBool( "FantasticSplinesSnapToHalfGrid", false );
             set => EditorPrefs.SetBool( "FantasticSplinesSnapToHalfGrid", value );
+        }
+
+        public static float HandleCapScale
+        {
+            get => EditorPrefs.GetFloat( "FantasticSplinesHandleCapScale", 1 );
+            set => EditorPrefs.SetFloat( "FantasticSplinesHandleCapScale", value );
         }
 
         public static Vector3 SnapToGridScale
@@ -734,7 +749,7 @@ namespace FantasticSplines
                 }
 
                 Vector3 point = spline.GetCurvePoint( i ).position;
-                Handles.SphereHandleCap( 0, point, spline.GetTransform().rotation, handleCapSize, EventType.Repaint );
+                Handles.SphereHandleCap( 0, point, spline.GetTransform().rotation, HandleCapSize, EventType.Repaint );
             }
             Handles.color = Color.white;
         }
@@ -868,13 +883,13 @@ namespace FantasticSplines
 
             if( index > 0 || spline.IsLoop() )
             {
-                Handles.SphereHandleCap( 0, control1, Quaternion.identity, handleCapSize, EventType.Repaint );
+                Handles.SphereHandleCap( 0, control1, Quaternion.identity, HandleCapSize, EventType.Repaint );
                 Handles.DrawLine( point.position, control1 );
             }
 
             if( index < spline.GetCurvePointCount() - 1 || spline.IsLoop() )
             {
-                Handles.SphereHandleCap( 0, control2, Quaternion.identity, handleCapSize, EventType.Repaint );
+                Handles.SphereHandleCap( 0, control2, Quaternion.identity, HandleCapSize, EventType.Repaint );
                 Handles.DrawLine( point.position, control2 );
             }
         }
@@ -1255,8 +1270,8 @@ namespace FantasticSplines
 
             Handles.color = controlColour;
             // draw control placement GUI
-            Handles.SphereHandleCap( 0, control1, Quaternion.identity, handleCapSize * 0.5f, EventType.Repaint );
-            Handles.SphereHandleCap( 0, control2, Quaternion.identity, handleCapSize * 0.5f, EventType.Repaint );
+            Handles.SphereHandleCap( 0, control1, Quaternion.identity, HandleCapSize * 0.5f, EventType.Repaint );
+            Handles.SphereHandleCap( 0, control2, Quaternion.identity, HandleCapSize * 0.5f, EventType.Repaint );
 
             DrawWireDisk( control1, transform.up, diskRadius * 0.5f, camera.transform.position );
             DrawWireDisk( control2, transform.up, diskRadius * 0.5f, camera.transform.position );
@@ -1474,7 +1489,7 @@ namespace FantasticSplines
                 }
             }
 
-            Handles.SphereHandleCap( 0, addPointPosition, Quaternion.identity, handleCapSize, guiEvent.type );
+            Handles.SphereHandleCap( 0, addPointPosition, Quaternion.identity, HandleCapSize, guiEvent.type );
             Handles.color = Color.white;
         }
 
@@ -1495,7 +1510,7 @@ namespace FantasticSplines
 
             // new point
             Handles.color = Color.yellow;
-            Handles.SphereHandleCap( 0, newPointPosition, transform.rotation, handleCapSize, guiEvent.type );
+            Handles.SphereHandleCap( 0, newPointPosition, transform.rotation, HandleCapSize, guiEvent.type );
             DrawWireDisk( newPointPosition, transform.up, diskRadius, camera.transform.position );
             DrawWireDisk( planePosition, transform.up, diskRadius, camera.transform.position );
             Handles.DrawLine( planePosition, newPointPosition );
@@ -1521,7 +1536,7 @@ namespace FantasticSplines
         bool IsMouseOverPoint(Camera camera, Vector3 point, Vector3 mousePosition)
         {
             Vector3 screenPoint = Camera.current.WorldToScreenPoint( point );
-            Vector3 screenPoint2 = Camera.current.WorldToScreenPoint( point + Camera.current.transform.right * handleCapSize );
+            Vector3 screenPoint2 = Camera.current.WorldToScreenPoint( point + Camera.current.transform.right * HandleCapSize );
             Vector3 mouseScreenPoint = TransformMousePositionToScreenPoint( Camera.current, mousePosition );
             screenPoint.z = 0;
             screenPoint2.z = 0;
@@ -1590,7 +1605,7 @@ namespace FantasticSplines
 
                 if( control1Detected
                     && control2Detected
-                    && Vector3.Distance( worldControl1, worldControl2 ) <= handleCapSize )
+                    && Vector3.Distance( worldControl1, worldControl2 ) <= HandleCapSize )
                 {
                     // if control points are ontop of eachother 
                     // we need to determin which to move later on when we know the drag direction
