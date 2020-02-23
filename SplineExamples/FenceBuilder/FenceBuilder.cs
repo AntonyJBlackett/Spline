@@ -19,7 +19,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     public bool clear = false;
     public bool regenerate = false;
     public bool autoRegenerate = false;
-    
+
     //SplineComponent lastSpline = null;
 
     [SerializeField]
@@ -108,46 +108,46 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
             instanceBucket.SetParent( transform );
         }
 
-        SplinePosition post1Position = new SplinePosition( spline, 0 );
+        SplineResult post1Position = spline.GetResultAtDistance( 0 );
         separation = segment.transform.localScale.z;
         float step = separation * 0.5f;
 
-        SplinePosition post2Position = post1Position.MoveUntilAtWorldDistance( separation, step );
-        
+        SplineResult post2Position = spline.GetResultAtWorldDistanceFrom( post1Position.splineDistance, separation, step );
+
         // first segment
         if( post != null )
         {
             GameObject postInstance = GetInstance( post, instanceBucket );
             postInstance.SetActive( true );
-            postInstance.transform.position = post1Position.Position;
-            postInstance.transform.rotation = Quaternion.LookRotation( post1Position.Tangent, Vector3.up );
+            postInstance.transform.position = post1Position.position;
+            postInstance.transform.rotation = Quaternion.LookRotation( post1Position.tangent, Vector3.up );
         }
 
         float splineLength = spline.GetLength();
 
-        int limit = Mathf.CeilToInt(1 + spline.GetLength() / separation); // we should never need more segments than a dead straight spline needs
+        int limit = Mathf.CeilToInt( 1 + splineLength / separation ); // we should never need more segments than a dead straight spline needs
         while( !post1Position.AtEnd )
         {
             GameObject segmentInstance = GetInstance( segment, instanceBucket );
             segmentInstance.SetActive( true );
 
-            Vector3 segmentDirection = (post2Position.Position - post1Position.Position).normalized;
-            Vector3 segmentPosition = post1Position.Position + segmentDirection * separation * 0.5f;
+            Vector3 segmentDirection = (post2Position.position - post1Position.position).normalized;
+            Vector3 segmentPosition = post1Position.position + segmentDirection * separation * 0.5f;
 
             segmentInstance.transform.position = segmentPosition;
             segmentInstance.transform.rotation = Quaternion.LookRotation( segmentDirection, Vector3.up );
-            
+
             if( post != null )
             {
-                Vector3 nextPostPosition = post1Position.Position + segmentDirection * separation;
+                Vector3 nextPostPosition = post1Position.position + segmentDirection * separation;
                 GameObject postInstance = GetInstance( post, instanceBucket );
                 postInstance.SetActive( true );
                 postInstance.transform.position = nextPostPosition;
-                postInstance.transform.rotation = Quaternion.LookRotation( post2Position.Tangent, Vector3.up );
+                postInstance.transform.rotation = Quaternion.LookRotation( post2Position.tangent, Vector3.up );
             }
 
             post1Position = post2Position;
-            post2Position = post2Position.MoveUntilAtWorldDistance( separation, step );
+            post2Position = spline.GetResultAtWorldDistanceFrom( post2Position.splineDistance, separation, step );
 
             --limit;
             if( limit < 0 )
@@ -181,7 +181,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
             return;
         }
         int count = instanceBucket.childCount;
-        for( int i = count-1; i >= 0; --i )
+        for( int i = count - 1; i >= 0; --i )
         {
             GameObject child = instanceBucket.GetChild( i ).gameObject;
             if( !child.activeSelf )
@@ -200,11 +200,11 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         int count = instanceBucket.childCount;
         for( int i = 0; i < count; ++i )
         {
-            instanceBucket.GetChild( i ).gameObject.SetActive(false);
+            instanceBucket.GetChild( i ).gameObject.SetActive( false );
         }
     }
 
-    GameObject FindUnusedInstanceInPool( GameObject prefabOrGameObject )
+    GameObject FindUnusedInstanceInPool(GameObject prefabOrGameObject)
     {
 #if UNITY_EDITOR
         if( instanceBucket == null )
@@ -239,7 +239,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         return null;
     }
 
-    GameObject GetInstance( GameObject prefabOrGameObject, Transform parent )
+    GameObject GetInstance(GameObject prefabOrGameObject, Transform parent)
     {
         if( prefabOrGameObject == null )
         {
@@ -251,7 +251,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         if( instance != null )
         {
             instance.SetActive( true );
-            instance.transform.SetSiblingIndex( instance.transform.parent.childCount-1 );
+            instance.transform.SetSiblingIndex( instance.transform.parent.childCount - 1 );
         }
 
         if( instance == null )
@@ -272,7 +272,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         return InstantiatePrefabOrGameObject( prefabOrGameObject.gameObject, parent ).GetComponent<T>();
     }
 
-    static GameObject InstantiatePrefabOrGameObject( GameObject prefabOrGameObject, Transform parent )
+    static GameObject InstantiatePrefabOrGameObject(GameObject prefabOrGameObject, Transform parent)
     {
         if( prefabOrGameObject == null )
         {

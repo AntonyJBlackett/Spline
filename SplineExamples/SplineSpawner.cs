@@ -17,7 +17,7 @@ public class SplineSpawner : MonoBehaviour
     public bool clear = false;
     public bool regenerate = false;
     public bool autoRegenerate = false;
-    
+
     SplineComponent lastSpline = null;
     void OnEnable()
     {
@@ -102,26 +102,26 @@ public class SplineSpawner : MonoBehaviour
             return;
         }
 
-        SplinePosition splinePosition = new SplinePosition( spline, 0 );
+        SplineResult splineResult = spline.GetResultAtT( 0 );
 
         bool spawning = true;
         while( spawning )
         {
             GameObject instance = Instantiate( prefab, transform );
             instance.SetActive( true );
-            instance.transform.position = splinePosition.Position;
-            instance.transform.rotation = Quaternion.LookRotation( splinePosition.Tangent, Vector3.up );
+            instance.transform.position = splineResult.position;
+            instance.transform.rotation = Quaternion.LookRotation( splineResult.tangent, Vector3.up );
 
-            spawning = splinePosition.DistanceOnSpline < spline.GetLength();
+            spawning = splineResult.segmentT < 1;
 
             switch( separationMethod )
             {
                 case SeparationMethod.SplineDistance:
-                    splinePosition = splinePosition.Move( separation );
-                break;
-            case SeparationMethod.WorldDistance:
-                    splinePosition = splinePosition.MoveUntilAtWorldDistance( separation, separation * 0.5f );
-                break;
+                    splineResult = spline.GetResultAtDistance( splineResult.splineDistance + separation );
+                    break;
+                case SeparationMethod.WorldDistance:
+                    splineResult = spline.GetResultAtWorldDistanceFrom( splineResult.splineDistance, separation, separation * 0.33f );
+                    break;
             }
         }
     }

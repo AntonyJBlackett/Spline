@@ -73,10 +73,10 @@ namespace FantasticSplines
 
         public Vector3 Derivative(float t)
         {
-            return Vector3.Lerp(A, B, t);
+            return Vector3.Lerp( A, B, t );
         }
     }
-    
+
     /// <summary>
     /// Quadratic Bézier curve calculation class.
     /// </summary>
@@ -114,16 +114,16 @@ namespace FantasticSplines
             return mt * mt * A + 2.0f * t * mt * B + t * t * C;
         }
 
-        public Vector3 P(float t) => GetPos(t);
-        
+        public Vector3 P(float t) => GetPos( t );
+
         public float GetLengthInterpolated(int steps)
         {
             float step = 1f / steps;
             float distance = 0f;
-            Vector3 prev = GetPos(0f);
-            for (float t = step; t < 1f; t += step)
+            Vector3 prev = GetPos( 0f );
+            for( float t = step; t < 1f; t += step )
             {
-                Vector3 curr = GetPos(t);
+                Vector3 curr = GetPos( t );
                 distance += (curr - prev).magnitude;
                 prev = curr;
             }
@@ -136,31 +136,32 @@ namespace FantasticSplines
             get
             {
                 SimpleLine cube = DerivedCurve();
-                
+
                 float z = 0.5f;
                 float sum = 0;
                 int len = Utils.Tvalues.Length;
-                for (int i = 0; i < len; i++) {
+                for( int i = 0; i < len; i++ )
+                {
                     float t = z * Utils.Tvalues[i] + z;
-                    sum += Utils.Cvalues[i] * cube.Derivative(t).magnitude;
+                    sum += Utils.Cvalues[i] * cube.Derivative( t ).magnitude;
                 }
                 return z * sum;
             }
         }
-        
+
         public SimpleLine DerivedCurve()
         {
             return new SimpleLine(
                 2 * (B - A),
-                2 * (C - B));
+                2 * (C - B) );
         }
-        
+
         public Vector3 Derivative(float t)
         {
             float mt = 1f - t;
-            float a = mt*mt;
-            float b = mt*t*2;
-            float c = t*t;
+            float a = mt * mt;
+            float b = mt * t * 2;
+            float c = t * t;
             return (a * A) + (b * B) + (c * C);
         }
     }
@@ -173,7 +174,7 @@ namespace FantasticSplines
     {
         const float InterpolationPrecision = 0.001f;
         const float LineInterpolationPrecision = 0.05f;
-        
+
         const float Sqrt3 = 1.7320508076f; // Mathf.Sqrt(3f)
         const float Div18Sqrt3 = 18f / Sqrt3;
         const float OneThird = 1f / 3f;
@@ -195,10 +196,10 @@ namespace FantasticSplines
         /// End point.
         /// </summary>
         public Vector3 D;
-    
+
         public Vector3 start => A;
-        public Vector3 startControl => B-A;
-        public Vector3 endControl => C-D;
+        public Vector3 startControl => B - A;
+        public Vector3 endControl => C - D;
         public Vector3 end => D;
 
         /// <summary>
@@ -222,7 +223,7 @@ namespace FantasticSplines
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public Vector3 GetPos(float t)
+        public Vector3 GetPosition(float t)
         {
             return A + 3.0f * t * (B - A) + 3.0f * t * t * (C - 2.0f * B + A) + t * t * t * (D - 3.0f * C + 3.0f * B - A);
         }
@@ -232,7 +233,7 @@ namespace FantasticSplines
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public Vector3 GetTangent( float t )
+        public Vector3 GetTangent(float t)
         {
             t = Mathf.Clamp( t, 0.0001f, 0.9999f ); // clamp like this of there is no tangent at position exactly on the curve point
             float oneMinusT = 1f - t;
@@ -255,7 +256,7 @@ namespace FantasticSplines
         /// </summary>
         public Bezier2 ApproximateQuadratic
         {
-            get { return new Bezier2(A, Q, D); }
+            get { return new Bezier2( A, Q, D ); }
         }
 
         /// <summary>
@@ -276,53 +277,53 @@ namespace FantasticSplines
         /// </remarks>
         public void SplitAt(float t, out Bezier3 left, out Bezier3 right)
         {
-            Vector3 a = Vector3.Lerp(A, B, t);
-            Vector3 b = Vector3.Lerp(B, C, t);
-            Vector3 c = Vector3.Lerp(C, D, t);
-            Vector3 m = Vector3.Lerp(a, b, t);
-            Vector3 n = Vector3.Lerp(b, c, t);
-            Vector3 p = GetPos(t);
+            Vector3 a = Vector3.Lerp( A, B, t );
+            Vector3 b = Vector3.Lerp( B, C, t );
+            Vector3 c = Vector3.Lerp( C, D, t );
+            Vector3 m = Vector3.Lerp( a, b, t );
+            Vector3 n = Vector3.Lerp( b, c, t );
+            Vector3 p = GetPosition( t );
 
-            left = new Bezier3(A, a, m, p);
-            right = new Bezier3(p, n, c, D);
+            left = new Bezier3( A, a, m, p );
+            right = new Bezier3( p, n, c, D );
         }
 
         public Bezier3 MiddleSplitAt(float t1, float t2)
         {
-            Bezier3 right = RightSplitAt(t1);
-            float newT = Mathf.InverseLerp(t1, 1f, t2);
-            #if DEBUG
-            Debug.Assert((right.GetPos(newT) - GetPos(t2)).sqrMagnitude < 0.0001f);
-            #endif
-            return right.LeftSplitAt(newT);
+            Bezier3 right = RightSplitAt( t1 );
+            float newT = Mathf.InverseLerp( t1, 1f, t2 );
+#if DEBUG
+            Debug.Assert( (right.GetPosition( newT ) - GetPosition( t2 )).sqrMagnitude < 0.0001f );
+#endif
+            return right.LeftSplitAt( newT );
         }
 
         public Bezier3 LeftSplitAt(float t)
         {
-            if (Mathf.Approximately(t, 1f))
+            if( Mathf.Approximately( t, 1f ) )
             {
                 return this;
             }
-            Vector3 a = Vector3.Lerp(A, B, t);
-            Vector3 b = Vector3.Lerp(B, C, t);
-            Vector3 m = Vector3.Lerp(a, b, t);
-            Vector3 p = GetPos(t);
+            Vector3 a = Vector3.Lerp( A, B, t );
+            Vector3 b = Vector3.Lerp( B, C, t );
+            Vector3 m = Vector3.Lerp( a, b, t );
+            Vector3 p = GetPosition( t );
 
-            return new Bezier3(A, a, m, p);
+            return new Bezier3( A, a, m, p );
         }
-        
+
         public Bezier3 RightSplitAt(float t)
         {
-            if (Mathf.Approximately(t, 0f))
+            if( Mathf.Approximately( t, 0f ) )
             {
                 return this;
             }
-            Vector3 b = Vector3.Lerp(B, C, t);
-            Vector3 c = Vector3.Lerp(C, D, t);
-            Vector3 n = Vector3.Lerp(b, c, t);
-            Vector3 p = GetPos(t);
+            Vector3 b = Vector3.Lerp( B, C, t );
+            Vector3 c = Vector3.Lerp( C, D, t );
+            Vector3 n = Vector3.Lerp( b, c, t );
+            Vector3 p = GetPosition( t );
 
-            return new Bezier3(p, n, c, D);
+            return new Bezier3( p, n, c, D );
         }
 
         /// <summary>
@@ -336,20 +337,23 @@ namespace FantasticSplines
                 3 * (D - C)
             );
         }
-        
+
         /// <summary>
         /// Gets the calculated length of adaptive quadratic approximation.
         /// </summary>
-        public float Length {
-            get {
+        public float Length
+        {
+            get
+            {
                 Bezier2 cube = DerivedCurve();
-                
+
                 float z = 0.5f;
                 float sum = 0;
                 int len = Utils.Tvalues.Length;
-                for (int i = 0; i < len; i++) {
+                for( int i = 0; i < len; i++ )
+                {
                     float t = z * Utils.Tvalues[i] + z;
-                    sum += Utils.Cvalues[i] * cube.Derivative(t).magnitude;
+                    sum += Utils.Cvalues[i] * cube.Derivative( t ).magnitude;
                 }
                 return z * sum;
             }
@@ -357,17 +361,17 @@ namespace FantasticSplines
 
         public float CalculateDistanceAt(float t)
         {
-            return LeftSplitAt(t).Length;
+            return LeftSplitAt( t ).Length;
         }
 
         public float GetLengthInterpolated(int steps)
         {
             float step = 1f / steps;
             float distance = 0f;
-            Vector3 prev = GetPos(0f);
-            for (float t = step; t < 1f; t += step)
+            Vector3 prev = GetPosition( 0f );
+            for( float t = step; t < 1f; t += step )
             {
-                Vector3 curr = GetPos(t);
+                Vector3 curr = GetPosition( t );
                 distance += (curr - prev).magnitude;
                 prev = curr;
             }
@@ -377,35 +381,35 @@ namespace FantasticSplines
 
         public float GetClosestT(Vector3 pos, float paramThreshold = 0.000001f)
         {
-            return GetClosestTRecursive(pos, 0.0f, 1.0f, paramThreshold);
+            return GetClosestTRecursive( pos, 0.0f, 1.0f, paramThreshold );
         }
 
         float GetClosestTRecursive(Vector3 pos, float beginT, float endT, float thresholdT)
         {
-            float mid = (beginT + endT)/2.0f;
+            float mid = (beginT + endT) / 2.0f;
 
             // Base case for recursion.
-            if ((endT - beginT) < thresholdT)
+            if( (endT - beginT) < thresholdT )
                 return mid;
 
             // The two halves have param range [start, mid] and [mid, end]. We decide which one to use by using a midpoint param calculation for each section.
-            float paramA = (beginT+mid) / 2.0f;
-            float paramB = (mid+endT) / 2.0f;
-        
-            Vector3 posA = GetPos(paramA);
-            Vector3 posB = GetPos(paramB);
+            float paramA = (beginT + mid) / 2.0f;
+            float paramB = (mid + endT) / 2.0f;
+
+            Vector3 posA = GetPosition( paramA );
+            Vector3 posB = GetPosition( paramB );
             float distASq = (posA - pos).sqrMagnitude;
             float distBSq = (posB - pos).sqrMagnitude;
 
-            if (distASq < distBSq)
+            if( distASq < distBSq )
                 endT = mid;
             else
                 beginT = mid;
 
             // The (tail) recursive call.
-            return GetClosestTRecursive(pos, beginT, endT, thresholdT);
+            return GetClosestTRecursive( pos, beginT, endT, thresholdT );
         }
-        
+
         public static Bezier3 ProjectToPlane(Bezier3 curve, Vector3 planePoint, Vector3 planeNormal)
         {
             Bezier3 result = curve;
@@ -416,13 +420,13 @@ namespace FantasticSplines
             return result;
         }
 
-        public static Bezier3 Transform( Bezier3 curve, Transform transform )
+        public static Bezier3 Transform(Bezier3 curve, Transform transform)
         {
             Bezier3 result = curve;
-            result.A = transform.TransformPoint(curve.A);
-            result.B = transform.TransformPoint(curve.B);
-            result.C = transform.TransformPoint(curve.C);
-            result.D = transform.TransformPoint(curve.D);
+            result.A = transform.TransformPoint( curve.A );
+            result.B = transform.TransformPoint( curve.B );
+            result.C = transform.TransformPoint( curve.C );
+            result.D = transform.TransformPoint( curve.D );
             return result;
         }
     }

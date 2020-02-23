@@ -4,161 +4,85 @@ using UnityEngine;
 using FantasticSplines;
 #if UNITY_EDITOR
 using UnityEditor;
+using UnityEngine.UIElements;
 #endif
 
 namespace FantasticSplines
 {
-    public abstract class SplineBehaviour : MonoBehaviour, ISpline, IEditableSpline
+    public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
     {
-        public IEditableSpline GetEditableSpline() { return this; }
-        public Object GetUndoObject() { return this; }
-        [SerializeField][HideInInspector] Color color;
-        public Color GetColor() { return color;  }
-        public void SetColor(Color newColor) { color = newColor; }
-        [SerializeField][HideInInspector] bool zTest = false;
-        public bool GetZTest() { return zTest; }
-        public void SetZTest(bool test) { zTest = test; } 
-
-        public abstract float GetSpeed(float t);
-        public abstract Vector3 GetDirection(float t);
-        public abstract Vector3 GetPoint(float t);
-        public abstract float GetLength(float fromT = 0, float toT = 1);
-        public abstract float GetT(float length);
-        public abstract Transform GetTransform();
-        public abstract Component GetComponent();
-        public abstract int GetPointCount();
-        public abstract bool IsLoop();
-        public abstract void SetLoop(bool loop);
-        public abstract CurvePoint GetPoint(int index);
-        public abstract SegmentPosition GetSegmentAtDistance(float distance);
-        public abstract float GetDistanceOnSpline(SegmentPosition position);
-        public abstract Vector3 GetPosition(SegmentPosition position);
-        public abstract Vector3 GetDirection(SegmentPosition position);
-        public abstract void SetPoint(int index, CurvePoint point);
-        public abstract void InsertPoint(float t);
-        public abstract void AddPoint(CurvePoint point);
-        public abstract void AddPointAt(int index, CurvePoint point);
-        public abstract void RemovePoint(int index);
-        public abstract float GetClosestT(Vector3 point);
-        public abstract Vector3 GetClosestPoint(Vector3 point);
-        public abstract Vector3 GetClosestPoint(Ray ray);
-        public abstract void DrawSegmentLengths();
-        public abstract float GetClosestT(Ray ray);
-        public abstract float Step(float t, float worldDistance);
-        public abstract List<CurvePoint> GetPoints();
-        public abstract List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true, bool includeSplinePoints = false);
-    }
-    
-    public class SplineComponent : SplineBehaviour
-    {
-#if UNITY_EDITOR
-        void OnDrawGizmos()
-        {
-            if (Selection.activeObject != gameObject)
-            {
-                Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-                for (int i = 0; i < curve.SegmentCount; ++i)
-                {
-                    Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment(i), transform );
-
-                    Handles.DrawBezier(bezier.start, bezier.end, bezier.B, bezier.C, GetColor() * .9f, null,
-                        2f);
-                }
-
-                // this stops selection of the spline when we're doing other things.
-                if( Selection.activeObject == null )
-                {
-                    Gizmos.color = Color.white;
-                    for( int i = 0; i < PointCount; ++i )
-                    {
-                        Gizmos.DrawSphere( GetPoint( i ).position, 0.05f );
-                    }
-                }
-                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
-            }
-        }
-#endif
-
-        public override void DrawSegmentLengths()
-        {
-#if UNITY_EDITOR
-            for (int i = 0; i < curve.SegmentCount; ++i)
-            {
-                Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment(i), transform );
-                Vector3 pos = bezier.GetPos(0.5f);
-                Handles.Label(pos, bezier.Length.ToString("N2"));
-            }
-#endif
-        }
-
         public Curve curve; // spline in local space
 
-        public bool Loop
+        public float GetLength() { return curve.Length; }
+
+        public bool IsLoop() { return curve.Loop; }
+        public void SetLoop(bool loop) { curve.Loop = loop; }
+
+        public int GetCurvePointCount()
         {
-            get { return curve.Loop; }
-            set { curve.Loop = value; }
+            return curve.CurvePointCount;
         }
 
-        public int PointCount
+        bool IsCurvePointIndexInRange(int index)
         {
-            get { return curve.CurvePointCount; }
+            return MathHelper.IsInArrayRange( index, GetCurvePointCount() );
         }
 
         Vector3 InverseTransformPosition(Vector3 position)
         {
-            return transform.InverseTransformPoint(position);
+            return transform.InverseTransformPoint( position );
         }
 
         Vector3 TransformPosition(Vector3 position)
         {
-            return transform.TransformPoint(position);
+            return transform.TransformPoint( position );
         }
 
         Vector3 InverseTransformPoint(Vector3 point)
         {
-            return transform.InverseTransformPoint(point);
+            return transform.InverseTransformPoint( point );
         }
 
         Vector3 TransformPoint(Vector3 point)
         {
-            return transform.TransformPoint(point);
+            return transform.TransformPoint( point );
         }
 
         Vector3 InverseTransformVector(Vector3 vector)
         {
-            return transform.InverseTransformVector(vector);
+            return transform.InverseTransformVector( vector );
         }
 
         Vector3 TransformVector(Vector3 vector)
         {
-            return transform.TransformVector(vector);
+            return transform.TransformVector( vector );
         }
 
         Vector3 InverseTransformDirection(Vector3 direction)
         {
-            return transform.InverseTransformDirection(direction);
+            return transform.InverseTransformDirection( direction );
         }
 
         Vector3 TransformDirection(Vector3 direction)
         {
-            return transform.TransformDirection(direction);
+            return transform.TransformDirection( direction );
         }
 
         CurvePoint TransformPoint(CurvePoint point)
         {
-            return point.Transform(transform);
+            return point.Transform( transform );
         }
 
         CurvePoint InverseTransformPoint(CurvePoint point)
         {
-            return point.InverseTransform(transform);
+            return point.InverseTransform( transform );
         }
 
         List<Vector3> TransformPoints(List<Vector3> points)
         {
-            for (int i = 0; i < points.Count; ++i)
+            for( int i = 0; i < points.Count; ++i )
             {
-                points[i] = TransformPoint(points[i]);
+                points[i] = TransformPoint( points[i] );
             }
 
             return points;
@@ -166,9 +90,9 @@ namespace FantasticSplines
 
         List<CurvePoint> TransformPoints(List<CurvePoint> points)
         {
-            for (int i = 0; i < points.Count; ++i)
+            for( int i = 0; i < points.Count; ++i )
             {
-                points[i] = TransformPoint(points[i]);
+                points[i] = TransformPoint( points[i] );
             }
 
             return points;
@@ -176,171 +100,172 @@ namespace FantasticSplines
 
         Ray InverseTransformRay(Ray ray)
         {
-            ray.origin = InverseTransformPoint(ray.origin);
-            ray.direction = InverseTransformDirection(ray.direction);
+            ray.origin = InverseTransformPoint( ray.origin );
+            ray.direction = InverseTransformDirection( ray.direction );
             return ray;
         }
 
-        public bool IsIndexInRange(int index)
+        SplineResult TransformResult(SplineResult toTransform)
         {
-            return index >= 0 && index < PointCount;
+            SplineResult result = toTransform;
+            result.position = TransformPoint( toTransform.position );
+            result.tangent = TransformVector( toTransform.tangent );
+            return result;
         }
 
-        public override void InsertPoint(float t)
+        public void AppendCurvePoint(CurvePoint point)
+        {
+            curve.AddCurvePoint( point.InverseTransform( transform ) );
+        }
+
+        public void PrependCurvePoint(CurvePoint point)
+        {
+            curve.AddCurvePointAt( 0, point.InverseTransform( transform ) );
+        }
+
+        public void InsertCurvePoint(float t)
         {
             curve.InsertCurvePoint( t );
         }
 
-        public override void AddPoint(CurvePoint point)
+        public void RemoveCurvePoint(int index)
         {
-            curve.AddCurvePoint(point.InverseTransform(transform));
+            curve.RemoveCurvePoint( index );
         }
 
-        public override void AddPointAt( int index, CurvePoint point)
+        public CurvePoint GetCurvePoint(int index)
         {
-            curve.AddCurvePointAt( index, point.InverseTransform(transform) );
-        }
-
-        public override void RemovePoint(int index)
-        {
-            curve.RemoveCurvePoint(index);
-        }
-
-        public override CurvePoint GetPoint(int index)
-        {
-            if (index < 0 || index > PointCount - 1)
+            if( !IsCurvePointIndexInRange( index ) )
             {
-                return new CurvePoint(transform.position);
+                return new CurvePoint( transform.position );
             }
 
-            return TransformPoint(curve.GetCurvePoint(index));
+            return TransformPoint( curve.GetCurvePoint( index ) );
         }
 
-        public override void SetPoint(int index, CurvePoint point)
+        public void SetCurvePoint(int index, CurvePoint point)
         {
-            curve.SetCurvePoint(index, point.InverseTransform(transform));
+            curve.SetCurvePoint( index, point.InverseTransform( transform ) );
         }
 
-        public override bool IsLoop() => Loop;
-        public override void SetLoop(bool loop) { Loop = loop; }
-        public override int GetPointCount() => PointCount;
-        public override Transform GetTransform() => transform;
-        public override Component GetComponent() => this;
-
-        const float resolution = 0.1f;
-
-        public List<Vector3> GetPolyLinePoints()
+        public SplineResult GetResultAtT(float t)
         {
-            List<Vector3> points = new List<Vector3>();
-            if (PointCount < 2)
+            return TransformResult( curve.GetResultAtDistance( t * curve.Length ) );
+        }
+
+        public SplineResult GetResultAtDistance(float distance)
+        {
+            return TransformResult( curve.GetResultAtDistance( distance ) );
+        }
+
+        public SplineResult GetResultAtWorldDistanceFrom(float startDistance, float worldDistance, float stepDistance)
+        {
+            if( Mathf.Approximately( stepDistance, 0 ) )
             {
-                return points;
+                Debug.LogWarning( "Step is too small." );
+                return GetResultAtDistance( startDistance );
             }
 
-            float step = resolution / curve.Length;
-            for (float f = 0; f <= 1f; f += step)
+            int maxIterations = Mathf.CeilToInt( worldDistance * 5f / stepDistance );
+            if( maxIterations > 10 )
             {
-                points.Add(this.TransformPoint(curve.GetPoint(f)));
+                Debug.LogWarning( "Increase step distance for better performance." );
             }
 
-            return points;
+            int iterationsLeft = maxIterations;
+
+            SplineResult currentPosition = GetResultAtDistance( startDistance );
+            SplineResult previousPosition = currentPosition;
+            Vector3 origin = currentPosition.position;
+            float worldDistanceTest = 0;
+
+            do
+            {
+                // early out, there's no more spline
+                if( currentPosition.AtEnd )
+                {
+                    return currentPosition;
+                }
+
+                previousPosition = currentPosition;
+                currentPosition = GetResultAtDistance( currentPosition.splineDistance + stepDistance );
+                worldDistanceTest = Vector3.Distance( currentPosition.position, origin );
+
+                --iterationsLeft;
+                if( iterationsLeft < 0 )
+                {
+                    Debug.LogWarning( "Hit iterations limit of " + maxIterations + " in MoveUntilAtWorldDistance() on spline" );
+                    break;
+                }
+            } while( worldDistanceTest < worldDistance );
+
+            float lastWorldDistanceTest = Vector3.Distance( previousPosition.position, origin );
+            float lerpT = Mathf.InverseLerp( lastWorldDistanceTest, worldDistanceTest, worldDistance );
+
+            return GetResultAtDistance( currentPosition.splineDistance - stepDistance + (stepDistance * lerpT) );
         }
 
-        public override List<CurvePoint> GetPoints()
+        public SplineResult GetResultClosestTo(Vector3 point)
         {
-            return TransformPoints(curve.GetPoints());
+            return TransformResult( curve.GetResultClosestTo( InverseTransformPoint( point ) ) );
         }
 
-        //TODO this will break when scaled
-        public override float GetSpeed(float t)
+        public SplineResult GetResultClosestTo(Ray ray)
         {
-            return curve.GetSpeed(t);
+            return TransformResult( curve.GetResultClosestTo( InverseTransformRay( ray ) ) );
         }
 
-        public override Vector3 GetDirection(float t)
-        {
-            return TransformVector(curve.GetDirection(t));
-        }
+        // Editor related things
+        public Transform GetTransform() => transform;
+        public Component GetComponent() => this;
 
-        public override Vector3 GetPoint(float t)
-        {
-            return TransformPoint(curve.GetPoint(t));
-        }
+        public IEditableSpline GetEditableSpline() { return this; }
+        public Object GetUndoObject() { return this; }
+        [SerializeField] [HideInInspector] Color color;
+        public Color GetColor() { return color; }
+        public void SetColor(Color newColor) { color = newColor; }
+        [SerializeField] [HideInInspector] bool zTest = false;
+        public bool GetZTest() { return zTest; }
+        public void SetZTest(bool test) { zTest = test; }
 
-        public override float GetDistanceOnSpline(SegmentPosition position)
+#if UNITY_EDITOR
+        void OnDrawGizmos()
         {
-            return curve.GetSegmentPointer(position).DistanceOnSpline;
-        }
+            if( Selection.activeObject != gameObject )
+            {
+                Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+                for( int i = 0; i < curve.SegmentCount; ++i )
+                {
+                    Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment( i ), transform );
 
-        public override Vector3 GetPosition(SegmentPosition position)
-        {
-            return TransformPosition( curve.GetSegmentPointer(position).Position );
-        }
+                    Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, GetColor() * .9f, null,
+                        2f );
+                }
 
-        public override Vector3 GetDirection(SegmentPosition position)
-        {
-            return TransformVector( curve.GetSegmentPointer(position).Tangent );
+                // this stops selection of the spline when we're doing other things.
+                if( Selection.activeObject == null )
+                {
+                    Gizmos.color = Color.white;
+                    for( int i = 0; i < GetCurvePointCount(); ++i )
+                    {
+                        Gizmos.DrawSphere( GetCurvePoint( i ).position, 0.05f );
+                    }
+                }
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
+            }
         }
+#endif
 
-        public override SegmentPosition GetSegmentAtDistance(float distance)
+        public void DrawSegmentLengths()
         {
-            var pointer = curve.GetSegmentPointerAtDistance(distance);
-            return new SegmentPosition(pointer.segmentIndex, pointer.segmentT);
-        }
-
-        public float GetLength()
-        {
-            return curve.Length;
-        }
-
-        public float GetLength(float toNormalisedT)
-        {
-            return curve.GetDistance(toNormalisedT);
-        }
-
-        //TODO this will break when scaled
-        public override float GetLength(float fromNormalisedT, float toNormalisedT)
-        {
-            return curve.GetDistance(toNormalisedT) - curve.GetDistance(fromNormalisedT);
-        }
-
-        //TODO this will break when scaled
-        public override float GetT(float length)
-        {
-            return curve.GetT(length);
-        }
-
-        public override float GetClosestT(Vector3 point)
-        {
-            return curve.GetClosestT(InverseTransformPoint(point));
-        }
-
-        public override float GetClosestT(Ray ray)
-        {
-            return curve.GetClosestT(InverseTransformRay(ray));
-        }
-
-        public override Vector3 GetClosestPoint(Vector3 point)
-        {
-            return TransformPoint( curve.GetClosestPoint( InverseTransformPoint(point) ) );
-        }
-
-        public override Vector3 GetClosestPoint(Ray ray)
-        {
-            return TransformPoint( curve.GetClosestPoint( InverseTransformRay(ray) ) );
-        }
-
-        //TODO this will break when scaled
-        public override float Step(float t, float worldDistance)
-        {
-            return curve.Step(t, worldDistance);
-        }
-
-        //TODO this will break when scaled
-        public override List<Vector3> GetPoints(float worldSpacing, bool includeEndPoint = true,
-            bool includeSplinePoints = false)
-        {
-            throw new System.NotImplementedException();
+#if UNITY_EDITOR
+            for( int i = 0; i < curve.SegmentCount; ++i )
+            {
+                Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment( i ), transform );
+                Vector3 pos = bezier.GetPosition( 0.5f );
+                Handles.Label( pos, bezier.Length.ToString( "N2" ) );
+            }
+#endif
         }
     }
 }
