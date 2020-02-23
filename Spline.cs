@@ -128,14 +128,14 @@ namespace FantasticSplines
             curve.InsertPoint( t );
         }
 
-        public override void AddPoint(CurvePoint point)
+        public override void AppendPoint(CurvePoint point)
         {
             curve.AddPoint(point.InverseTransform(transform));
         }
 
-        public override void AddPointAt( int index, CurvePoint point)
+        public override void PrependPoint( CurvePoint point)
         {
-            curve.AddPointAt( index, point.InverseTransform(transform) );
+            curve.AddPointAt( 0, point.InverseTransform(transform) );
         }
 
         public override void RemovePoint(int index)
@@ -228,6 +228,11 @@ namespace FantasticSplines
             return curve.GetSegmentAtDistance(distance);
         }
 
+        public override float GetSegmentLength(int index)
+        {
+            return GetDistanceOnSpline( new SegmentPosition( index, 1 ) ) - GetDistanceOnSpline( new SegmentPosition( index, 0 ) );
+        }
+
         public float GetLength()
         {
             return curve.Length;
@@ -281,6 +286,10 @@ namespace FantasticSplines
             bool includeSplinePoints = false)
         {
             throw new System.NotImplementedException();
+        }
+
+        public override void RefreshCache()
+        {
         }
     }
 }

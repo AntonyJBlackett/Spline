@@ -92,7 +92,7 @@ namespace FantasticSplines
             }
         }
         
-        void UpdateCachedData()
+        public void UpdateCachedData()
         {
             if (_segments == null || _segments.Length != SegmentCount)
             {

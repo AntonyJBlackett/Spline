@@ -8,17 +8,31 @@ using UnityEditor;
 
 namespace FantasticSplines
 {
-    public abstract class SplineBehaviour : MonoBehaviour, ISpline, IEditableSpline
+    public abstract class SplineBehaviour : MonoBehaviour, ISpline, IEditableSpline, ISerializationCallbackReceiver
     {
+        public void OnBeforeSerialize() { }
+        void OnGUI() { }
+        public void OnAfterDeserialize()
+        {
+            RefreshCache();
+        }
+
+        public System.Action onWillAppendPoint;
+        public System.Action onWillPrependPoint;
+        public System.Action<int, float> onWillInsertPoint;
+        public System.Action<int> onWillRemovePoint;
+        public System.Action<bool> onWillChangeLoop;
+
         public IEditableSpline GetEditableSpline() { return this; }
         public Object GetUndoObject() { return this; }
-        [SerializeField][HideInInspector] Color color;
+        [SerializeField][HideInInspector] Color color = Color.white;
         public Color GetColor() { return color;  }
         public void SetColor(Color newColor) { color = newColor; }
         [SerializeField][HideInInspector] bool zTest = false;
         public bool GetZTest() { return zTest; }
         public void SetZTest(bool test) { zTest = test; } 
-
+        
+        public abstract void RefreshCache();
         public abstract float GetSpeed(float t);
         public abstract Vector3 GetDirection(float t);
         public abstract Vector3 GetPoint(float t);
@@ -30,14 +44,15 @@ namespace FantasticSplines
         public abstract bool IsLoop();
         public abstract void SetLoop(bool loop);
         public abstract CurvePoint GetPoint(int index);
+        public abstract float GetSegmentLength( int index );
         public abstract SegmentPosition GetSegmentAtDistance(float distance);
         public abstract float GetDistanceOnSpline(SegmentPosition position);
         public abstract Vector3 GetPosition(SegmentPosition position);
         public abstract Vector3 GetDirection(SegmentPosition position);
         public abstract void SetPoint(int index, CurvePoint point);
         public abstract void InsertPoint(float t);
-        public abstract void AddPoint(CurvePoint point);
-        public abstract void AddPointAt(int index, CurvePoint point);
+        public abstract void AppendPoint(CurvePoint point);
+        public abstract void PrependPoint(CurvePoint point);
         public abstract void RemovePoint(int index);
         public abstract float GetClosestT(Vector3 point);
         public abstract Vector3 GetClosestPoint(Vector3 point);
@@ -96,7 +111,14 @@ namespace FantasticSplines
         public bool Loop
         {
             get { return curve.Loop; }
-            set { curve.Loop = value; }
+            set 
+            {
+                if( onWillChangeLoop != null )
+                {
+                    onWillChangeLoop( value );
+                }
+                curve.Loop = value; 
+            }
         }
 
         public int PointCount
@@ -188,21 +210,42 @@ namespace FantasticSplines
 
         public override void InsertPoint(float t)
         {
+            if( onWillInsertPoint != null )
+            {
+                int index = curve.GetSegmentIndexAtT(t)+1;
+                onWillInsertPoint( index, curve.Length * t );
+            }
+
             curve.InsertCurvePoint( t );
         }
 
-        public override void AddPoint(CurvePoint point)
+        public override void AppendPoint(CurvePoint point)
         {
+            if( onWillAppendPoint != null )
+            {
+                onWillAppendPoint();
+            }
+
             curve.AddCurvePoint(point.InverseTransform(transform));
         }
 
-        public override void AddPointAt( int index, CurvePoint point)
+        public override void PrependPoint( CurvePoint point )
         {
-            curve.AddCurvePointAt( index, point.InverseTransform(transform) );
+            if( onWillPrependPoint != null )
+            {
+                onWillPrependPoint();
+            }
+
+            curve.AddCurvePointAt( 0, point.InverseTransform(transform) );
         }
 
         public override void RemovePoint(int index)
         {
+            if( onWillRemovePoint != null )
+            {
+                onWillRemovePoint( index );
+            }
+
             curve.RemoveCurvePoint(index);
         }
 
@@ -282,6 +325,11 @@ namespace FantasticSplines
             return TransformVector( curve.GetSegmentPointer(position).Tangent );
         }
 
+        public override float GetSegmentLength(int index)
+        {
+            return GetDistanceOnSpline( new SegmentPosition( index, 1 ) ) - GetDistanceOnSpline( new SegmentPosition( index, 0 ) );
+        }
+
         public override SegmentPosition GetSegmentAtDistance(float distance)
         {
             var pointer = curve.GetSegmentPointerAtDistance(distance);
@@ -341,6 +389,11 @@ namespace FantasticSplines
             bool includeSplinePoints = false)
         {
             throw new System.NotImplementedException();
+        }
+
+        public override void RefreshCache()
+        {
+            curve.UpdateCachedData();
         }
     }
 }

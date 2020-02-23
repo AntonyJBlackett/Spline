@@ -280,7 +280,7 @@ namespace FantasticSplines
 			segments[seg.index + 1] = segments[seg.index + 1].ReInitialise(B, PointType.Aligned, end);
 		}
 		
-		// appends a point to the end of the curve at position
+        // adds the given CurvePoint to the end of the curve
 		public void AddPoint(CurvePoint point)
 		{
 			if (PointCount == 0)
@@ -297,7 +297,13 @@ namespace FantasticSplines
 				segments.Add(newSegment);
 			}
 		}
-		
+        
+        // adds the given CurvePoint to the start of the curve
+        public void PrependPoint(CurvePoint point)
+        {
+            AddPointAt( 0, point );
+        }
+
 		// adds the given CurvePoint at index in the list of CurvePoint in curve
 		public void AddPointAt(int index, CurvePoint point)
 		{

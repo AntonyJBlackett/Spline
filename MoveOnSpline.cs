@@ -6,21 +6,35 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class MoveOnSpline : MonoBehaviour
 {
-	public SplinePosition myPosition;
+	public LiveSplinePosition livePosition = new LiveSplinePosition();
 
 	public float speed;
-	
-	void Update()
-	{
-		if (Application.isPlaying)
-		{
-			myPosition = myPosition.Move(speed * Time.deltaTime);
-		}
 
-		if (myPosition.spline != null)
+    private void OnDrawGizmos()
+    {
+        UpdatePosition();
+    }
+
+    private void OnEnable()
+    {
+        livePosition.Initialise();
+    }
+
+    void Update()
+    {
+        if( Application.isPlaying )
+        {
+            livePosition.Move( speed * Time.deltaTime );
+        }
+        UpdatePosition();
+    }
+
+    void UpdatePosition()
+    {
+		if( livePosition.IsValid )
 		{
-			this.transform.position = myPosition.Position;
-			this.transform.rotation = Quaternion.LookRotation(myPosition.Tangent, Vector3.up);
+			this.transform.position = livePosition.Position;
+			this.transform.rotation = Quaternion.LookRotation(livePosition.Tangent, Vector3.up);
 		}
 	}
 }

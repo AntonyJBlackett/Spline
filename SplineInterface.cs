@@ -28,8 +28,8 @@ namespace FantasticSplines
         void SetPoint(int index, CurvePoint point);
 
         void InsertPoint( float t ); // inserts a point on the curve without changing its shape
-        void AddPoint(CurvePoint point); // appends a point to the end of the curve at position
-        void AddPointAt(int index, CurvePoint point); // adds the given CurvePoint at index in the list of CurvePoint in curve
+        void AppendPoint(CurvePoint point); // adds a point to the end of the curve at position
+        void PrependPoint(CurvePoint point); // adds a point to the start of the curve at position
         void RemovePoint(int index); // removes a Curve Point at index
 
         float GetClosestT(Vector3 point);

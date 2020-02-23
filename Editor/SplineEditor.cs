@@ -199,7 +199,7 @@ namespace FantasticSplines
             int oldPointCount = spline.GetPointCount();
             for( int i = 0; i < clipboard.Count; i++ )
             {
-                spline.AddPoint( clipboard[i] );
+                spline.AppendPoint( clipboard[i] );
             }
 
             pointSelection.Clear();
@@ -1414,13 +1414,13 @@ namespace FantasticSplines
                     switch( addPointMode )
                     {
                         case SplineAddPointMode.Append:
-                            spline.AddPoint( newPoint );
+                            spline.AppendPoint( newPoint );
                             break;
                         case SplineAddPointMode.Prepend:
-                            spline.AddPointAt( 0, newPoint );
+                            spline.PrependPoint( newPoint );
                             break;
                         default:
-                            spline.AddPoint( newPoint );
+                            spline.AppendPoint( newPoint );
                             break;
                     }
 
