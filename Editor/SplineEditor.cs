@@ -1656,17 +1656,17 @@ namespace FantasticSplines
                     controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, node.Control2Position );
                     controlPlaneOffset = node.Control2Position - controlPlanePosition;
 
-                    moveNodeState = new MoveNodeState( result.nodeIndex, MoveControlPointId.Unknown, node.Control2Position );
+                    moveNodeState = new MoveNodeState( result.nodeIndex, result.selectedType, node.Control2Position );
                 }
                 else if( result.selectedType == MoveControlPointId.Control1 )
                 {
                     controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, node.Control1Position );
                     controlPlaneOffset = node.Control1Position - controlPlanePosition;
-                    moveNodeState = new MoveNodeState( result.nodeIndex, MoveControlPointId.Control1, node.Control1Position );
+                    moveNodeState = new MoveNodeState( result.nodeIndex, result.selectedType, node.Control1Position );
                 }
                 else
                 {
-                    moveNodeState = new MoveNodeState( result.nodeIndex, MoveControlPointId.None, node.position );
+                    moveNodeState = new MoveNodeState( result.nodeIndex, result.selectedType, node.position );
                 }
 
                 if( moveNodeState.Moving )
