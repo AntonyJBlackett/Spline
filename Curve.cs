@@ -32,7 +32,7 @@ namespace FantasticSplines
     }
 
     [System.Serializable]
-    public partial class Curve
+    public partial class Curve : ISerializationCallbackReceiver
     {
         [System.NonSerialized] private bool isDirty = true;
         [System.NonSerialized] private float splineLength;
@@ -461,6 +461,15 @@ namespace FantasticSplines
             }
 
             return GetSplineResult( bestDistance );
+        }
+
+        public void OnBeforeSerialize()
+        {
+        }
+
+        public void OnAfterDeserialize()
+        {
+            UpdateCachedData();
         }
     }
 }

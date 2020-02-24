@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using UnityEngine.Serialization;
 
 namespace FantasticSplines
 {
@@ -24,6 +25,7 @@ namespace FantasticSplines
         int lastChangedControl;
 
         [SerializeField]
+        [FormerlySerializedAsAttribute( "pointType" )]
         NodeType nodeType;
 
         public Vector3 Control1Position => position + control1;
