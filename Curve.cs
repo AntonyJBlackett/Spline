@@ -463,6 +463,28 @@ namespace FantasticSplines
             return GetSplineResult( bestDistance );
         }
 
+        public void OnDrawGizmos(Color color)
+        {
+#if UNITY_EDITOR
+            EnsureCacheIsUpdated();
+            for( int i = 0; i < segments.Length; ++i )
+            {
+                Bezier3 bezier = segments[i].bezier;
+                Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, color * .9f, null, 2f );
+            }
+
+            // this stops selection of the spline when we're doing other things.
+            if( Selection.activeObject == null )
+            {
+                Gizmos.color = Color.white;
+                for( int i = 0; i < NodeCount; ++i )
+                {
+                    Gizmos.DrawSphere( nodes[i].position, 0.05f );
+                }
+            }
+#endif
+        }
+
         public void OnBeforeSerialize()
         {
         }

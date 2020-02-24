@@ -244,7 +244,7 @@ namespace FantasticSplines
 
         public IEditableSpline GetEditableSpline() { return this; }
         public Object GetUndoObject() { return this; }
-        [SerializeField] [HideInInspector] Color color;
+        [SerializeField] [HideInInspector] Color color = Color.white;
         public Color GetColor() { return color; }
         public void SetColor(Color newColor) { color = newColor; }
         [SerializeField] [HideInInspector] bool zTest = false;
@@ -257,23 +257,11 @@ namespace FantasticSplines
             if( Selection.activeObject != gameObject )
             {
                 Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-                for( int i = 0; i < curve.SegmentCount; ++i )
-                {
-                    Bezier3 bezier = Bezier3.Transform( curve.CalculateSegment( i ), transform );
-
-                    Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, GetColor() * .9f, null,
-                        2f );
-                }
-
-                // this stops selection of the spline when we're doing other things.
-                if( Selection.activeObject == null )
-                {
-                    Gizmos.color = Color.white;
-                    for( int i = 0; i < GetNodeCount(); ++i )
-                    {
-                        Gizmos.DrawSphere( GetNode( i ).position, 0.05f );
-                    }
-                }
+                Gizmos.matrix = transform.localToWorldMatrix;
+                Handles.matrix = transform.localToWorldMatrix;
+                curve.OnDrawGizmos( GetColor() );
+                Gizmos.matrix = Matrix4x4.identity;
+                Handles.matrix = Matrix4x4.identity;
                 Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
             }
         }

@@ -483,6 +483,10 @@ namespace FantasticSplines
                     ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
                     ShowNodeControls = GUILayout.Toggle( ShowNodeControls, "Show Point Controls" );
                     GUILayout.Space( 10 );
+                    ShowProjectionLines = GUILayout.Toggle( ShowProjectionLines, "Show Projection Lines" );
+                    ShowProjectedSpline = GUILayout.Toggle( ShowProjectedSpline, "Show Y Plane Projected Spline" );
+                    ShowSelectionDisks = GUILayout.Toggle( ShowSelectionDisks, "Show Selection Disks" );
+                    GUILayout.Space( 10 );
                 }
 
                 if( EditorGUI.EndChangeCheck() )
@@ -517,6 +521,24 @@ namespace FantasticSplines
         {
             get => EditorPrefs.GetBool( "FantasticSplinesShowNodeControls", true );
             set => EditorPrefs.SetBool( "FantasticSplinesShowNodeControls", value );
+        }
+
+        public static bool ShowProjectionLines
+        {
+            get => EditorPrefs.GetBool( "FantasticSplinesShowProjectionLines", true );
+            set => EditorPrefs.SetBool( "FantasticSplinesShowProjectionLines", value );
+        }
+
+        public static bool ShowProjectedSpline
+        {
+            get => EditorPrefs.GetBool( "FantasticSplinesShowProjectedSpline", true );
+            set => EditorPrefs.SetBool( "FantasticSplinesShowProjectedSpline", value );
+        }
+
+        public static bool ShowSelectionDisks
+        {
+            get => EditorPrefs.GetBool( "FantasticSplinesShowSelectionDisks", true );
+            set => EditorPrefs.SetBool( "FantasticSplinesShowSelectionDisks", value );
         }
 
         public static bool ShowGrid
@@ -752,25 +774,29 @@ namespace FantasticSplines
 
             KeyboardInputs( spline, guiEvent );
 
-            switch( editMode )
+            if( guiEvent.isMouse
+            || guiEvent.type == EventType.Layout )
             {
-                case SplineEditMode.None:
-                    DoMoveNode( spline, guiEvent );
-                    break;
-                case SplineEditMode.MoveNode:
-                    DoMoveNode( spline, guiEvent );
-                    break;
-                case SplineEditMode.AddNode:
-                    if( addNodeMode == SplineAddNodeMode.Insert
-                        && spline.GetNodeCount() >= 2 )
-                    {
-                        DoInsertNode( spline, guiEvent );
-                    }
-                    else
-                    {
-                        DoAddNode( spline, guiEvent );
-                    }
-                    break;
+                switch( editMode )
+                {
+                    case SplineEditMode.None:
+                        DoMoveNode( spline, guiEvent );
+                        break;
+                    case SplineEditMode.MoveNode:
+                        DoMoveNode( spline, guiEvent );
+                        break;
+                    case SplineEditMode.AddNode:
+                        if( addNodeMode == SplineAddNodeMode.Insert
+                            && spline.GetNodeCount() >= 2 )
+                        {
+                            DoInsertNode( spline, guiEvent );
+                        }
+                        else
+                        {
+                            DoAddNode( spline, guiEvent );
+                        }
+                        break;
+                }
             }
 
             if( !moveNodeState.MovingNodeControlPoint && (ShowGrid || guiEvent.alt) )
@@ -779,7 +805,10 @@ namespace FantasticSplines
             }
 
             // draw things
-            DrawSpline( spline );
+            if( guiEvent.type == EventType.Repaint )
+            {
+                DrawSpline( spline );
+            }
 
             if( guiEvent.isMouse && doRepaint )
             {
@@ -893,6 +922,11 @@ namespace FantasticSplines
 
         void DrawSplinePlaneProjectionLines(IEditableSpline spline)
         {
+            if( !ShowProjectionLines )
+            {
+                return;
+            }
+
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 Vector3 point = spline.GetNode( i ).position;
@@ -946,6 +980,11 @@ namespace FantasticSplines
 
         void DrawBezierPlaneProjectedSplineLines(IEditableSpline spline)
         {
+            if( !ShowProjectedSpline )
+            {
+                return;
+            }
+
             for( int i = 1; i < spline.GetNodeCount(); ++i )
             {
                 DrawBezierSegmentOnPlane( spline.GetTransform().position, spline.GetTransform().up, spline.GetNode( i - 1 ), spline.GetNode( i ) );
@@ -974,6 +1013,11 @@ namespace FantasticSplines
 
         void DrawSplineSelectionDisks(IEditableSpline spline)
         {
+            if( !ShowSelectionDisks )
+            {
+                return;
+            }
+
             ValidateNodeSelection( spline );
             Transform transform = spline.GetTransform();
             Handles.color = Color.grey;
@@ -1058,7 +1102,7 @@ namespace FantasticSplines
         {
             DrawBezierPlaneProjectedSplineLines( spline );
             DrawSplinePlaneProjectionLines( spline );
-            ;
+
             DrawSplineSelectionDisks( spline );
             DrawBezierSplineLines( spline );
 
