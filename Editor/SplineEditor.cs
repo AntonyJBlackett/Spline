@@ -119,7 +119,7 @@ namespace FantasticSplines
             {
                 RemoveNode( spline, nodeIndicies[0] );
             }
-            ClearNodeSelection();
+            ClearNodeSelection( spline );
             EditorUtility.SetDirty( spline.GetComponent() );
         }
 
@@ -510,7 +510,7 @@ namespace FantasticSplines
         }
 
         Vector2 rightClickMovement = Vector2.zero;
-        void RightClickCancel(Event guiEvent)
+        void RightClickCancel(IEditableSpline spline, Event guiEvent)
         {
             if( guiEvent.button == 1 && guiEvent.type == EventType.MouseDown )
             {
@@ -657,9 +657,25 @@ namespace FantasticSplines
             {
                 return;
             }
+
+            //hack click deselect node.
+            // maintain as selected active object if we click when we have a node selected
+            if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
+            {
+                hadSelectionOnMouseDown = nodeSelection.Count > 0;
+            }
+            if( guiEvent.type == EventType.Used && (nodeSelection.Count > 0 || hadSelectionOnMouseDown) )
+            {
+                Selection.activeObject = (target as Component).gameObject;
+            }
+            else if( guiEvent.type != EventType.Repaint && guiEvent.type != EventType.Layout && guiEvent.type != EventType.Used && !IsMouseButtonEvent( guiEvent, 0 ) )
+            {
+                hadSelectionOnMouseDown = false;
+            }
+
             SceneViewEventSetup( guiEvent );
 
-            RightClickCancel( guiEvent );
+            RightClickCancel( spline, guiEvent );
 
             KeyboardInputs( spline, guiEvent );
 
@@ -719,7 +735,6 @@ namespace FantasticSplines
                     guiEvent.Use();
                 }
             }
-
         }
 
         Color horizontalGridColour = new Color( .7f, .7f, 1, .2f );
@@ -781,7 +796,7 @@ namespace FantasticSplines
         {
             lastTool = Tool.Move;
             Tools.current = Tool.Move;
-            ClearNodeSelection();
+            ClearNodeSelection( GetSpline() );
             editMode = SplineEditMode.None;
             planeOffset = Vector3.zero;
             controlPlanePosition = Vector3.zero;
@@ -1028,6 +1043,7 @@ namespace FantasticSplines
                 return;
             }
             nodeSelection.Add( index );
+            EditorUtility.SetDirty( spline.GetComponent() );
         }
 
         void ValidateNodeSelection(IEditableSpline spline)
@@ -1041,10 +1057,11 @@ namespace FantasticSplines
             }
         }
 
-        void ClearNodeSelection()
+        void ClearNodeSelection(IEditableSpline spline)
         {
             nodeSelection.Clear();
             editMode = SplineEditMode.None;
+            EditorUtility.SetDirty( spline.GetComponent() );
         }
 
         List<int> GetSelectedNodeOrAllIndicies(IEditableSpline spline)
@@ -1188,7 +1205,7 @@ namespace FantasticSplines
                         {
                             if( !guiEvent.shift && !guiEvent.command )
                             {
-                                ClearNodeSelection();
+                                ClearNodeSelection( spline );
                             }
                             SelectionAddNode( spline, result.nodeIndex );
                             editMode = SplineEditMode.MoveNode;
@@ -1304,26 +1321,13 @@ namespace FantasticSplines
         bool hadSelectionOnMouseDown = false;
         void DoNodeSelection(IEditableSpline spline, Event guiEvent)
         {
-            if( guiEvent.type == EventType.MouseDown )
-            {
-                hadSelectionOnMouseDown = nodeSelection.Count > 0;
-            }
-            if( guiEvent.type == EventType.Used && (nodeSelection.Count > 0 || hadSelectionOnMouseDown) )
-            {
-                Selection.activeObject = (target as Component).gameObject;
-            }
-            else if( guiEvent.type != EventType.Repaint && guiEvent.type != EventType.Layout && guiEvent.type != EventType.Used && !IsMouseButtonEvent( guiEvent, 0 ) )
-            {
-                hadSelectionOnMouseDown = false;
-            }
-
             bool clearClick = DoClickSelection( spline, guiEvent );
             bool clearDrag = DoDragSelection( spline, guiEvent );
             bool clearSelection = clearClick && clearDrag;
 
             if( clearSelection )
             {
-                ClearNodeSelection();
+                ClearNodeSelection( spline );
             }
         }
 
