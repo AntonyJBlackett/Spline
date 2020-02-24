@@ -34,6 +34,7 @@ namespace FantasticSplines
 
     public struct SplineResult
     {
+        public int updateCount; // can be used to see if the spline has changed since this result
         public float t; // distance / length
         public float loopT; // 0 - 1 along spline
         public float length; // real world distance along spline
@@ -58,14 +59,6 @@ namespace FantasticSplines
                 return new SplineResult()
                 {
                     segmentResult = SegmentResult.Default,
-
-                    t = 0,
-                    distance = 0,
-                    loopDistance = 0,
-                    length = 0,
-                    lapCount = 0,
-
-                    isLoop = false,
                 };
             }
         }
@@ -113,6 +106,7 @@ namespace FantasticSplines
     // No rotations, no colours, no normals
     public interface ISpline
     {
+        int GetUpdateCount();
         SplineResult GetResultAtT(float splineT);
         SplineResult GetResultAtDistance(float splineDistance);
         SplineResult GetResultAtSegmentT(int segmentIndex, float segmentT);

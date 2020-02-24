@@ -38,6 +38,7 @@ namespace FantasticSplines
         [System.NonSerialized] private float splineLength;
         [System.NonSerialized] private float inverseSplineLength;
         [System.NonSerialized] private SegmentCache[] segments;
+        [System.NonSerialized] private int cacheUpdateCount = 0;
 
         [SerializeField]
         [FormerlySerializedAsAttribute( "curvePoints" )]
@@ -106,8 +107,22 @@ namespace FantasticSplines
             return MathHelper.IsInArrayRange( index, NodeCount );
         }
 
+        public int UpdateCount
+        {
+            get
+            {
+                if( isDirty )
+                {
+                    return cacheUpdateCount + 1; // what count we would be on after a GetResult is called.
+                }
+                return cacheUpdateCount;
+            }
+        }
+
         void UpdateCachedData()
         {
+            cacheUpdateCount++;
+
             if( segments == null || segments.Length != SegmentCount )
             {
                 segments = new SegmentCache[SegmentCount];
@@ -298,6 +313,7 @@ namespace FantasticSplines
 
             SplineResult result = new SplineResult()
             {
+                updateCount = UpdateCount,
                 distance = distance,
                 loopDistance = loopDistance,
                 t = distance * inverseSplineLength,

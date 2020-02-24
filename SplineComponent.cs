@@ -140,6 +140,11 @@ namespace FantasticSplines
             curve.SetNode( index, node.InverseTransform( transform ) );
         }
 
+        public int GetUpdateCount()
+        {
+            return curve.UpdateCount;
+        }
+
         public SplineResult GetResultAtT(float t)
         {
             return TransformResult( curve.GetResultAtT( t ) );

@@ -20,28 +20,11 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     public bool regenerate = false;
     public bool autoRegenerate = false;
 
-    //SplineComponent lastSpline = null;
+    SplineChangeDetector changeDetector;
 
     [SerializeField]
     [HideInInspector]
     Transform instanceBucket;
-    void OnEnable()
-    {
-        // this isn't going to work... hmm
-        /*if( spline != null )
-        {
-            spline.onUpdated += Regenerate;
-        }*/
-    }
-
-    void OnDisable()
-    {
-        // this isn't going to work... hmm
-        /*if( spline != null )
-        {
-            spline.onUpdated -= Regenerate;
-        }*/
-    }
 
     void Update()
     {
@@ -55,7 +38,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
             Clear();
         }
 
-        //if( lastSpline != spline )
+        if( changeDetector.IsDifferentFrom( spline ) )
         {
             AutoRegenerate();
         }
@@ -70,6 +53,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     {
         if( spline == null )
         {
+            Clear();
             return;
         }
         if( autoRegenerate )
@@ -106,6 +90,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         {
             return;
         }
+
 
         if( instanceBucket == null )
         {
@@ -172,6 +157,8 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         }
 
         CleanUpUnusedInstances();
+
+        changeDetector = new SplineChangeDetector( spline );
     }
 
     void Clear()

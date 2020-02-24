@@ -10,7 +10,7 @@ public class SplineSpawner : MonoBehaviour
     public enum SeparationMethod
     {
         WorldDistance,
-        SplineDistance
+        SplineDistance,
     }
     public SeparationMethod separationMethod = SeparationMethod.SplineDistance;
 
@@ -18,24 +18,7 @@ public class SplineSpawner : MonoBehaviour
     public bool regenerate = false;
     public bool autoRegenerate = false;
 
-    SplineComponent lastSpline = null;
-    void OnEnable()
-    {
-        // this isn't going to work... hmm
-        /*if( spline != null )
-        {
-            spline.onUpdated += Regenerate;
-        }*/
-    }
-
-    void OnDisable()
-    {
-        // this isn't going to work... hmm
-        /*if( spline != null )
-        {
-            spline.onUpdated -= Regenerate;
-        }*/
-    }
+    SplineChangeDetector changeDetector;
 
     void Clear()
     {
@@ -45,6 +28,11 @@ public class SplineSpawner : MonoBehaviour
         {
             DestroyImmediate( transform.GetChild( 0 ).gameObject );
         }
+    }
+
+    private void OnDrawGizmos()
+    {
+        Update();
     }
 
     void Update()
@@ -59,7 +47,7 @@ public class SplineSpawner : MonoBehaviour
             Clear();
         }
 
-        if( lastSpline != spline )
+        if( changeDetector.IsDifferentFrom( spline ) )
         {
             AutoRegenerate();
         }
@@ -103,6 +91,7 @@ public class SplineSpawner : MonoBehaviour
         }
 
         SplineResult splineResult = spline.GetResultAtT( 0 );
+        changeDetector = new SplineChangeDetector( spline );
 
         while( splineResult.t < 1 )
         {
