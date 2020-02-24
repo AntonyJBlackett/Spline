@@ -23,6 +23,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     //SplineComponent lastSpline = null;
 
     [SerializeField]
+    [HideInInspector]
     Transform instanceBucket;
     void OnEnable()
     {
@@ -67,6 +68,10 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 
     void AutoRegenerate()
     {
+        if( spline == null )
+        {
+            return;
+        }
         if( autoRegenerate )
         {
             Regenerate();

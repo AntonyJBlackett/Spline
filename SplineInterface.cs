@@ -38,14 +38,15 @@ namespace FantasticSplines
         public float length; // real world distance along spline
         public float distance; // real world distance along spline
         public float loopDistance; // real world distance along spline
+        public bool isLoop;
 
         public Vector3 position => segmentResult.position;
         public Vector3 tangent => segmentResult.tangent;
 
         public int lapCount;
 
-        public bool AtEnd => Mathf.Approximately( t, 1 );
-        public bool AtStart => Mathf.Approximately( t, 0 );
+        public bool AtEnd => !isLoop && Mathf.Approximately( t, 1 );
+        public bool AtStart => !isLoop && Mathf.Approximately( t, 0 );
 
         public SegmentResult segmentResult;
 
@@ -62,6 +63,8 @@ namespace FantasticSplines
                     loopDistance = 0,
                     length = 0,
                     lapCount = 0,
+
+                    isLoop = false,
                 };
             }
         }
@@ -109,10 +112,13 @@ namespace FantasticSplines
     // No rotations, no colours, no normals
     public interface ISpline
     {
-        SplineResult GetResultAtT(float t);
-        SplineResult GetResultAtDistance(float distance);
+        SplineResult GetResultAtT(float splineT);
+        SplineResult GetResultAtDistance(float splineDistance);
+        SplineResult GetResultAtSegmentT(int segmentIndex, float segmentT);
+        SplineResult GetResultAtSegmentDistance(int segmentIndex, float segementT);
         SplineResult GetResultClosestTo(Vector3 point);
         SplineResult GetResultClosestTo(Ray ray);
+        SplineResult GetResultAtWorldDistanceFrom(float startDistance, float worldDistance, float stepDistance);
     }
 
     // Interface for added additional data to a place

@@ -142,12 +142,22 @@ namespace FantasticSplines
 
         public SplineResult GetResultAtT(float t)
         {
-            return TransformResult( curve.GetResultAtDistance( t * curve.Length ) );
+            return TransformResult( curve.GetResultAtT( t ) );
         }
 
         public SplineResult GetResultAtDistance(float distance)
         {
             return TransformResult( curve.GetResultAtDistance( distance ) );
+        }
+
+        public SplineResult GetResultAtSegmentT(int segentIndex, float segmentT)
+        {
+            return TransformResult( curve.GetResultAtSegmentT( segentIndex, segmentT ) );
+        }
+
+        public SplineResult GetResultAtSegmentDistance(int segentIndex, float segmentDistance)
+        {
+            return TransformResult( curve.GetResultAtSegmentDistance( segentIndex, segmentDistance ) );
         }
 
         public SplineResult GetResultAtWorldDistanceFrom(float startDistance, float worldDistance, float stepDistance)

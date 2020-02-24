@@ -5,46 +5,29 @@ using UnityEngine;
 using UnityEditor;
 using UnityEngine.Assertions;
 using UnityEngine.UIElements;
+using UnityEngine.Serialization;
 #endif
 
 namespace FantasticSplines
 {
     public static class BezierCalculator
     {
-
-        /// <summary>
-        /// Splits the curve at given position (t : 0..1). alters point1 and point2 control points so the curve remains the same
-        /// </summary>
-        /// <param name="t">A number from 0 to 1.</param>
-        /// <returns>new CurvePoint between two points</returns>
-        /// <remarks>
-        /// (De Casteljau's algorithm, see: http://caffeineowl.com/graphics/2d/vectorial/bezierintro.html)
-        /// </remarks>
         public static SplineNode SplitAt(ref SplineNode node1, ref SplineNode node2, float t)
         {
-            Bezier3 bezier = new Bezier3( node1, node2 );
+            Bezier3 segement = new Bezier3( node1, node2 );
+            Bezier3 leftSplit = segement.LeftSplitAt( t );
+            Bezier3 rightSplit = segement.RightSplitAt( t );
 
-            Vector3 a = Vector3.Lerp( bezier.A, bezier.B, t );
-            Vector3 b = Vector3.Lerp( bezier.B, bezier.C, t );
-            Vector3 c = Vector3.Lerp( bezier.C, bezier.D, t );
-            Vector3 m = Vector3.Lerp( a, b, t );
-            Vector3 n = Vector3.Lerp( b, c, t );
-            Vector3 p = bezier.GetPosition( t );
+            SplineNode split = new SplineNode( leftSplit.end, leftSplit.endControl, rightSplit.startControl );
+            node1.SetNodeType( NodeType.Free );
+            node1.Control2 = leftSplit.startControl;
+            node1.SetNodeType( SplineNode.GetNodeTypeFromControls( node1 ) );
 
-            if( node1.NodeType == NodeType.Mirrored )
-            {
-                node1.SetNodeType( NodeType.Aligned );
-            }
-            node1.Control2 = a - node1.position;
+            node2.SetNodeType( NodeType.Free );
+            node2.Control1 = rightSplit.endControl;
+            node2.SetNodeType( SplineNode.GetNodeTypeFromControls( node2 ) );
 
-            if( node2.NodeType == NodeType.Mirrored )
-            {
-                node2.SetNodeType( NodeType.Aligned );
-            }
-            node2.Control1 = c - node2.position;
-
-            SplineNode newNode = new SplineNode( p, m - p, n - p, NodeType.Free );
-            return newNode;
+            return split;
         }
     }
 
@@ -57,6 +40,7 @@ namespace FantasticSplines
         [System.NonSerialized] private SegmentCache[] segments;
 
         [SerializeField]
+        [FormerlySerializedAsAttribute( "curvePoints" )]
         private List<SplineNode> nodes = new List<SplineNode>();
 
         [SerializeField]
@@ -206,7 +190,10 @@ namespace FantasticSplines
             SplineNode node1 = nodes[index1];
             SplineNode node2 = nodes[index2];
 
+
             SplineNode split = BezierCalculator.SplitAt( ref node1, ref node2, segmentT );
+
+
             nodes[index1] = node1;
             nodes[index2] = node2;
 
@@ -314,6 +301,8 @@ namespace FantasticSplines
                 distance = distance,
                 loopDistance = loopDistance,
                 t = loopDistance * inverseSplineLength,
+                lapCount = Mathf.FloorToInt( distance * inverseSplineLength ),
+                isLoop = loop,
 
                 segmentResult = segmentResult
             };
@@ -335,6 +324,41 @@ namespace FantasticSplines
 
             EnsureCacheIsUpdated();
             return GetSplineResult( distance );
+        }
+
+        public SplineResult GetResultAtT(float t)
+        {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+            return GetSplineResult( Length * t );
+        }
+
+        public SplineResult GetResultAtSegmentDistance(int segmentIndex, float segmentDistance)
+        {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+            segmentIndex = LoopSegementIndex( segmentIndex );
+            return GetResultAtDistance( segments[segmentIndex].startDistanceInSpline + segmentDistance );
+        }
+
+        public SplineResult GetResultAtSegmentT(int segmentIndex, float segmentT)
+        {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+            segmentIndex = LoopSegementIndex( segmentIndex );
+            return GetResultAtDistance( segments[segmentIndex].startDistanceInSpline + segmentT * segments[segmentIndex].Length );
         }
 
         public SplineResult GetResultClosestTo(Vector3 point, float paramThreshold = 0.000001f)
