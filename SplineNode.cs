@@ -29,6 +29,32 @@ namespace FantasticSplines
         public Vector3 Control1Position => position + control1;
         public Vector3 Control2Position => position + control2;
 
+        // return the NodeType that the node can be while still retaining it's shape
+        public static NodeType GetNodeTypeFromControls(SplineNode node)
+        {
+            if( node.nodeType == NodeType.Point )
+            {
+                return NodeType.Point;
+            }
+
+            if( Mathf.Approximately( node.control1.sqrMagnitude, 0 ) && Mathf.Approximately( node.control2.sqrMagnitude, 0 ) )
+            {
+                return NodeType.Point;
+            }
+
+            if( node.control1 == -node.control2 )
+            {
+                return NodeType.Mirrored;
+            }
+
+            if( node.control1.normalized == node.control2.normalized )
+            {
+                return NodeType.Aligned;
+            }
+
+            return NodeType.Free;
+        }
+
         public static Vector3 ConstrainControlPoint(Vector3 master, Vector3 constrain, NodeType type)
         {
             switch( type )
@@ -113,6 +139,16 @@ namespace FantasticSplines
             this.position = position;
             control1 = control2 = Vector3.zero;
             lastChangedControl = 0;
+        }
+
+        public SplineNode(Vector3 position, Vector3 control1, Vector3 control2)
+        {
+            this.position = position;
+            this.control1 = control1;
+            this.control2 = control2;
+            lastChangedControl = 0;
+            nodeType = NodeType.Free;
+            nodeType = GetNodeTypeFromControls( this );
         }
 
         public SplineNode(Vector3 position, Vector3 control1, Vector3 control2, NodeType type)
