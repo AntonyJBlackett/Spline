@@ -112,15 +112,15 @@ public class SplineSpawner : MonoBehaviour
             instance.transform.position = splineResult.position;
             instance.transform.rotation = Quaternion.LookRotation( splineResult.tangent, Vector3.up );
 
-            spawning = splineResult.segmentT < 1;
+            spawning = splineResult.t < 1;
 
             switch( separationMethod )
             {
                 case SeparationMethod.SplineDistance:
-                    splineResult = spline.GetResultAtDistance( splineResult.splineDistance + separation );
+                    splineResult = spline.GetResultAtDistance( splineResult.distance + separation );
                     break;
                 case SeparationMethod.WorldDistance:
-                    splineResult = spline.GetResultAtWorldDistanceFrom( splineResult.splineDistance, separation, separation * 0.33f );
+                    splineResult = spline.GetResultAtWorldDistanceFrom( splineResult.distance, separation, separation * 0.33f );
                     break;
             }
         }

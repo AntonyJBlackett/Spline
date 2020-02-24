@@ -112,7 +112,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         separation = segment.transform.localScale.z;
         float step = separation * 0.5f;
 
-        SplineResult post2Position = spline.GetResultAtWorldDistanceFrom( post1Position.splineDistance, separation, step );
+        SplineResult post2Position = spline.GetResultAtWorldDistanceFrom( post1Position.distance, separation, step );
 
         // first segment
         if( post != null )
@@ -129,7 +129,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         {
             float lengthLeft = splineLength;
             int limit = Mathf.CeilToInt( 1 + splineLength / separation ); // we should never need more segments than a dead straight spline needs
-            while( post1Position.splineT < post2Position.splineT )
+            while( post1Position.t < post2Position.t )
             {
                 GameObject segmentInstance = GetInstance( segment, instanceBucket );
                 segmentInstance.SetActive( true );
@@ -155,7 +155,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
                 }
 
                 post1Position = post2Position;
-                post2Position = spline.GetResultAtWorldDistanceFrom( post2Position.splineDistance, separation, step );
+                post2Position = spline.GetResultAtWorldDistanceFrom( post2Position.distance, separation, step );
 
                 --limit;
                 if( limit < 0 )

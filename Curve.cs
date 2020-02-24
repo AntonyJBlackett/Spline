@@ -4,6 +4,7 @@ using UnityEngine;
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEngine.Assertions;
+using UnityEngine.UIElements;
 #endif
 
 namespace FantasticSplines
@@ -191,8 +192,8 @@ namespace FantasticSplines
         public void InsertNode(float normalisedT)
         {
             SplineResult result = GetResultAtDistance( normalisedT * Length );
-            int segment = result.segmentIndex;
-            float segmentT = segments[segment].GetT( result.segmentDistance );
+            int segment = result.segmentResult.index;
+            float segmentT = result.segmentResult.t;
 
             if( segment < 0 || segment > SegmentCount )
             {
@@ -268,38 +269,58 @@ namespace FantasticSplines
             return Mathf.Clamp( distance, 0f, Length );
         }
 
-        private struct SegmentPointer
+        private SegmentResult GetSegmentResultAtDistance(float distance)
         {
-            public SegmentPointer(int index, float distance)
+            float distanceRemaining = LoopDistance( distance );
+            for( int i = 0; i < segments.Length; ++i )
             {
-                this.index = index;
-                this.distance = distance;
+                if( distanceRemaining >= segments[i].Length )
+                {
+                    distanceRemaining -= segments[i].Length;
+                }
+                else
+                {
+                    return new SegmentResult()
+                    {
+                        index = i,
+                        distance = distanceRemaining,
+                        length = segments[i].Length,
+                        t = segments[i].GetT( distanceRemaining ),
+                        position = segments[i].GetPositionAtDistance( distanceRemaining ),
+                        tangent = segments[i].GetTangentAtDistance( distanceRemaining ),
+                    };
+                }
             }
 
-            public int index;
-            public float distance;
+            int index = segments.Length - 1;
+            return new SegmentResult()
+            {
+                index = index,
+                distance = segments[index].Length,
+                length = segments[index].Length,
+                t = 1,
+                position = segments[index].GetPositionAtT( 1 ),
+                tangent = segments[index].GetTangentAtT( 1 )
+            };
         }
 
-        private SplineResult GetSplineResult(SegmentPointer pointer)
+        private SplineResult GetSplineResult(float distance)
         {
-            float splineDistance = segments[pointer.index].startDistanceInSpline + pointer.distance;
+            float loopDistance = LoopDistance( distance );
+            SegmentResult segmentResult = GetSegmentResultAtDistance( distance );
+
             SplineResult result = new SplineResult()
             {
-                splineDistance = splineDistance,
-                splineT = splineDistance * inverseSplineLength,
+                distance = distance,
+                loopDistance = loopDistance,
+                t = loopDistance * inverseSplineLength,
 
-                position = segments[pointer.index].GetPositionAtDistance( pointer.distance ),
-                tangent = segments[pointer.index].GetTangentAtDistance( pointer.distance ),
-
-                segmentT = segments[pointer.index].GetT( pointer.distance ),
-                segmentDistance = pointer.distance,
-                segmentIndex = pointer.index,
-                segmentLength = segments[pointer.index].Length
+                segmentResult = segmentResult
             };
 
             if( Mathf.Approximately( result.tangent.sqrMagnitude, 0 ) )
             {
-                result.tangent = Vector3.forward;
+                result.segmentResult.tangent = Vector3.forward;
             }
 
             return result;
@@ -313,20 +334,7 @@ namespace FantasticSplines
             }
 
             EnsureCacheIsUpdated();
-
-            float distanceRemain = LoopDistance( distance );
-            for( int i = 0; i < segments.Length; ++i )
-            {
-                if( distanceRemain >= segments[i].Length )
-                {
-                    distanceRemain -= segments[i].Length;
-                }
-                else
-                {
-                    return GetSplineResult( new SegmentPointer( i, distanceRemain ) );
-                }
-            }
-            return GetSplineResult( new SegmentPointer( segments.Length - 1, segments[segments.Length - 1].Length ) );
+            return GetSplineResult( distance );
         }
 
         public SplineResult GetResultClosestTo(Vector3 point, float paramThreshold = 0.000001f)
@@ -339,7 +347,7 @@ namespace FantasticSplines
             EnsureCacheIsUpdated();
 
             float minDistSq = float.MaxValue;
-            SegmentPointer bestSegment = new SegmentPointer();
+            float bestDistance = 0;
             for( int i = 0; i < SegmentCount; i++ )
             {
                 Bezier3 curve = segments[i].bezier;
@@ -350,12 +358,11 @@ namespace FantasticSplines
                 if( distSq < minDistSq )
                 {
                     minDistSq = distSq;
-                    bestSegment.index = i;
-                    bestSegment.distance = segments[i].GetDistance( curveClosestParam );
+                    bestDistance = segments[i].startDistanceInSpline + segments[i].GetDistance( curveClosestParam );
                 }
             }
 
-            return GetSplineResult( bestSegment );
+            return GetSplineResult( bestDistance );
         }
 
         public SplineResult GetResultClosestTo(Ray ray, float paramThreshold = 0.000001f)
@@ -369,7 +376,7 @@ namespace FantasticSplines
 
             float minDistSqWorld = float.MaxValue;
             float minDistSqProjected = float.MaxValue;
-            SegmentPointer bestSegment = new SegmentPointer();
+            float bestDistance = 0;
             bool foundPointInFront = false;
             for( int i = 0; i < SegmentCount; i++ )
             {
@@ -407,13 +414,12 @@ namespace FantasticSplines
                     {
                         minDistSqProjected = distSqProjected;
                         minDistSqWorld = distSqWorld;
-                        bestSegment.index = i;
-                        bestSegment.distance = segments[i].GetDistance( curveClosestParam );
+                        bestDistance = segments[i].startDistanceInSpline + segments[i].GetDistance( curveClosestParam );
                     }
                 }
             }
 
-            return GetSplineResult( bestSegment );
+            return GetSplineResult( bestDistance );
         }
     }
 }

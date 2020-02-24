@@ -13,7 +13,7 @@ namespace FantasticSplines
     {
         [HideInInspector]
         [SerializeField]
-        Curve curve; // spline in local space
+        Curve curve = new Curve(); // spline in local space
 
         public float GetLength() { return curve.Length; }
 
@@ -100,8 +100,8 @@ namespace FantasticSplines
         SplineResult TransformResult(SplineResult toTransform)
         {
             SplineResult result = toTransform;
-            result.position = TransformPoint( toTransform.position );
-            result.tangent = TransformVector( toTransform.tangent );
+            result.segmentResult.position = TransformPoint( toTransform.position );
+            result.segmentResult.tangent = TransformVector( toTransform.tangent );
             return result;
         }
 
@@ -196,7 +196,7 @@ namespace FantasticSplines
                 }
 
                 previousPosition = currentPosition;
-                currentPosition = GetResultAtDistance( currentPosition.splineDistance + stepDistance );
+                currentPosition = GetResultAtDistance( currentPosition.distance + stepDistance );
                 worldDistanceTest = Vector3.Distance( currentPosition.position, origin );
 
                 --iterationsLeft;
@@ -210,7 +210,7 @@ namespace FantasticSplines
             float lastWorldDistanceTest = Vector3.Distance( previousPosition.position, origin );
             float lerpT = Mathf.InverseLerp( lastWorldDistanceTest, worldDistanceTest, worldDistance );
 
-            return GetResultAtDistance( currentPosition.splineDistance - stepDistance + (stepDistance * lerpT) );
+            return GetResultAtDistance( currentPosition.distance - stepDistance + (stepDistance * lerpT) );
         }
 
         public SplineResult GetResultClosestTo(Vector3 point)

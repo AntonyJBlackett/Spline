@@ -2,24 +2,52 @@
 using UnityEngine;
 namespace FantasticSplines
 {
+    public struct SegmentResult
+    {
+        public int index;
+        public float t;
+        public float distance;
+        public float length;
+        public Vector3 position;
+        public Vector3 tangent;
+
+        public bool AtSegmentEnd => Mathf.Approximately( t, 1 );
+        public bool AtSegmentStart => Mathf.Approximately( t, 0 );
+
+        public static SegmentResult Default
+        {
+            get
+            {
+                return new SegmentResult()
+                {
+                    index = 0,
+                    t = 0,
+                    distance = 0,
+                    length = 0,
+                    tangent = Vector3.forward,
+                    position = Vector3.zero,
+
+                };
+            }
+        }
+    }
+
     public struct SplineResult
     {
-        public float splineT; // 0 - 1 along spline
-        public float splineDistance; // real world distance along spline
+        public float t; // 0 - 1 along spline
+        public float length; // real world distance along spline
+        public float distance; // real world distance along spline
+        public float loopDistance; // real world distance along spline
 
-        public Vector3 position; // world position
-        public Vector3 tangent; // world direction
+        public Vector3 position => segmentResult.position;
+        public Vector3 tangent => segmentResult.tangent;
 
-        public int segmentIndex;
-        public float segmentT;
-        public float segmentDistance;
-        public float segmentLength;
+        public int lapCount;
 
-        public bool AtEnd => Mathf.Approximately( splineT, 1 );
-        public bool AtStart => Mathf.Approximately( splineT, 0 );
+        public bool AtEnd => Mathf.Approximately( t, 1 );
+        public bool AtStart => Mathf.Approximately( t, 0 );
 
-        public bool AtSegmentEnd => Mathf.Approximately( segmentT, 1 );
-        public bool AtSegmentStart => Mathf.Approximately( segmentT, 0 );
+        public SegmentResult segmentResult;
 
         public static SplineResult Default
         {
@@ -27,16 +55,13 @@ namespace FantasticSplines
             {
                 return new SplineResult()
                 {
-                    position = Vector3.zero,
-                    tangent = Vector3.forward,
+                    segmentResult = SegmentResult.Default,
 
-                    splineT = 0,
-                    splineDistance = 0,
-
-                    segmentIndex = 0,
-                    segmentT = 0,
-                    segmentDistance = 0,
-                    segmentLength = 0
+                    t = 0,
+                    distance = 0,
+                    loopDistance = 0,
+                    length = 0,
+                    lapCount = 0,
                 };
             }
         }

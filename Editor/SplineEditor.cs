@@ -1585,7 +1585,7 @@ namespace FantasticSplines
             if( guiEvent.type == EventType.MouseDown && guiEvent.button == 0 )
             {
                 Undo.RecordObject( spline.GetUndoObject(), "Insert Node" );
-                spline.InsertNode( closestToRay.splineT );
+                spline.InsertNode( closestToRay.t );
                 EditorUtility.SetDirty( spline.GetComponent() );
                 guiEvent.Use();
             }
