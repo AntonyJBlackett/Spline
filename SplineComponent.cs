@@ -181,11 +181,6 @@ namespace FantasticSplines
             }
 
             int maxIterations = Mathf.CeilToInt( worldDistance * 5f / stepDistance );
-            if( maxIterations > 10 )
-            {
-                Debug.LogWarning( "Increase step distance for better performance." );
-            }
-
             int iterationsLeft = maxIterations;
 
             SplineResult currentPosition = GetResultAtDistance( startDistance );
@@ -196,11 +191,11 @@ namespace FantasticSplines
             do
             {
                 // early out, there's no more spline
-                if( currentPosition.AtEnd && stepDistance > 0 )
+                if( currentPosition.t > 1 && stepDistance > 0 )
                 {
                     return currentPosition;
                 }
-                if( currentPosition.AtStart && stepDistance < 0 )
+                if( currentPosition.t < 0 && stepDistance < 0 )
                 {
                     return currentPosition;
                 }
@@ -216,6 +211,11 @@ namespace FantasticSplines
                     break;
                 }
             } while( worldDistanceTest < worldDistance );
+
+            if( maxIterations - iterationsLeft > 10 )
+            {
+                Debug.LogWarning( "Increase step distance for better performance. Num iterations to resolve: " + (maxIterations - iterationsLeft).ToString() );
+            }
 
             float lastWorldDistanceTest = Vector3.Distance( previousPosition.position, origin );
             float lerpT = Mathf.InverseLerp( lastWorldDistanceTest, worldDistanceTest, worldDistance );

@@ -300,7 +300,8 @@ namespace FantasticSplines
             {
                 distance = distance,
                 loopDistance = loopDistance,
-                t = loopDistance * inverseSplineLength,
+                t = distance * inverseSplineLength,
+                loopT = loopDistance * inverseSplineLength,
                 lapCount = Mathf.FloorToInt( distance * inverseSplineLength ),
                 isLoop = loop,
 

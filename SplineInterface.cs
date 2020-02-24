@@ -34,7 +34,8 @@ namespace FantasticSplines
 
     public struct SplineResult
     {
-        public float t; // 0 - 1 along spline
+        public float t; // distance / length
+        public float loopT; // 0 - 1 along spline
         public float length; // real world distance along spline
         public float distance; // real world distance along spline
         public float loopDistance; // real world distance along spline

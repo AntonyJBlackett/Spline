@@ -104,15 +104,12 @@ public class SplineSpawner : MonoBehaviour
 
         SplineResult splineResult = spline.GetResultAtT( 0 );
 
-        bool spawning = true;
-        while( spawning )
+        while( splineResult.t < 1 )
         {
             GameObject instance = Instantiate( prefab, transform );
             instance.SetActive( true );
             instance.transform.position = splineResult.position;
             instance.transform.rotation = Quaternion.LookRotation( splineResult.tangent, Vector3.up );
-
-            spawning = splineResult.t < 1;
 
             switch( separationMethod )
             {
@@ -122,6 +119,8 @@ public class SplineSpawner : MonoBehaviour
                 case SeparationMethod.WorldDistance:
                     splineResult = spline.GetResultAtWorldDistanceFrom( splineResult.distance, separation, separation * 0.33f );
                     break;
+                default:
+                    return;
             }
         }
     }

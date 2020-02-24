@@ -1335,6 +1335,7 @@ namespace FantasticSplines
                 }
 
                 dragSelectActive = false;
+                doRepaint = true;
             }
 
             if( dragSelectActive )
@@ -1944,12 +1945,13 @@ namespace FantasticSplines
                 {
                     moveNodeState = new MoveNodeState();
                 }
+
+                EditorUtility.SetDirty( spline.GetComponent() );
             }
 
             if( moveNodeState.Moving )
             {
                 useEvent = true;
-                EditorUtility.SetDirty( spline.GetComponent() );
             }
 
             if( moveNodeState.MovingNodeControlPoint )
