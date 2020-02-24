@@ -18,13 +18,23 @@ namespace FantasticSplines
             Bezier3 leftSplit = segement.LeftSplitAt( t );
             Bezier3 rightSplit = segement.RightSplitAt( t );
 
+            bool wasPoint = node1.NodeType == NodeType.Point;
             SplineNode split = new SplineNode( leftSplit.end, leftSplit.endControl, rightSplit.startControl );
             node1.SetNodeType( NodeType.Free );
             node1.Control2 = leftSplit.startControl;
+            if( wasPoint )
+            {
+                node1.Control1 = Vector3.zero;
+            }
             node1.SetNodeType( SplineNode.GetNodeTypeFromControls( node1 ) );
 
+            wasPoint = node2.NodeType == NodeType.Point;
             node2.SetNodeType( NodeType.Free );
             node2.Control1 = rightSplit.endControl;
+            if( wasPoint )
+            {
+                node2.Control2 = Vector3.zero;
+            }
             node2.SetNodeType( SplineNode.GetNodeTypeFromControls( node2 ) );
 
             return split;

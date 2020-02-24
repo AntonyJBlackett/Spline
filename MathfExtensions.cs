@@ -21,6 +21,13 @@ namespace FantasticSplines
             return Mathf.Lerp( newMin, newMax, t );
         }
 
+        public static Vector3 ProjectPointOnPlane(Vector3 planePoint, Vector3 planeNormal, Vector3 point)
+        {
+            Vector3 diff = point - planePoint;
+            float prod1 = Vector3.Dot( diff, planeNormal );
+            return point - planeNormal * prod1;
+        }
+
         public static Vector3 LinePlaneIntersection(Ray ray, Vector3 planePoint, Vector3 planeNormal)
         {
             return LinePlaneIntersection( ray.origin, ray.direction, planePoint, planeNormal );

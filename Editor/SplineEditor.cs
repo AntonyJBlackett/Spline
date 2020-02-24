@@ -67,32 +67,6 @@ namespace FantasticSplines
             }
         }
 
-        void SetSelectionNodeType(IEditableSpline spline, NodeType type)
-        {
-            Undo.RecordObject( spline.GetUndoObject(), "Set Point Type" );
-            for( int i = 0; i < nodeSelection.Count; ++i )
-            {
-                int index = nodeSelection[i];
-                SplineNode node = spline.GetNode( index );
-                node.SetNodeType( type );
-                spline.SetNode( index, node );
-            }
-            EditorUtility.SetDirty( spline.GetComponent() );
-        }
-
-        void SimplifySelectionNodeType(IEditableSpline spline)
-        {
-            Undo.RecordObject( spline.GetUndoObject(), "Simplify Node Type" );
-            for( int i = 0; i < nodeSelection.Count; ++i )
-            {
-                int index = nodeSelection[i];
-                SplineNode node = spline.GetNode( index );
-                node.SetNodeType( SplineNode.GetNodeTypeFromControls( node ) );
-                spline.SetNode( index, node );
-            }
-            EditorUtility.SetDirty( spline.GetComponent() );
-        }
-
         Bounds GetSelectionBounds(IEditableSpline spline)
         {
             if( nodeSelection.Count == 0 )
@@ -138,168 +112,12 @@ namespace FantasticSplines
             SceneView.lastActiveSceneView.Frame( bounds, false );
         }
 
-        void FlattenSelection(IEditableSpline spline)
+        public void DeleteNodes(IEditableSpline spline, List<int> nodeIndicies)
         {
-            Undo.RecordObject( spline.GetUndoObject(), "Flatten Selection" );
-            for( int i = 0; i < nodeSelection.Count; ++i )
-            {
-                int index = nodeSelection[i];
-                SplineNode point = spline.GetNode( index );
-
-                point.position = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point.position );
-                point.Control1 = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point.Control1 + point.position ) - point.position;
-                point.Control2 = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point.Control2 + point.position ) - point.position;
-
-                spline.SetNode( index, point );
-            }
-            EditorUtility.SetDirty( spline.GetComponent() );
-        }
-
-        void SmoothSelection(IEditableSpline spline)
-        {
-            Undo.RecordObject( spline.GetUndoObject(), "Smooth Selection" );
-            for( int i = 0; i < nodeSelection.Count; ++i )
-            {
-                int index = nodeSelection[i];
-                SplineNode point = spline.GetNode( index );
-                SplineNode before = point;
-                SplineNode after = point;
-
-                int beforeIndex = index - 1;
-                if( beforeIndex < 0 )
-                {
-                    beforeIndex = spline.GetNodeCount() - 1;
-                }
-                before = spline.GetNode( beforeIndex );
-
-                int afterIndex = (index + 1) % spline.GetNodeCount();
-                after = spline.GetNode( afterIndex );
-
-                Vector3 direction = after.position - before.position;
-                float dist1 = Mathf.Min( (point.position - before.position).magnitude, direction.magnitude );
-                float dist2 = Mathf.Min( (point.position - after.position).magnitude, direction.magnitude );
-
-                point.SetNodeType( NodeType.Aligned );
-                point.Control1 = -direction.normalized * dist1 * 0.4f;
-                point.Control2 = direction.normalized * dist2 * 0.4f;
-
-                if( !spline.IsLoop() )
-                {
-                    if( index == 0 || index == spline.GetNodeCount() - 1 )
-                    {
-                        point.SetNodeType( NodeType.Point );
-                    }
-                }
-
-                spline.SetNode( index, point );
-            }
-            EditorUtility.SetDirty( spline.GetComponent() );
-        }
-
-        void DeleteDuplicateNodes(IEditableSpline spline)
-        {
-            Undo.RecordObject( spline.GetUndoObject(), "Delete Duplicate Nodes" );
-            List<int> removeNodes = new List<int>();
-            int nodeCount = spline.GetNodeCount();
-
-            for( int i = 1; i < nodeCount; ++i )
-            {
-                SplineNode previousNode = spline.GetNode( i - 1 );
-                SplineNode node = spline.GetNode( i );
-
-                if( node.position == previousNode.position )
-                {
-                    if( previousNode.Control2.sqrMagnitude <= 0
-                        && node.Control1.magnitude <= 0 )
-                    {
-                        removeNodes.Add( i );
-                    }
-                }
-            }
-
-            for( int i = removeNodes.Count - 1; i >= 0; --i )
-            {
-                int previousNodeIndex = removeNodes[i] - 1;
-                int removeIndex = removeNodes[i];
-
-                SplineNode previousNode = spline.GetNode( previousNodeIndex );
-                SplineNode node = spline.GetNode( removeIndex );
-
-                SplineNode newNode = new SplineNode( previousNode.position, previousNode.Control1, node.Control2 );
-                spline.SetNode( previousNodeIndex, newNode );
-                spline.RemoveNode( removeIndex );
-            }
-
-            ValidateNodeSelection( spline );
-            EditorUtility.SetDirty( spline.GetComponent() );
-        }
-
-        void SimplifySpline(IEditableSpline spline)
-        {
-            Undo.RecordObject( spline.GetUndoObject(), "Simplify Spline" );
-
-            // simplify all node types
-            for( int i = 1; i < spline.GetNodeCount(); ++i )
-            {
-                SplineNode previousNode = spline.GetNode( i - 1 );
-                SplineNode node = spline.GetNode( i );
-                node.SetNodeType( SplineNode.GetNodeTypeFromControls( node ) );
-                spline.SetNode( i, node );
-            }
-
-            DeleteDuplicateNodes( spline );
-
-            // remove nodes in linear sections
-            for( int i = 2; i < spline.GetNodeCount(); ++i )
-            {
-                SplineNode node1 = spline.GetNode( i - 2 );
-                SplineNode node2 = spline.GetNode( i - 1 );
-                SplineNode node3 = spline.GetNode( i );
-
-                Vector3[] points = new Vector3[7];
-                points[0] = node1.position;
-                points[1] = node1.Control2Position;
-                points[2] = node2.Control1Position;
-                points[3] = node2.position;
-                points[4] = node2.Control2Position;
-                points[5] = node3.Control1Position;
-                points[6] = node3.position;
-
-                Vector3 testVector = (points[0] - points[6]).normalized;
-                bool linear = true;
-
-                for( int p = 1; p < points.Length; ++p )
-                {
-                    Vector3 dif = points[p - 1] - points[p];
-                    if( dif.sqrMagnitude <= float.Epsilon )
-                    {
-                        continue;
-                    }
-
-                    Vector3 vector = dif.normalized;
-                    if( Vector3.Dot( vector, testVector ) < 0.98f )
-                    {
-                        linear = false;
-                        break;
-                    }
-                }
-
-                if( !linear )
-                {
-                    continue;
-                }
-
-                spline.RemoveNode( i - 1 );
-                i--;
-            }
-        }
-
-        public void DeleteSelectedNodes(IEditableSpline spline)
-        {
-            int removePoints = nodeSelection.Count;
+            int removePoints = nodeIndicies.Count;
             for( int i = 0; i < removePoints; ++i )
             {
-                RemoveNode( spline, nodeSelection[0] );
+                RemoveNode( spline, nodeIndicies[0] );
             }
             ClearNodeSelection();
             EditorUtility.SetDirty( spline.GetComponent() );
@@ -307,7 +125,7 @@ namespace FantasticSplines
 
         void PasteCurve(IEditableSpline spline)
         {
-            DeleteSelectedNodes( spline );
+            DeleteNodes( spline, nodeSelection );
             int oldPointCount = spline.GetNodeCount();
             for( int i = 0; i < clipboard.Count; i++ )
             {
@@ -373,20 +191,33 @@ namespace FantasticSplines
         {
             if( editMode == SplineEditMode.AddNode && addNodeMode == mode )
             {
-                if( GUILayout.Button( "Cancel " + mode.ToString() + " Point" ) )
+                if( GUILayout.Button( "Cancel " + mode.ToString() ) )
                 {
                     ResetEditMode();
                 }
             }
-            else if( GUILayout.Button( mode.ToString() + " Point" ) )
+            else if( GUILayout.Button( mode.ToString() ) )
             {
                 StartAddPointMode( mode );
             }
         }
 
+        static bool DoToggleButton(bool value, string buttonText)
+        {
+            GUIStyle style = new GUIStyle( UnityEditor.EditorStyles.miniButton );
+            style.normal.textColor = value ? Color.white * 0.85f : Color.white * 0.7f;
+            buttonText = value ? buttonText + " (On)" : buttonText + " (Off)";
+            if( GUILayout.Button( buttonText, style ) )
+            {
+                value = !value;
+            }
+            return value;
+        }
+
         static bool foldoutSplineEditor = true;
         static bool foldoutGizmos = true;
         static bool foldoutDebug = false;
+        static Vector3 nodeSetPosition;
         public override void OnInspectorGUI()
         {
             DrawDefaultInspector();
@@ -397,95 +228,155 @@ namespace FantasticSplines
                 return;
             }
 
+            EditorGUI.BeginChangeCheck();
             GUILayout.Space( 20 );
             foldoutSplineEditor = EditorGUILayout.Foldout( foldoutSplineEditor, "Spline Editor" );
 
             if( foldoutSplineEditor )
             {
                 GUILayout.Label( "Spline Settings" );
-                EditorGUI.BeginChangeCheck();
-                bool loop = GUILayout.Toggle( spline.IsLoop(), "Loop" );
-                if( EditorGUI.EndChangeCheck() )
+                string loopText = spline.IsLoop() ? "Looped" : "Unlooped";
+                if( GUILayout.Button( loopText ) )
                 {
                     Undo.RecordObject( spline.GetUndoObject(), "Loop Toggle" );
-                    spline.SetLoop( loop );
+                    spline.SetLoop( !spline.IsLoop() );
                     EditorUtility.SetDirty( spline.GetComponent() );
                 }
-                GUILayout.Space( 10 );
 
                 GUILayout.Label( "Edit Modes" );
+                EditorGUILayout.BeginHorizontal();
                 InspectorAddPointModeButton( SplineAddNodeMode.Append );
                 InspectorAddPointModeButton( SplineAddNodeMode.Prepend );
                 InspectorAddPointModeButton( SplineAddNodeMode.Insert );
-
-
-                GUILayout.Space( 10 );
-                GUILayout.Label( "Control Point Types" );
-                if( GUILayout.Button( "Linear" ) )
-                {
-                    SetSelectionNodeType( spline, NodeType.Point );
-                }
-                if( GUILayout.Button( "Mirror" ) )
-                {
-                    SetSelectionNodeType( spline, NodeType.Mirrored );
-                }
-                if( GUILayout.Button( "Aligned" ) )
-                {
-                    SetSelectionNodeType( spline, NodeType.Aligned );
-                }
-                if( GUILayout.Button( "Free" ) )
-                {
-                    SetSelectionNodeType( spline, NodeType.Free );
-                }
-                if( GUILayout.Button( "Simplify" ) )
-                {
-                    SimplifySelectionNodeType( spline );
-                }
+                EditorGUILayout.EndHorizontal();
+                ShowNodeControls = DoToggleButton( ShowNodeControls, "Edit Node Control Points" );
 
                 GUILayout.Space( 10 );
-                GUILayout.Label( "Tools" );
-                if( GUILayout.Button( "Smooth Selection" ) )
+                GUILayout.Label( "Set Selected Node Type" );
+                EditorGUI.DisabledGroupScope selectionDisableGroup = new EditorGUI.DisabledGroupScope( nodeSelection.Count <= 0 );
+                EditorGUILayout.BeginHorizontal();
                 {
-                    SmoothSelection( spline );
+                    if( GUILayout.Button( "Point" ) )
+                    {
+                        Undo.RecordObject( spline.GetComponent(), "Point Nodes" );
+                        SplineEditorTools.SetNodeType( spline, NodeType.Point, nodeSelection );
+                    }
+                    if( GUILayout.Button( "Mirror" ) )
+                    {
+                        Undo.RecordObject( spline.GetComponent(), "Mirror Nodes" );
+                        SplineEditorTools.SetNodeType( spline, NodeType.Mirrored, nodeSelection );
+                    }
+                    if( GUILayout.Button( "Aligned" ) )
+                    {
+                        Undo.RecordObject( spline.GetComponent(), "Aligned Nodes" );
+                        SplineEditorTools.SetNodeType( spline, NodeType.Aligned, nodeSelection );
+                    }
+                    if( GUILayout.Button( "Free" ) )
+                    {
+                        Undo.RecordObject( spline.GetComponent(), "Free Nodes" );
+                        SplineEditorTools.SetNodeType( spline, NodeType.Free, nodeSelection );
+                    }
+                    if( GUILayout.Button( "Simplify" ) )
+                    {
+                        Undo.RecordObject( spline.GetComponent(), "Simplify Nodes" );
+                        SplineEditorTools.SimplifyNodeType( spline, nodeSelection );
+                    }
                 }
-                if( GUILayout.Button( "Flatten Selection" ) )
+                EditorGUILayout.EndHorizontal();
+
+                // set position tool
+                EditorGUILayout.BeginHorizontal();
                 {
-                    FlattenSelection( spline );
+                    EditorGUI.BeginChangeCheck();
+                    if( nodeSelection.Count > 0 )
+                    {
+                        nodeSetPosition = spline.GetNode( nodeSelection[0] ).position;
+                    }
+                    Vector3 beforeChange = nodeSetPosition;
+                    nodeSetPosition = spline.GetTransform().InverseTransformPoint( nodeSetPosition );
+                    nodeSetPosition = EditorGUILayout.Vector3Field( "Set Position", nodeSetPosition );
+                    nodeSetPosition = spline.GetTransform().TransformPoint( nodeSetPosition );
+                    if( EditorGUI.EndChangeCheck() )
+                    {
+                        bool changeX = !Mathf.Approximately( beforeChange.x, nodeSetPosition.x );
+                        bool changeY = !Mathf.Approximately( beforeChange.y, nodeSetPosition.y );
+                        bool changeZ = !Mathf.Approximately( beforeChange.z, nodeSetPosition.z );
+                        if( changeX )
+                        {
+                            Undo.RecordObject( spline.GetComponent(), "Set Node X Position" );
+                            SplineEditorTools.SetNodesXPosition( spline, nodeSelection, nodeSetPosition.x );
+                        }
+
+                        if( changeY )
+                        {
+                            Undo.RecordObject( spline.GetComponent(), "Set Node Y Position" );
+                            SplineEditorTools.SetNodesYPosition( spline, nodeSelection, nodeSetPosition.y );
+                        }
+
+                        if( changeZ )
+                        {
+                            Undo.RecordObject( spline.GetComponent(), "Set Node Z Position" );
+                            SplineEditorTools.SetNodesZPosition( spline, nodeSelection, nodeSetPosition.z );
+                        }
+                    }
                 }
-                if( GUILayout.Button( "Simplify Spline" ) )
+                EditorGUILayout.EndHorizontal();
+
+                selectionDisableGroup.Dispose();
+
+                GUILayout.Space( 10 );
+                GUILayout.Label( "Spline Tools" );
+                List<int> nodeIndicies = GetSelectedNodeOrAllIndicies( spline );
+                string workOn = nodeSelection.Count > 0 ? "Selection" : "Spline";
+                if( GUILayout.Button( "Smooth " + workOn ) )
                 {
-                    SimplifySpline( spline );
+                    Undo.RecordObject( spline.GetComponent(), "Smooth " + workOn );
+                    SplineEditorTools.Smooth( spline, nodeIndicies );
+                }
+                if( GUILayout.Button( "Flatten " + workOn ) )
+                {
+                    Undo.RecordObject( spline.GetComponent(), "Flatten " + workOn );
+                    SplineEditorTools.Flatten( spline, nodeIndicies );
+                }
+                if( GUILayout.Button( "Simplify " + workOn ) )
+                {
+                    Undo.RecordObject( spline.GetComponent(), "Simplify " + workOn );
+                    SplineEditorTools.Simplify( spline, nodeIndicies );
                 }
                 GUILayout.Space( 10 );
 
-                EditorGUI.BeginChangeCheck();
                 // grid
                 {
                     GUILayout.Label( "Snap to Grid (hold alt)" );
-                    ShowGrid = GUILayout.Toggle( ShowGrid, "Show Grid" );
-                    SnapToHalfGrid = GUILayout.Toggle( SnapToHalfGrid, "Snap To Half Grid Size" );
-                    SnapToGridScale = EditorGUILayout.Vector3Field( "Grid Snap Scale", SnapToGridScale );
+
                     GUILayout.BeginHorizontal();
-                    GUILayout.Label( "Snap Axies" );
-                    SnapToGridX = GUILayout.Toggle( SnapToGridX, "X" );
-                    SnapToGridY = GUILayout.Toggle( SnapToGridY, "Y" );
-                    SnapToGridZ = GUILayout.Toggle( SnapToGridZ, "Z" );
+                    ShowGrid = DoToggleButton( ShowGrid, "Show Grid" );
+                    SnapToHalfGrid = DoToggleButton( SnapToHalfGrid, "Half Grid Snap" );
                     GUILayout.EndHorizontal();
+
+                    SnapToGridScale = EditorGUILayout.Vector3Field( "", SnapToGridScale );
+
+                    GUILayout.BeginHorizontal();
+                    SnapToGridX = DoToggleButton( SnapToGridX, "Snap X" );
+                    SnapToGridY = DoToggleButton( SnapToGridY, "Snap Y" );
+                    SnapToGridZ = DoToggleButton( SnapToGridZ, "Snap Z" );
+                    GUILayout.EndHorizontal();
+
                     GUILayout.Space( 10 );
                 }
 
                 foldoutGizmos = EditorGUILayout.Foldout( foldoutGizmos, "Gizmos" );
                 if( foldoutGizmos )
                 {
-                    HandleCapScale = EditorGUILayout.FloatField( "Editor Point Scale", HandleCapScale );
+                    EditorGUILayout.LabelField( "Node Gizmo Size" );
+                    HandleCapScale = EditorGUILayout.Slider( HandleCapScale, 0.1f, 10 );
                     spline.SetColor( EditorGUILayout.ColorField( "Spline Colour", spline.GetColor() ) );
-                    spline.SetZTest( GUILayout.Toggle( spline.GetZTest(), "ZTest" ) );
-                    ShowSegmentLengths = GUILayout.Toggle( ShowSegmentLengths, "Show Segment Lengths" );
-                    ShowNodeControls = GUILayout.Toggle( ShowNodeControls, "Show Point Controls" );
-                    GUILayout.Space( 10 );
-                    ShowProjectionLines = GUILayout.Toggle( ShowProjectionLines, "Show Projection Lines" );
-                    ShowProjectedSpline = GUILayout.Toggle( ShowProjectedSpline, "Show Y Plane Projected Spline" );
-                    ShowSelectionDisks = GUILayout.Toggle( ShowSelectionDisks, "Show Selection Disks" );
+
+                    spline.SetZTest( DoToggleButton( spline.GetZTest(), "ZTest" ) );
+                    ShowSegmentLengths = DoToggleButton( ShowSegmentLengths, "Segment Lengths" );
+                    ShowProjectionLines = DoToggleButton( ShowProjectionLines, "Projection Lines" );
+                    ShowProjectedSpline = DoToggleButton( ShowProjectedSpline, "Projected Spline" );
+                    ShowSelectionDisks = DoToggleButton( ShowSelectionDisks, "Selection Disks" );
                     GUILayout.Space( 10 );
                 }
 
@@ -686,7 +577,8 @@ namespace FantasticSplines
                     guiEvent.Use();
                 }
 
-                if( guiEvent.command && guiEvent.keyCode == KeyCode.C )
+                if( nodeSelection.Count > 0
+                    && guiEvent.command && guiEvent.keyCode == KeyCode.C )
                 {
                     CopyCurve( spline );
                     guiEvent.Use();
@@ -696,7 +588,7 @@ namespace FantasticSplines
                 {
                     Undo.RecordObject( spline.GetUndoObject(), "Cut Nodes" );
                     CopyCurve( spline );
-                    DeleteSelectedNodes( spline );
+                    DeleteNodes( spline, nodeSelection );
                     guiEvent.Use();
                 }
 
@@ -712,7 +604,7 @@ namespace FantasticSplines
                     && (guiEvent.keyCode == KeyCode.Delete || guiEvent.keyCode == KeyCode.Backspace) )
                 {
                     Undo.RecordObject( spline.GetUndoObject(), "Delete Nodes" );
-                    DeleteSelectedNodes( spline );
+                    DeleteNodes( spline, nodeSelection );
                     guiEvent.Use();
                 }
             }
@@ -765,9 +657,6 @@ namespace FantasticSplines
             {
                 return;
             }
-            Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-
-
             SceneViewEventSetup( guiEvent );
 
             RightClickCancel( guiEvent );
@@ -775,7 +664,7 @@ namespace FantasticSplines
             KeyboardInputs( spline, guiEvent );
 
             if( guiEvent.isMouse
-            || guiEvent.type == EventType.Layout )
+            || guiEvent.type == EventType.Layout || guiEvent.type == EventType.Repaint )
             {
                 switch( editMode )
                 {
@@ -799,18 +688,20 @@ namespace FantasticSplines
                 }
             }
 
-            if( !moveNodeState.MovingNodeControlPoint && (ShowGrid || guiEvent.alt) )
-            {
-                DrawGrid( spline, guiEvent );
-            }
-
             // draw things
             if( guiEvent.type == EventType.Repaint )
             {
+                if( !moveNodeState.MovingNodeControlPoint && (ShowGrid || guiEvent.alt) )
+                {
+                    DrawGrid( spline, guiEvent );
+                }
+
+                Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
                 DrawSpline( spline );
+                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
             }
 
-            if( guiEvent.isMouse && doRepaint )
+            if( guiEvent.isMouse || doRepaint )
             {
                 SceneView.currentDrawingSceneView.Repaint();
             }
@@ -829,7 +720,6 @@ namespace FantasticSplines
                 }
             }
 
-            Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
         }
 
         Color horizontalGridColour = new Color( .7f, .7f, 1, .2f );
@@ -930,7 +820,7 @@ namespace FantasticSplines
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 Vector3 point = spline.GetNode( i ).position;
-                Vector3 pointOnPlane = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point );
+                Vector3 pointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
                 Handles.DrawDottedLine( pointOnPlane, point, 2 );
             }
         }
@@ -940,7 +830,7 @@ namespace FantasticSplines
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 Vector3 point = spline.GetNode( i ).position;
-                Vector3 pointOnPlane = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point );
+                Vector3 pointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
                 if( i < spline.GetNodeCount() - 1 )
                 {
                     Vector3 nextPoint = spline.GetNode( i + 1 ).position;
@@ -956,11 +846,11 @@ namespace FantasticSplines
 
         static void DrawBezierSegmentOnPlane(Vector3 planeOrigin, Vector3 planeNormal, SplineNode node1, SplineNode node2)
         {
-            Vector3 pointOnPlane1 = GetPointOnPlaneY( planeOrigin, planeNormal, node1.position );
-            Vector3 pointOnPlane2 = GetPointOnPlaneY( planeOrigin, planeNormal, node2.position );
+            Vector3 pointOnPlane1 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node1.position );
+            Vector3 pointOnPlane2 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node2.position );
 
-            Vector3 tangentFlat1 = GetPointOnPlaneY( planeOrigin, planeNormal, node1.position + node1.Control2 );
-            Vector3 tangentFlat2 = GetPointOnPlaneY( planeOrigin, planeNormal, node2.position + node2.Control1 );
+            Vector3 tangentFlat1 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node1.position + node1.Control2 );
+            Vector3 tangentFlat2 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node2.position + node2.Control1 );
 
             Handles.DrawBezier( pointOnPlane1, pointOnPlane2, tangentFlat1, tangentFlat2, Color.grey, null, 2.5f );
         }
@@ -1001,11 +891,11 @@ namespace FantasticSplines
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 Vector3 point = spline.GetNode( i ).position;
-                Vector3 pointOnPlane = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, point );
+                Vector3 pointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
                 if( i < spline.GetNodeCount() - 1 )
                 {
                     Vector3 nextPoint = spline.GetNode( i + 1 ).position;
-                    Vector3 nextPointOnPlane = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, nextPoint );
+                    Vector3 nextPointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, nextPoint );
                     Handles.DrawDottedLine( pointOnPlane, nextPointOnPlane, 2 );
                 }
             }
@@ -1026,7 +916,7 @@ namespace FantasticSplines
                 int index = nodeSelection[i];
 
                 Vector3 point = spline.GetNode( index ).position;
-                Vector3 planePoint = GetPointOnPlaneY( transform.position, transform.up, point );
+                Vector3 planePoint = MathHelper.ProjectPointOnPlane( transform.position, transform.up, point );
                 DrawWireDisk( point, transform.up, diskRadius, Camera.current.transform.position );
                 DrawWireDisk( planePoint, transform.up, diskRadius, Camera.current.transform.position );
 
@@ -1157,14 +1047,35 @@ namespace FantasticSplines
             editMode = SplineEditMode.None;
         }
 
-        List<int> GetNodeIndiciesSelectedFirst(IEditableSpline spline)
+        List<int> GetSelectedNodeOrAllIndicies(IEditableSpline spline)
+        {
+            List<int> nodeIndicies = new List<int>();
+            if( nodeSelection.Count > 0 )
+            {
+                nodeIndicies.AddRange( nodeSelection );
+                return nodeIndicies;
+            }
+
+            for( int i = 0; i < spline.GetNodeCount(); ++i )
+            {
+                nodeIndicies.Add( i );
+            }
+            return nodeIndicies;
+        }
+
+        List<int> GetNodeIndicies(IEditableSpline spline)
         {
             List<int> nodeIndicies = new List<int>();
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 nodeIndicies.Add( i );
             }
+            return nodeIndicies;
+        }
 
+        List<int> GetNodeIndiciesSelectedFirst(IEditableSpline spline)
+        {
+            List<int> nodeIndicies = GetNodeIndicies( spline );
             // selected points take priority
             nodeIndicies.Sort( (int one, int two) =>
             {
@@ -1467,8 +1378,8 @@ namespace FantasticSplines
             Camera camera = Camera.current;
             Transform transform = spline.GetTransform();
 
-            Vector3 controlPlane1 = GetPointOnPlaneY( point, transform.up, control1 );
-            Vector3 controlPlane2 = GetPointOnPlaneY( point, transform.up, control2 );
+            Vector3 controlPlane1 = MathHelper.ProjectPointOnPlane( point, transform.up, control1 );
+            Vector3 controlPlane2 = MathHelper.ProjectPointOnPlane( point, transform.up, control2 );
 
             Handles.color = controlColour;
             // draw control placement GUI
@@ -1547,7 +1458,7 @@ namespace FantasticSplines
                 connectingNodePosition = spline.GetNode( adjoiningIndex ).position;
             }
 
-            Vector3 connectingPlanePoint = GetPointOnPlaneY( transform.position, transform.up, connectingNodePosition );
+            Vector3 connectingPlanePoint = MathHelper.ProjectPointOnPlane( transform.position, transform.up, connectingNodePosition );
 
             if( addNodeState == AddNodeState.NodePosition )
             {
@@ -1816,14 +1727,14 @@ namespace FantasticSplines
                 if( result.selectedType == MoveControlPointId.Control2
                     || result.selectedType == MoveControlPointId.Unknown )
                 {
-                    controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, node.Control2Position );
+                    controlPlanePosition = MathHelper.ProjectPointOnPlane( node.position, spline.GetTransform().up, node.Control2Position );
                     controlPlaneOffset = node.Control2Position - controlPlanePosition;
 
                     moveNodeState = new MoveNodeState( result.nodeIndex, result.selectedType, node.Control2Position );
                 }
                 else if( result.selectedType == MoveControlPointId.Control1 )
                 {
-                    controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, node.Control1Position );
+                    controlPlanePosition = MathHelper.ProjectPointOnPlane( node.position, spline.GetTransform().up, node.Control1Position );
                     controlPlaneOffset = node.Control1Position - controlPlanePosition;
                     moveNodeState = new MoveNodeState( result.nodeIndex, result.selectedType, node.Control1Position );
                 }
@@ -1834,7 +1745,7 @@ namespace FantasticSplines
 
                 if( moveNodeState.Moving )
                 {
-                    planePosition = GetPointOnPlaneY( spline.GetTransform().position, spline.GetTransform().up, node.position );
+                    planePosition = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, node.position );
                     planeOffset = node.position - planePosition;
                 }
             }
@@ -1953,7 +1864,7 @@ namespace FantasticSplines
                                 worldControl = node.position + node.Control1;
                             }
 
-                            controlPlanePosition = GetPointOnPlaneY( node.position, spline.GetTransform().up, worldControl );
+                            controlPlanePosition = MathHelper.ProjectPointOnPlane( node.position, spline.GetTransform().up, worldControl );
                             controlPlaneOffset = worldControl - controlPlanePosition;
                         }
 
@@ -1981,7 +1892,7 @@ namespace FantasticSplines
                     moveNodeState.LastSnappedMovement = snappedMovement;
 
                     SplineNode latestNode = spline.GetNode( moveNodeState.NodeIndex );
-                    planePosition = GetPointOnPlaneY( transform.position, transform.up, latestNode.position );
+                    planePosition = MathHelper.ProjectPointOnPlane( transform.position, transform.up, latestNode.position );
                     planeOffset = latestNode.position - planePosition;
                 }
 
@@ -2009,19 +1920,15 @@ namespace FantasticSplines
             }
         }
 
-        // stop points disappearing into infinity!
+        // functions to help stop points disappearing into infinity!
         bool IsSafeToProjectFromPlane(Camera camera, Transform transform)
         {
             return Vector3.Dot( camera.transform.forward, transform.up ) < 0.95f;
         }
+
         bool TwoDimentionalMode(Camera camera, Transform transform)
         {
             return Vector3.Dot( camera.transform.up, transform.up ) < 0.95f;
-        }
-
-        static Vector3 GetPointOnPlaneY(Vector3 planePosition, Vector3 planeNormal, Vector3 point)
-        {
-            return MathHelper.LinePlaneIntersection( point, planeNormal, planePosition, planeNormal );
         }
 
         float DepthScale(Vector3 point, Vector3 cameraPosition)
@@ -2041,6 +1948,231 @@ namespace FantasticSplines
             {
                 Debug.Log( guiEvent.type );
             }
+        }
+    }
+
+    public static class SplineEditorTools
+    {
+        public static void SetNodeType(IEditableSpline spline, NodeType type, List<int> nodeIndicies)
+        {
+            Undo.RecordObject( spline.GetUndoObject(), "Set Point Type" );
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                int index = nodeIndicies[i];
+                SplineNode node = spline.GetNode( index );
+                node.SetNodeType( type );
+                spline.SetNode( index, node );
+            }
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void SetNodesXPosition(IEditableSpline spline, List<int> nodeIndicies, float x)
+        {
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                int index = nodeIndicies[i];
+                SplineNode node = spline.GetNode( index );
+                node.position = new Vector3( x, node.position.y, node.position.z );
+                spline.SetNode( index, node );
+            }
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void SetNodesYPosition(IEditableSpline spline, List<int> nodeIndicies, float y)
+        {
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                int index = nodeIndicies[i];
+                SplineNode node = spline.GetNode( index );
+                node.position = new Vector3( node.position.x, y, node.position.z );
+                spline.SetNode( index, node );
+            }
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void SetNodesZPosition(IEditableSpline spline, List<int> nodeIndicies, float z)
+        {
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                int index = nodeIndicies[i];
+                SplineNode node = spline.GetNode( index );
+                node.position = new Vector3( node.position.x, node.position.y, z );
+                spline.SetNode( index, node );
+            }
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void SimplifyNodeType(IEditableSpline spline, List<int> nodeIndicies)
+        {
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                int index = nodeIndicies[i];
+                SplineNode node = spline.GetNode( index );
+                node.SetNodeType( SplineNode.GetNodeTypeFromControls( node ) );
+                spline.SetNode( index, node );
+            }
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void Flatten(IEditableSpline spline, List<int> nodeIndicies)
+        {
+            Undo.RecordObject( spline.GetUndoObject(), "Flatten Selection" );
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                int index = nodeIndicies[i];
+                SplineNode point = spline.GetNode( index );
+
+                point.position = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.position );
+                point.Control1 = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.Control1 + point.position ) - point.position;
+                point.Control2 = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.Control2 + point.position ) - point.position;
+
+                spline.SetNode( index, point );
+            }
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void Smooth(IEditableSpline spline, List<int> nodeIndicies)
+        {
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                int index = nodeIndicies[i];
+                SplineNode point = spline.GetNode( index );
+                SplineNode before = point;
+                SplineNode after = point;
+
+                int beforeIndex = index - 1;
+                if( beforeIndex < 0 )
+                {
+                    beforeIndex = spline.GetNodeCount() - 1;
+                }
+                before = spline.GetNode( beforeIndex );
+
+                int afterIndex = (index + 1) % spline.GetNodeCount();
+                after = spline.GetNode( afterIndex );
+
+                Vector3 direction = after.position - before.position;
+                float dist1 = Mathf.Min( (point.position - before.position).magnitude, direction.magnitude );
+                float dist2 = Mathf.Min( (point.position - after.position).magnitude, direction.magnitude );
+
+                point.SetNodeType( NodeType.Aligned );
+                point.Control1 = -direction.normalized * dist1 * 0.4f;
+                point.Control2 = direction.normalized * dist2 * 0.4f;
+
+                if( !spline.IsLoop() )
+                {
+                    if( index == 0 || index == spline.GetNodeCount() - 1 )
+                    {
+                        point.SetNodeType( NodeType.Point );
+                    }
+                }
+
+                spline.SetNode( index, point );
+            }
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void DeleteDuplicateNodes(IEditableSpline spline, List<int> nodeIndicies)
+        {
+            List<int> removeNodes = new List<int>();
+            for( int n = 1; n < nodeIndicies.Count; ++n )
+            {
+                int i = nodeIndicies[n];
+                if( i < 1 )
+                {
+                    continue;
+                }
+
+                SplineNode previousNode = spline.GetNode( i - 1 );
+                SplineNode node = spline.GetNode( i );
+
+                if( node.position == previousNode.position )
+                {
+                    if( previousNode.Control2.sqrMagnitude <= 0
+                        && node.Control1.magnitude <= 0 )
+                    {
+                        removeNodes.Add( i );
+                    }
+                }
+            }
+
+            for( int i = removeNodes.Count - 1; i >= 0; --i )
+            {
+                int previousNodeIndex = removeNodes[i] - 1;
+                int removeIndex = removeNodes[i];
+
+                SplineNode previousNode = spline.GetNode( previousNodeIndex );
+                SplineNode node = spline.GetNode( removeIndex );
+
+                SplineNode newNode = new SplineNode( previousNode.position, previousNode.Control1, node.Control2 );
+                spline.SetNode( previousNodeIndex, newNode );
+                spline.RemoveNode( removeIndex );
+            }
+
+            EditorUtility.SetDirty( spline.GetComponent() );
+        }
+
+        public static void RemoveLinearSegments(IEditableSpline spline, List<int> nodeIndicies)
+        {
+            // remove nodes in linear sections
+            for( int n = 2; n < nodeIndicies.Count; ++n )
+            {
+                int i = nodeIndicies[n];
+                if( i < 2 )
+                {
+                    continue;
+                }
+
+                SplineNode node1 = spline.GetNode( i - 2 );
+                SplineNode node2 = spline.GetNode( i - 1 );
+                SplineNode node3 = spline.GetNode( i );
+
+                Vector3[] points = new Vector3[7];
+                points[0] = node1.position;
+                points[1] = node1.Control2Position;
+                points[2] = node2.Control1Position;
+                points[3] = node2.position;
+                points[4] = node2.Control2Position;
+                points[5] = node3.Control1Position;
+                points[6] = node3.position;
+
+                Vector3 testVector = (points[0] - points[6]).normalized;
+                bool linear = true;
+
+                for( int p = 1; p < points.Length; ++p )
+                {
+                    Vector3 dif = points[p - 1] - points[p];
+                    if( dif.sqrMagnitude <= float.Epsilon )
+                    {
+                        continue;
+                    }
+
+                    Vector3 vector = dif.normalized;
+                    if( Vector3.Dot( vector, testVector ) < 0.98f )
+                    {
+                        linear = false;
+                        break;
+                    }
+                }
+
+                if( !linear )
+                {
+                    continue;
+                }
+
+                spline.RemoveNode( i - 1 );
+                i--;
+            }
+        }
+
+        public static void Simplify(IEditableSpline spline, List<int> nodeIndicies)
+        {
+            if( nodeIndicies.Count == 0 )
+            {
+                return;
+            }
+            SimplifyNodeType( spline, nodeIndicies );
+            DeleteDuplicateNodes( spline, nodeIndicies );
+            RemoveLinearSegments( spline, nodeIndicies );
         }
     }
 }
