@@ -1,22 +1,22 @@
 ﻿using FantasticSplines;
 
 [System.Serializable]
-public struct SplineChangeDetector
+public struct SplineSnapshot
 {
     readonly ISpline spline;
-    readonly bool WasNotNull;
+    readonly bool wasNotNull;
     readonly int updateCount;
 
-    public SplineChangeDetector(ISpline spline)
+    public SplineSnapshot(ISpline spline)
     {
         this.spline = spline;
-        WasNotNull = spline != null;
-        updateCount = WasNotNull ? spline.GetUpdateCount() : 0;
+        wasNotNull = spline != null;
+        updateCount = wasNotNull ? spline.GetUpdateCount() : 0;
     }
 
-    public bool HasChanged()
+    public bool IsOutOfDate()
     {
-        if( WasNotNull )
+        if( wasNotNull )
         {
             if( spline == null )
             {
@@ -25,10 +25,8 @@ public struct SplineChangeDetector
 
             return updateCount != spline.GetUpdateCount();
         }
-        else // spline was null
-        {
-            return spline != null;
-        }
+
+        return false;
     }
 
     public bool IsDifferentFrom(ISpline compare)

@@ -51,7 +51,7 @@ public class SplineSeparationSpawner : MonoBehaviour
     public bool regenerate = false;
     public bool autoRegenerate = false;
 
-    SplineChangeDetector changeDetector;
+    SplineSnapshot splineSnapshot;
     SpawnerParameters lastParameters = SpawnerParameters.Default;
     SpawnerParameters warningParameters = SpawnerParameters.Default;
 
@@ -82,7 +82,7 @@ public class SplineSeparationSpawner : MonoBehaviour
             Clear();
         }
 
-        if( parameters.IsDifferentFrom( lastParameters ) || changeDetector.IsDifferentFrom( parameters.spline ) )
+        if( parameters.IsDifferentFrom( lastParameters ) || splineSnapshot.IsDifferentFrom( parameters.spline ) )
         {
             AutoRegenerate();
         }
@@ -132,7 +132,7 @@ public class SplineSeparationSpawner : MonoBehaviour
         lastParameters = parameters;
 
         SplineResult splineResult = parameters.spline.GetResultAtT( 0 );
-        changeDetector = new SplineChangeDetector( parameters.spline );
+        splineSnapshot = new SplineSnapshot( parameters.spline );
 
         while( splineResult.t < 1 )
         {

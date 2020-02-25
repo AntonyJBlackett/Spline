@@ -20,7 +20,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     public bool regenerate = false;
     public bool autoRegenerate = false;
 
-    SplineChangeDetector changeDetector;
+    SplineSnapshot changeDetector;
 
     [SerializeField]
     [HideInInspector]
@@ -158,7 +158,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 
         CleanUpUnusedInstances();
 
-        changeDetector = new SplineChangeDetector( spline );
+        changeDetector = new SplineSnapshot( spline );
     }
 
     void Clear()
