@@ -1,6 +1,9 @@
 ﻿using UnityEngine;
 using FantasticSplines;
-using System.Collections.Generic;
+
+// Authors: Antony Blackett
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
 
 [ExecuteInEditMode]
 public class SplineSeparationSpawner : MonoBehaviour
@@ -55,14 +58,14 @@ public class SplineSeparationSpawner : MonoBehaviour
     SpawnerParameters lastParameters = SpawnerParameters.Default;
     SpawnerParameters warningParameters = SpawnerParameters.Default;
 
+    [HideInInspector]
+    [SerializeField]
+    PrefabInstanceBucket instanceBucket;
+
     void Clear()
     {
         clear = false;
-        int count = transform.childCount;
-        for( int i = 0; i < count; ++i )
-        {
-            DestroyImmediate( transform.GetChild( 0 ).gameObject );
-        }
+        instanceBucket.Clear();
     }
 
     private void OnDrawGizmos()
@@ -82,26 +85,35 @@ public class SplineSeparationSpawner : MonoBehaviour
             Clear();
         }
 
-        if( parameters.IsDifferentFrom( lastParameters ) || splineSnapshot.IsDifferentFrom( parameters.spline ) )
-        {
-            AutoRegenerate();
-        }
+        AutoRegenerate();
     }
 
     void AutoRegenerate()
     {
         if( autoRegenerate )
         {
-            Regenerate();
+            if( parameters.spline == null )
+            {
+                Clear();
+                return;
+            }
+            if( parameters.IsDifferentFrom( lastParameters ) || splineSnapshot.IsDifferentFrom( parameters.spline ) )
+            {
+                Regenerate();
+            }
         }
     }
 
     void Regenerate()
     {
-        parameters = parameters.Constrain();
+        if( instanceBucket == null )
+        {
+            instanceBucket = PrefabInstanceBucket.Instantiate( transform );
+        }
+        instanceBucket.DeactivateInstances();
 
+        parameters = parameters.Constrain();
         regenerate = false;
-        Clear();
 
         bool escape = false;
         bool warn = warningParameters.IsDifferentFrom( parameters );
@@ -136,8 +148,11 @@ public class SplineSeparationSpawner : MonoBehaviour
 
         while( splineResult.t < 1 )
         {
-            GameObject instance = Instantiate( parameters.prefab, transform );
+            GameObject instance = instanceBucket.GetInstance( parameters.prefab );
             instance.SetActive( true );
+
+            splineResult = splineResult.ConvertTransform( parameters.spline.transform, transform );
+
             instance.transform.position = splineResult.position;
             instance.transform.rotation = Quaternion.LookRotation( splineResult.tangent, Vector3.up );
 
@@ -153,5 +168,7 @@ public class SplineSeparationSpawner : MonoBehaviour
                     return;
             }
         }
+
+        instanceBucket.CleanUpUnusedInstances();
     }
 }

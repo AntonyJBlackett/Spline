@@ -1,11 +1,13 @@
-﻿using System.Collections;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using UnityEngine;
-using FantasticSplines;
 #if UNITY_EDITOR
 using UnityEditor;
-using UnityEngine.UIElements;
 #endif
+
+
+// Authors: Antony Blackett
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
 
 namespace FantasticSplines
 {
@@ -27,7 +29,7 @@ namespace FantasticSplines
 
         bool IsNodeIndexInRange(int index)
         {
-            return MathHelper.IsInArrayRange( index, GetNodeCount() );
+            return MathsUtils.IsInArrayRange( index, GetNodeCount() );
         }
 
         Vector3 InverseTransformPoint(Vector3 point)

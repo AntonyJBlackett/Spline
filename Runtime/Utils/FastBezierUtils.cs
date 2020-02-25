@@ -1,5 +1,14 @@
 ﻿using UnityEngine;
 
+// Authors: Antony Blackett, Matthew Clark
+//
+// FastBezier utility is a converstion of FastBezier c# from 'HTD' on github along with some added additions.
+// The original can be found here https://github.com/HTD/FastBezier
+// HTD credits Adrian Colomitchi and Dave Eberly for the original theory. See the bottom of his github page.
+// HTD lists the license for FastBezier as Free and Open Source. 
+// Therefore FastBezierUtils.cs is also Free and Open Source, but the rest of Fantastic Spline is not.
+// For more info contact me at: antony@fantasticfoundry.com
+
 namespace FantasticSplines
 {
     public static class Utils
@@ -413,10 +422,10 @@ namespace FantasticSplines
         public static Bezier3 ProjectToPlane(Bezier3 curve, Vector3 planePoint, Vector3 planeNormal)
         {
             Bezier3 result = curve;
-            result.A = MathHelper.LinePlaneIntersection( curve.A, planeNormal, planePoint, planeNormal );
-            result.B = MathHelper.LinePlaneIntersection( curve.B, planeNormal, planePoint, planeNormal );
-            result.C = MathHelper.LinePlaneIntersection( curve.C, planeNormal, planePoint, planeNormal );
-            result.D = MathHelper.LinePlaneIntersection( curve.D, planeNormal, planePoint, planeNormal );
+            result.A = MathsUtils.LinePlaneIntersection( curve.A, planeNormal, planePoint, planeNormal );
+            result.B = MathsUtils.LinePlaneIntersection( curve.B, planeNormal, planePoint, planeNormal );
+            result.C = MathsUtils.LinePlaneIntersection( curve.C, planeNormal, planePoint, planeNormal );
+            result.D = MathsUtils.LinePlaneIntersection( curve.D, planeNormal, planePoint, planeNormal );
             return result;
         }
 

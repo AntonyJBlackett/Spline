@@ -1,7 +1,10 @@
 ﻿using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
-using System.Linq;
+
+// Authors: Antony Blackett
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
 
 namespace FantasticSplines
 {
@@ -183,7 +186,7 @@ namespace FantasticSplines
                 adjoiningPointPosition = spline.GetNode( adjoiningIndex ).position;
             }
 
-            planePosition = MathHelper.LinePlaneIntersection( adjoiningPointPosition, transform.up, transform.position, transform.up );
+            planePosition = MathsUtils.LinePlaneIntersection( adjoiningPointPosition, transform.up, transform.position, transform.up );
             planeOffset = adjoiningPointPosition - planePosition;
         }
 
@@ -835,7 +838,7 @@ namespace FantasticSplines
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 Vector3 point = spline.GetNode( i ).position;
-                Vector3 pointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
+                Vector3 pointOnPlane = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
                 Handles.DrawDottedLine( pointOnPlane, point, 2 );
             }
         }
@@ -845,7 +848,7 @@ namespace FantasticSplines
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 Vector3 point = spline.GetNode( i ).position;
-                Vector3 pointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
+                Vector3 pointOnPlane = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
                 if( i < spline.GetNodeCount() - 1 )
                 {
                     Vector3 nextPoint = spline.GetNode( i + 1 ).position;
@@ -861,11 +864,11 @@ namespace FantasticSplines
 
         static void DrawBezierSegmentOnPlane(Vector3 planeOrigin, Vector3 planeNormal, SplineNode node1, SplineNode node2)
         {
-            Vector3 pointOnPlane1 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node1.position );
-            Vector3 pointOnPlane2 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node2.position );
+            Vector3 pointOnPlane1 = MathsUtils.ProjectPointOnPlane( planeOrigin, planeNormal, node1.position );
+            Vector3 pointOnPlane2 = MathsUtils.ProjectPointOnPlane( planeOrigin, planeNormal, node2.position );
 
-            Vector3 tangentFlat1 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node1.position + node1.Control2 );
-            Vector3 tangentFlat2 = MathHelper.ProjectPointOnPlane( planeOrigin, planeNormal, node2.position + node2.Control1 );
+            Vector3 tangentFlat1 = MathsUtils.ProjectPointOnPlane( planeOrigin, planeNormal, node1.position + node1.Control2 );
+            Vector3 tangentFlat2 = MathsUtils.ProjectPointOnPlane( planeOrigin, planeNormal, node2.position + node2.Control1 );
 
             Handles.DrawBezier( pointOnPlane1, pointOnPlane2, tangentFlat1, tangentFlat2, Color.grey, null, 2.5f );
         }
@@ -906,11 +909,11 @@ namespace FantasticSplines
             for( int i = 0; i < spline.GetNodeCount(); ++i )
             {
                 Vector3 point = spline.GetNode( i ).position;
-                Vector3 pointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
+                Vector3 pointOnPlane = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point );
                 if( i < spline.GetNodeCount() - 1 )
                 {
                     Vector3 nextPoint = spline.GetNode( i + 1 ).position;
-                    Vector3 nextPointOnPlane = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, nextPoint );
+                    Vector3 nextPointOnPlane = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, nextPoint );
                     Handles.DrawDottedLine( pointOnPlane, nextPointOnPlane, 2 );
                 }
             }
@@ -931,7 +934,7 @@ namespace FantasticSplines
                 int index = nodeSelection[i];
 
                 Vector3 point = spline.GetNode( index ).position;
-                Vector3 planePoint = MathHelper.ProjectPointOnPlane( transform.position, transform.up, point );
+                Vector3 planePoint = MathsUtils.ProjectPointOnPlane( transform.position, transform.up, point );
                 DrawWireDisk( point, transform.up, diskRadius, Camera.current.transform.position );
                 DrawWireDisk( planePoint, transform.up, diskRadius, Camera.current.transform.position );
 
@@ -1061,7 +1064,10 @@ namespace FantasticSplines
         {
             nodeSelection.Clear();
             editMode = SplineEditMode.None;
-            EditorUtility.SetDirty( spline.GetComponent() );
+            if( spline != null )
+            {
+                EditorUtility.SetDirty( spline.GetComponent() );
+            }
         }
 
         List<int> GetSelectedNodeOrAllIndicies(IEditableSpline spline)
@@ -1340,7 +1346,7 @@ namespace FantasticSplines
         static Vector3 GetPointPlacement(Camera camera, Vector2 mousePosition, Vector3 origin, Vector3 up, ref Vector3 planePoint, ref Vector3 planeOffset, bool verticalDisplace, bool intersectPhsyics, bool snapToGrid)
         {
             Ray mouseRay = MousePositionToRay( camera, mousePosition );
-            Vector3 mouseWorldPosition = MathHelper.LinePlaneIntersection( mouseRay, origin + planeOffset, up );
+            Vector3 mouseWorldPosition = MathsUtils.LinePlaneIntersection( mouseRay, origin + planeOffset, up );
 
             if( intersectPhsyics )
             {
@@ -1348,14 +1354,14 @@ namespace FantasticSplines
                 if( Physics.Raycast( mouseRay, out hit ) )
                 {
                     mouseWorldPosition = hit.point;
-                    planePoint = MathHelper.LinePlaneIntersection( mouseWorldPosition, up, origin, up );
+                    planePoint = MathsUtils.LinePlaneIntersection( mouseWorldPosition, up, origin, up );
                     planeOffset = mouseWorldPosition - planePoint;
                 }
             }
             else if( verticalDisplace )
             {
                 Vector3 verticalPlaneNormal = Vector3.Cross( up, Vector3.Cross( up, mouseRay.direction ) );
-                mouseWorldPosition = MathHelper.LinePlaneIntersection( mouseRay, planePoint, verticalPlaneNormal );
+                mouseWorldPosition = MathsUtils.LinePlaneIntersection( mouseRay, planePoint, verticalPlaneNormal );
                 planeOffset = planeOffset + up * Vector3.Dot( up, mouseWorldPosition - (planePoint + planeOffset) );
             }
             else
@@ -1382,8 +1388,8 @@ namespace FantasticSplines
             Camera camera = Camera.current;
             Transform transform = spline.GetTransform();
 
-            Vector3 controlPlane1 = MathHelper.ProjectPointOnPlane( point, transform.up, control1 );
-            Vector3 controlPlane2 = MathHelper.ProjectPointOnPlane( point, transform.up, control2 );
+            Vector3 controlPlane1 = MathsUtils.ProjectPointOnPlane( point, transform.up, control1 );
+            Vector3 controlPlane2 = MathsUtils.ProjectPointOnPlane( point, transform.up, control2 );
 
             Handles.color = controlColour;
             // draw control placement GUI
@@ -1462,7 +1468,7 @@ namespace FantasticSplines
                 connectingNodePosition = spline.GetNode( adjoiningIndex ).position;
             }
 
-            Vector3 connectingPlanePoint = MathHelper.ProjectPointOnPlane( transform.position, transform.up, connectingNodePosition );
+            Vector3 connectingPlanePoint = MathsUtils.ProjectPointOnPlane( transform.position, transform.up, connectingNodePosition );
 
             if( addNodeState == AddNodeState.NodePosition )
             {
@@ -1641,7 +1647,7 @@ namespace FantasticSplines
             SplineResult closestToRay = spline.GetResultClosestTo( mouseRay );
             Vector3 newNodePosition = closestToRay.position;
 
-            planePosition = MathHelper.LinePlaneIntersection( newNodePosition, transform.up, transform.position, transform.up );
+            planePosition = MathsUtils.LinePlaneIntersection( newNodePosition, transform.up, transform.position, transform.up );
             planeOffset = newNodePosition - planePosition;
 
             // new point
@@ -1731,14 +1737,14 @@ namespace FantasticSplines
                 if( result.selectedType == MoveControlPointId.Control2
                     || result.selectedType == MoveControlPointId.Unknown )
                 {
-                    controlPlanePosition = MathHelper.ProjectPointOnPlane( node.position, spline.GetTransform().up, node.Control2Position );
+                    controlPlanePosition = MathsUtils.ProjectPointOnPlane( node.position, spline.GetTransform().up, node.Control2Position );
                     controlPlaneOffset = node.Control2Position - controlPlanePosition;
 
                     moveNodeState = new MoveNodeState( result.nodeIndex, result.selectedType, node.Control2Position );
                 }
                 else if( result.selectedType == MoveControlPointId.Control1 )
                 {
-                    controlPlanePosition = MathHelper.ProjectPointOnPlane( node.position, spline.GetTransform().up, node.Control1Position );
+                    controlPlanePosition = MathsUtils.ProjectPointOnPlane( node.position, spline.GetTransform().up, node.Control1Position );
                     controlPlaneOffset = node.Control1Position - controlPlanePosition;
                     moveNodeState = new MoveNodeState( result.nodeIndex, result.selectedType, node.Control1Position );
                 }
@@ -1749,7 +1755,7 @@ namespace FantasticSplines
 
                 if( moveNodeState.Moving )
                 {
-                    planePosition = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, node.position );
+                    planePosition = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, node.position );
                     planeOffset = node.position - planePosition;
                 }
             }
@@ -1794,14 +1800,14 @@ namespace FantasticSplines
                         Vector3 screenPoint = Camera.current.WorldToScreenPoint( moveNodeState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
                         Ray projectionRay = Camera.current.ScreenPointToRay( screenPoint );
                         Vector3 verticalPlaneNormal = Vector3.Cross( transform.up, Vector3.Cross( transform.up, projectionRay.direction ) );
-                        Vector3 screenWorldPosition = MathHelper.LinePlaneIntersection( projectionRay, moveNodeState.CurrentPosition, verticalPlaneNormal );
+                        Vector3 screenWorldPosition = MathsUtils.LinePlaneIntersection( projectionRay, moveNodeState.CurrentPosition, verticalPlaneNormal );
                         newPoint = moveNodeState.CurrentPosition + transform.up * Vector3.Dot( transform.up, screenWorldPosition - moveNodeState.CurrentPosition );
                     }
                     else
                     {
                         // relative pointer tracking
                         Vector3 screenPoint = Camera.current.WorldToScreenPoint( moveNodeState.CurrentPosition ) + new Vector3( screenDelta.x, screenDelta.y, 0 );
-                        newPoint = MathHelper.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), moveNodeState.CurrentPosition, transform.up );
+                        newPoint = MathsUtils.LinePlaneIntersection( Camera.current.ScreenPointToRay( screenPoint ), moveNodeState.CurrentPosition, transform.up );
                     }
                 }
 
@@ -1847,13 +1853,13 @@ namespace FantasticSplines
                             float directionTestBackward = 0;
                             if( spline.GetNodeCount() > moveNodeState.NodeIndex + 1 || spline.IsLoop() )
                             {
-                                int nextIndex = MathHelper.WrapIndex( moveNodeState.NodeIndex + 1, spline.GetNodeCount() );
+                                int nextIndex = MathsUtils.WrapIndex( moveNodeState.NodeIndex + 1, spline.GetNodeCount() );
                                 directionTestForward = Vector3.Dot( totalMovement.normalized, (spline.GetNode( nextIndex ).position - node.position).normalized );
                             }
 
                             if( moveNodeState.NodeIndex - 1 >= 0 || spline.IsLoop() )
                             {
-                                int nextIndex = MathHelper.WrapIndex( moveNodeState.NodeIndex - 1, spline.GetNodeCount() );
+                                int nextIndex = MathsUtils.WrapIndex( moveNodeState.NodeIndex - 1, spline.GetNodeCount() );
                                 directionTestBackward = Vector3.Dot( totalMovement.normalized, (spline.GetNode( moveNodeState.NodeIndex - 1 ).position - node.position).normalized );
                             }
 
@@ -1868,7 +1874,7 @@ namespace FantasticSplines
                                 worldControl = node.position + node.Control1;
                             }
 
-                            controlPlanePosition = MathHelper.ProjectPointOnPlane( node.position, spline.GetTransform().up, worldControl );
+                            controlPlanePosition = MathsUtils.ProjectPointOnPlane( node.position, spline.GetTransform().up, worldControl );
                             controlPlaneOffset = worldControl - controlPlanePosition;
                         }
 
@@ -1896,7 +1902,7 @@ namespace FantasticSplines
                     moveNodeState.LastSnappedMovement = snappedMovement;
 
                     SplineNode latestNode = spline.GetNode( moveNodeState.NodeIndex );
-                    planePosition = MathHelper.ProjectPointOnPlane( transform.position, transform.up, latestNode.position );
+                    planePosition = MathsUtils.ProjectPointOnPlane( transform.position, transform.up, latestNode.position );
                     planeOffset = latestNode.position - planePosition;
                 }
 
@@ -2026,9 +2032,9 @@ namespace FantasticSplines
                 int index = nodeIndicies[i];
                 SplineNode point = spline.GetNode( index );
 
-                point.position = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.position );
-                point.Control1 = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.Control1 + point.position ) - point.position;
-                point.Control2 = MathHelper.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.Control2 + point.position ) - point.position;
+                point.position = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.position );
+                point.Control1 = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.Control1 + point.position ) - point.position;
+                point.Control2 = MathsUtils.ProjectPointOnPlane( spline.GetTransform().position, spline.GetTransform().up, point.Control2 + point.position ) - point.position;
 
                 spline.SetNode( index, point );
             }

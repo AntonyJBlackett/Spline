@@ -1,5 +1,10 @@
-﻿using System.Collections.Generic;
+﻿
 using UnityEngine;
+
+// Authors: Antony Blackett
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
+
 namespace FantasticSplines
 {
     public struct SegmentResult
@@ -62,6 +67,16 @@ namespace FantasticSplines
                 };
             }
         }
+
+        // transforms the result from spline component space to transform space.
+        // Useful for instancing objects in multiple locations with a single spline.
+        public SplineResult ConvertTransform(Transform originalTransform, Transform newTransform)
+        {
+            SplineResult result = this;
+            result.segmentResult.position = newTransform.TransformPoint( originalTransform.InverseTransformPoint( position ) );
+            result.segmentResult.tangent = newTransform.TransformVector( originalTransform.InverseTransformVector( tangent ) );
+            return result;
+        }
     }
 
     // Proxy interfact to enable tools to easily use the spline editor in their own editors
@@ -106,6 +121,7 @@ namespace FantasticSplines
     // No rotations, no colours, no normals
     public interface ISpline
     {
+        Transform GetTransform();
         int GetUpdateCount();
         SplineResult GetResultAtT(float splineT);
         SplineResult GetResultAtDistance(float splineDistance);

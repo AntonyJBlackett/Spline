@@ -1,7 +1,8 @@
-using System.Collections;
-using System.Collections.Generic;
-using UnityEditor;
 using UnityEngine;
+
+// Authors: Antony Blackett, Matthew Clark
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
 
 namespace FantasticSplines
 {
@@ -91,7 +92,7 @@ namespace FantasticSplines
                 Debug.Break();
             }
 
-            return MathHelper.Remap( d, tdMapping[low].d, tdMapping[high].d, tdMapping[low].t, tdMapping[high].t );
+            return MathsUtils.Remap( d, tdMapping[low].d, tdMapping[high].d, tdMapping[low].t, tdMapping[high].t );
         }
 
         public float GetDistance(float t)
@@ -110,7 +111,7 @@ namespace FantasticSplines
             Debug.Assert( low + 1 == high );
 #endif
 
-            return MathHelper.Remap( t, tdMapping[low].t, tdMapping[high].t, tdMapping[low].d, tdMapping[high].d );
+            return MathsUtils.Remap( t, tdMapping[low].t, tdMapping[high].t, tdMapping[low].d, tdMapping[high].d );
         }
     }
 

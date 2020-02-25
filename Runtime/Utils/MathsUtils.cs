@@ -1,9 +1,12 @@
-﻿using System;
-using UnityEngine;
+﻿using UnityEngine;
+
+// Authors: Antony Blackett
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
 
 namespace FantasticSplines
 {
-    public static class MathHelper
+    public static class MathsUtils
     {
         public static bool IsInArrayRange(int i, int Count)
         {

@@ -1,12 +1,14 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.Serialization;
 
 #if UNITY_EDITOR
 using UnityEditor;
-using UnityEngine.Assertions;
-using UnityEngine.UIElements;
-using UnityEngine.Serialization;
 #endif
+
+// Authors: Antony Blackett, Matthew Clark
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
 
 namespace FantasticSplines
 {
@@ -114,7 +116,7 @@ namespace FantasticSplines
 
         bool IsNodeIndexInRange(int index)
         {
-            return MathHelper.IsInArrayRange( index, NodeCount );
+            return MathsUtils.IsInArrayRange( index, NodeCount );
         }
 
         public int UpdateCount

@@ -1,6 +1,12 @@
 ﻿using UnityEngine;
 using UnityEngine.Serialization;
 
+
+// Authors: Antony Blackett
+// For more info contact me at: antony@fantasticfoundry.com
+// (C) copyright Fantastic Foundry Limited 2020, New Zealand
+
+
 namespace FantasticSplines
 {
     public enum NodeType
