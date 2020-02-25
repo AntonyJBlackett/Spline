@@ -1,0 +1,17 @@
+{
+  "name": "com.fantasticfoundry.spline",
+  "version": "0.0.1",
+  "displayName": "Fantastic Spline",
+  "description": "Simple and easy to use spline for Unity.",
+  "unity": "2019.3",
+  "dependencies": {
+ },
+ "keywords": [
+    "spline"
+  ],
+  "author": {
+    "name": "Antony Blackett",
+    "email": "antony@fantasticfoundry.com",
+    "url": "https://www.fantasticfoundry.com/spline"
+  }
+}
