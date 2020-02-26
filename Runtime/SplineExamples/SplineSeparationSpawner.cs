@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using FantasticSplines;
 
 // Authors: Antony Blackett
@@ -21,15 +22,17 @@ public class SplineSeparationSpawner : MonoBehaviour
         public GameObject prefab;
         public float separation;
         public SeparationMethod separationMethod;
+        public bool retransformResult;
 
         public static SpawnerParameters Default => new SpawnerParameters() { separation = 1 };
 
         public bool Equals(SpawnerParameters other)
         {
             return spline == other.spline
-                && prefab == other.prefab
-                && Mathf.Approximately( separation, other.separation )
-                && separationMethod == other.separationMethod;
+                   && prefab == other.prefab
+                   && Mathf.Approximately(separation, other.separation)
+                   && separationMethod == other.separationMethod
+                   && retransformResult == other.retransformResult;
         }
 
         public bool IsDifferentFrom(SpawnerParameters other)
@@ -58,8 +61,6 @@ public class SplineSeparationSpawner : MonoBehaviour
     SpawnerParameters lastParameters = SpawnerParameters.Default;
     SpawnerParameters warningParameters = SpawnerParameters.Default;
 
-    [HideInInspector]
-    [SerializeField]
     PrefabInstanceBucket instanceBucket;
 
     void Clear()
@@ -71,6 +72,11 @@ public class SplineSeparationSpawner : MonoBehaviour
     private void OnDrawGizmos()
     {
         Update();
+    }
+
+    private void OnEnable()
+    {
+        instanceBucket = GetComponentInChildren<PrefabInstanceBucket>();
     }
 
     void Update()
@@ -90,17 +96,19 @@ public class SplineSeparationSpawner : MonoBehaviour
 
     void AutoRegenerate()
     {
-        if( autoRegenerate )
+        if (!autoRegenerate)
         {
-            if( parameters.spline == null )
-            {
-                Clear();
-                return;
-            }
-            if( parameters.IsDifferentFrom( lastParameters ) || splineSnapshot.IsDifferentFrom( parameters.spline ) )
-            {
-                Regenerate();
-            }
+            return;
+        }
+
+        if( parameters.spline == null )
+        {
+            Clear();
+            return;
+        }
+        if( parameters.IsDifferentFrom( lastParameters ) || splineSnapshot.IsDifferentFrom( parameters.spline ) )
+        {
+            Regenerate();
         }
     }
 
@@ -123,7 +131,7 @@ public class SplineSeparationSpawner : MonoBehaviour
             if( warn ) Debug.LogWarning( "No spline is set.", gameObject );
         }
 
-        if( parameters.separation <= 0 )
+        if( parameters.separation <= 0.0001f )
         {
             escape = true;
             if( warn ) Debug.LogWarning( "Separation needs to be greater than 0.", gameObject );
@@ -151,7 +159,10 @@ public class SplineSeparationSpawner : MonoBehaviour
             GameObject instance = instanceBucket.GetInstance( parameters.prefab );
             instance.SetActive( true );
 
-            splineResult = splineResult.ConvertTransform( parameters.spline.transform, transform );
+            if (parameters.retransformResult)
+            {
+                splineResult = splineResult.ConvertTransform(parameters.spline.transform, transform);
+            }
 
             instance.transform.position = splineResult.position;
             instance.transform.rotation = Quaternion.LookRotation( splineResult.tangent, Vector3.up );

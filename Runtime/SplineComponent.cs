@@ -191,25 +191,34 @@ namespace FantasticSplines
             int iterationsLeft = maxIterations;
 
             SplineResult currentPosition = GetResultAtDistance( startDistance );
-            SplineResult previousPosition = currentPosition;
-            Vector3 origin = currentPosition.position;
-            float worldDistanceTest = 0;
+            int startLapCount = currentPosition.lapCount;
+            float startLoopDistance = currentPosition.loopDistance;
 
+            Vector3 origin = currentPosition.position;
+
+            float currentWorldDistance;
+            SplineResult previousPosition;
             do
             {
-                // early out, there's no more spline
-                if( currentPosition.t > 1 && stepDistance > 0 )
+                if(!IsLoop() && currentPosition.t >= 1 && stepDistance >= 0 || currentPosition.t <= 0 && stepDistance < 0)
                 {
                     return currentPosition;
                 }
-                if( currentPosition.t < 0 && stepDistance < 0 )
+                else if( startLapCount != currentPosition.lapCount )
                 {
-                    return currentPosition;
+                    if( startLoopDistance < currentPosition.loopDistance && stepDistance >= 0 )
+                    {
+                        return currentPosition;
+                    }
+                    else if( startLoopDistance > currentPosition.loopDistance && stepDistance < 0 )
+                    {
+                        return currentPosition;
+                    }
                 }
 
                 previousPosition = currentPosition;
                 currentPosition = GetResultAtDistance( currentPosition.distance + stepDistance );
-                worldDistanceTest = Vector3.Distance( currentPosition.position, origin );
+                currentWorldDistance = Vector3.Distance( currentPosition.position, origin );
 
                 --iterationsLeft;
                 if( iterationsLeft < 0 )
@@ -217,15 +226,15 @@ namespace FantasticSplines
                     Debug.LogWarning( "Hit iterations limit of " + maxIterations + " in MoveUntilAtWorldDistance() on spline" );
                     break;
                 }
-            } while( worldDistanceTest < worldDistance );
+            } while( currentWorldDistance < worldDistance );
 
             if( maxIterations - iterationsLeft > 10 )
             {
                 Debug.LogWarning( "Increase step distance for better performance. Num iterations to resolve: " + (maxIterations - iterationsLeft).ToString() );
             }
 
-            float lastWorldDistanceTest = Vector3.Distance( previousPosition.position, origin );
-            float lerpT = Mathf.InverseLerp( lastWorldDistanceTest, worldDistanceTest, worldDistance );
+            float previousWorldDistance = Vector3.Distance( previousPosition.position, origin );
+            float lerpT = Mathf.InverseLerp( previousWorldDistance, currentWorldDistance, worldDistance );
 
             return GetResultAtDistance( currentPosition.distance - stepDistance + (stepDistance * lerpT) );
         }

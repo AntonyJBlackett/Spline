@@ -16,9 +16,9 @@ namespace FantasticSplines
     {
         public static SplineNode SplitAt(ref SplineNode node1, ref SplineNode node2, float t)
         {
-            Bezier3 segement = new Bezier3( node1, node2 );
-            Bezier3 leftSplit = segement.LeftSplitAt( t );
-            Bezier3 rightSplit = segement.RightSplitAt( t );
+            Bezier3 segment = new Bezier3( node1, node2 );
+            Bezier3 leftSplit = segment.LeftSplitAt( t );
+            Bezier3 rightSplit = segment.RightSplitAt( t );
 
             bool wasPoint = node1.NodeType == NodeType.Point;
             SplineNode split = new SplineNode( leftSplit.end, leftSplit.endControl, rightSplit.startControl );
@@ -242,13 +242,13 @@ namespace FantasticSplines
 
         public Bezier3 CalculateSegment(int segment)
         {
-            segment = LoopSegementIndex( segment );
+            segment = LoopSegmentIndex( segment );
             int index1 = segment;
             int index2 = LoopNodeIndex( segment + 1 );
             return new Bezier3( nodes[index1], nodes[index2] );
         }
 
-        int LoopSegementIndex(int segment)
+        int LoopSegmentIndex(int segment)
         {
             if( loop && SegmentCount > 0 )
             {
@@ -279,7 +279,7 @@ namespace FantasticSplines
             {
                 return Mathf.Repeat( distance, Length );
             }
-
+        
             return Mathf.Clamp( distance, 0f, Length );
         }
 
@@ -374,7 +374,7 @@ namespace FantasticSplines
             }
 
             EnsureCacheIsUpdated();
-            segmentIndex = LoopSegementIndex( segmentIndex );
+            segmentIndex = LoopSegmentIndex( segmentIndex );
             return GetResultAtDistance( segments[segmentIndex].startDistanceInSpline + segmentDistance );
         }
 
@@ -386,7 +386,7 @@ namespace FantasticSplines
             }
 
             EnsureCacheIsUpdated();
-            segmentIndex = LoopSegementIndex( segmentIndex );
+            segmentIndex = LoopSegmentIndex( segmentIndex );
             return GetResultAtDistance( segments[segmentIndex].startDistanceInSpline + segmentT * segments[segmentIndex].Length );
         }
 

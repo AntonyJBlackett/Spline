@@ -74,6 +74,7 @@ public class PrefabInstanceBucket : MonoBehaviour
             return InstantiatePrefabOrGameObject( prefabOrGameObject, transform );
         }
 
+        instance.SetActive(prefabOrGameObject.activeSelf);
         return instance;
     }
 
