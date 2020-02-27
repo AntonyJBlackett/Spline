@@ -475,14 +475,14 @@ namespace FantasticSplines
             return GetSplineResult( bestDistance );
         }
 
-        public void OnDrawGizmos(Color color)
+        public void OnDrawGizmos(Color color, float gizmoScale)
         {
 #if UNITY_EDITOR
             EnsureCacheIsUpdated();
             for( int i = 0; i < segments.Length; ++i )
             {
                 Bezier3 bezier = segments[i].bezier;
-                Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, color * .9f, null, 2f );
+                Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, color * .9f, null, 3f );
             }
 
             // this stops selection of the spline when we're doing other things.
@@ -491,7 +491,7 @@ namespace FantasticSplines
                 Gizmos.color = Color.white;
                 for( int i = 0; i < NodeCount; ++i )
                 {
-                    Gizmos.DrawSphere( nodes[i].position, 0.05f );
+                    Gizmos.DrawSphere( nodes[i].position, 0.05f * gizmoScale );
                 }
             }
 #endif

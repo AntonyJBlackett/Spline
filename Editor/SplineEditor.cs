@@ -91,7 +91,7 @@ namespace FantasticSplines
             return bounds;
         }
 
-        Bounds GetBounds(IEditableSpline spline)
+        static Bounds GetBounds(IEditableSpline spline)
         {
             Bounds bounds = new Bounds( spline.GetNode( 0 ).position, Vector3.zero );
             for( int i = 1; i < spline.GetNodeCount(); ++i )
@@ -103,15 +103,7 @@ namespace FantasticSplines
 
         public void FrameCamera(IEditableSpline spline)
         {
-            Bounds bounds;
-            if( nodeSelection.Count > 0 )
-            {
-                bounds = GetSelectionBounds( spline );
-            }
-            else
-            {
-                bounds = GetBounds( spline );
-            }
+            Bounds bounds = nodeSelection.Count > 0 ? GetSelectionBounds( spline ) : GetBounds( spline );
             SceneView.lastActiveSceneView.Frame( bounds, false );
         }
 
@@ -372,7 +364,8 @@ namespace FantasticSplines
                 if( foldoutGizmos )
                 {
                     EditorGUILayout.LabelField( "Node Gizmo Size" );
-                    HandleCapScale = EditorGUILayout.Slider( HandleCapScale, 0.1f, 10 );
+                    HandleCapScale = EditorGUILayout.Slider(HandleCapScale, 0.1f, 10);
+                    spline.SetGizmoScale( HandleCapScale );
                     spline.SetColor( EditorGUILayout.ColorField( "Spline Colour", spline.GetColor() ) );
 
                     spline.SetZTest( DoToggleButton( spline.GetZTest(), "ZTest" ) );
@@ -983,6 +976,14 @@ namespace FantasticSplines
             }
         }
 
+        void DrawSplineSelectionNodeControlPoints( IEditableSpline spline, List<int> nodeIndicies )
+        {
+            for( int i = 0; i < nodeIndicies.Count; ++i )
+            {
+                DrawNodeControlPoints( spline, nodeIndicies[i] );
+            }
+        }
+
         void DrawSplineSelectionNodeControlPoints(IEditableSpline spline)
         {
             if( !ShowNodeControls )
@@ -990,20 +991,7 @@ namespace FantasticSplines
                 return;
             }
 
-            if( nodeSelection.Count > 0 )
-            {
-                for( int i = 0; i < nodeSelection.Count; ++i )
-                {
-                    DrawNodeControlPoints( spline, nodeSelection[i] );
-                }
-            }
-            else
-            {
-                for( int i = 0; i < spline.GetNodeCount(); ++i )
-                {
-                    DrawNodeControlPoints( spline, i );
-                }
-            }
+            DrawSplineSelectionNodeControlPoints( spline, GetSelectedNodeOrAllIndicies( spline ) );
         }
 
         void DrawSpline(IEditableSpline spline)
@@ -1062,6 +1050,11 @@ namespace FantasticSplines
 
         void ClearNodeSelection(IEditableSpline spline)
         {
+            if(spline == null)
+            {
+                return;
+            }
+
             nodeSelection.Clear();
             editMode = SplineEditMode.None;
             if( spline != null )

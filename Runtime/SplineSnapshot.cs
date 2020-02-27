@@ -8,17 +8,17 @@ using UnityEngine;
 [System.Serializable]
 public struct SplineSnapshot
 {
-    readonly ISpline spline;
-    readonly bool wasNotNull;
-    readonly int updateCount;
-    readonly Matrix4x4 matrix;
+    [SerializeField] ISpline spline;
+    [SerializeField] bool wasNotNull;
+    [SerializeField] int updateCount;
+    [SerializeField] Matrix4x4 matrix;
 
     public SplineSnapshot(ISpline spline)
     {
         this.spline = spline;
         wasNotNull = spline != null;
-        updateCount = wasNotNull ? spline.GetUpdateCount() : 0;
-        matrix = wasNotNull ? spline.GetTransform().localToWorldMatrix : Matrix4x4.identity;
+        updateCount = spline != null ? spline.GetUpdateCount() : 0;
+        matrix = spline != null ? spline.GetTransform().localToWorldMatrix : Matrix4x4.identity;
     }
 
     public bool EqualsSnapshot(ISpline compare)

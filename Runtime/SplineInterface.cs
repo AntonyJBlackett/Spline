@@ -114,6 +114,8 @@ namespace FantasticSplines
         void SetColor(Color newColor);
         bool GetZTest();
         void SetZTest(bool test);
+        float GetGizmoScale();
+        void SetGizmoScale(float newScale);
         void DrawSegmentLengths();
     }
 

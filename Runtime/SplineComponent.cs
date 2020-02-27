@@ -261,6 +261,9 @@ namespace FantasticSplines
         [SerializeField] [HideInInspector] bool zTest = false;
         public bool GetZTest() { return zTest; }
         public void SetZTest(bool test) { zTest = test; }
+        [SerializeField] [HideInInspector] float gizmoScale = 1;
+        public float GetGizmoScale() { return gizmoScale; }
+        public void SetGizmoScale(float newscale) { gizmoScale = newscale; }
 
 #if UNITY_EDITOR
         void OnDrawGizmos()
@@ -270,7 +273,7 @@ namespace FantasticSplines
                 Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
                 Gizmos.matrix = transform.localToWorldMatrix;
                 Handles.matrix = transform.localToWorldMatrix;
-                curve.OnDrawGizmos( GetColor() );
+                curve.OnDrawGizmos( GetColor(), gizmoScale );
                 Gizmos.matrix = Matrix4x4.identity;
                 Handles.matrix = Matrix4x4.identity;
                 Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;

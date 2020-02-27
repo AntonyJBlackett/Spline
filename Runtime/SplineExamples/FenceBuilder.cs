@@ -1,8 +1,8 @@
 ﻿using UnityEngine;
 using FantasticSplines;
-
 #if UNITY_EDITOR
 using UnityEditor;
+
 #endif
 
 // Authors: Antony Blackett
@@ -29,8 +29,15 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     }
 
     // can now use the spline editor when this object is selected
-    public IEditableSpline GetEditableSpline() { return parameters.spline; }
-    public Object GetUndoObject() { return parameters.spline; }
+    public IEditableSpline GetEditableSpline()
+    {
+        return parameters.spline;
+    }
+
+    public Object GetUndoObject()
+    {
+        return parameters.spline;
+    }
 
     [System.Serializable]
     public struct FenceSpawnerParameters
@@ -46,21 +53,21 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
 
         public float Scale => scaleOffset + 1;
 
-        public bool Equals(FenceSpawnerParameters other)
+        public bool Equals( FenceSpawnerParameters other )
         {
             return spline == other.spline
-                && post == other.post
-                && segment == other.segment
-                && segmentForwardAxis == other.segmentForwardAxis
-                && boundsType == other.boundsType
-                && boundsAlignmentScalar == other.boundsAlignmentScalar
-                && Mathf.Approximately( scaleOffset, other.scaleOffset )
-                && Mathf.Approximately(padding, other.padding);
+                   && post == other.post
+                   && segment == other.segment
+                   && segmentForwardAxis == other.segmentForwardAxis
+                   && boundsType == other.boundsType
+                   && boundsAlignmentScalar == other.boundsAlignmentScalar
+                   && Mathf.Approximately( scaleOffset, other.scaleOffset )
+                   && Mathf.Approximately( padding, other.padding );
         }
 
-        public bool IsDifferentFrom(FenceSpawnerParameters other)
+        public bool IsDifferentFrom( FenceSpawnerParameters other )
         {
-            return !Equals(other);
+            return !Equals( other );
         }
     }
 
@@ -70,12 +77,12 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     public bool regenerate = false;
     public bool autoRegenerate = false;
 
-    SplineSnapshot changeDetector;
-    FenceSpawnerParameters lastParameters;
+    [SerializeField][HideInInspector] SplineSnapshot changeDetector;
+    [SerializeField][HideInInspector] FenceSpawnerParameters lastParameters;
 
     PrefabInstanceBucket instanceBucket;
 
-    private void OnEnable() 
+    private void OnEnable()
     {
         instanceBucket = GetComponentInChildren<PrefabInstanceBucket>();
     }
@@ -104,7 +111,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
     {
         if( autoRegenerate )
         {
-            if(parameters.spline == null )
+            if( parameters.spline == null )
             {
                 Clear();
                 return;
@@ -127,18 +134,23 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         regenerate = false;
         instanceBucket.DeactivateInstances();
 
+        bool warn = lastParameters.IsDifferentFrom( parameters ) || changeDetector.IsDifferentFrom( parameters.spline );
+
         bool escape = false;
-        if(parameters.spline == null )
+        if( parameters.spline == null )
         {
             escape = true;
-            Debug.LogWarning( "No spline is set.", gameObject );
+            if( warn ) Debug.LogWarning( "No spline is set.", gameObject );
         }
 
         if( parameters.segment == null )
         {
             escape = true;
-            Debug.LogWarning( "No prefab set.", gameObject );
+            if( warn ) Debug.LogWarning( "No prefab set.", gameObject );
         }
+
+        changeDetector = new SplineSnapshot( parameters.spline );
+        lastParameters = parameters;
 
         if( escape )
         {
@@ -149,7 +161,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         float segmentLength = parameters.segment.transform.localScale.z;
         Quaternion axisRotation = Quaternion.identity;
         Bounds segmentBounds = new Bounds( Vector3.zero, parameters.segment.transform.localScale );
-        switch(parameters.boundsType )
+        switch( parameters.boundsType )
         {
             case BoundsType.Collider:
                 Collider segmentCollider = parameters.segment.GetComponentInChildren<Collider>();
@@ -166,6 +178,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
                         segmentBounds = mesh.bounds;
                     }
                 }
+
                 break;
             case BoundsType.Renderer:
                 Renderer segmentRenderer = parameters.segment.GetComponentInChildren<Renderer>();
@@ -206,30 +219,29 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         segmentLength *= parameters.Scale;
 
         float worldDistance = segmentLength + parameters.padding;
-        if (worldDistance < parameters.spline.GetLength() * 0.001f)
+        if( worldDistance < parameters.spline.GetLength() * 0.001f )
         {
-            Debug.LogWarning("worldDistance is too small we may loop forever!");
+            Debug.LogWarning( "worldDistance is too small we may loop forever!" );
             return;
         }
 
         float step = worldDistance * 0.5f;
-        SplineResult post2Position = parameters.spline.GetResultAtWorldDistanceFrom(post1Position.distance, worldDistance, step);
+        SplineResult post2Position =
+            parameters.spline.GetResultAtWorldDistanceFrom( post1Position.distance, worldDistance, step );
 
         // first segment
         if( parameters.post != null )
         {
-            SpawnObject(parameters.post, post1Position.position, Quaternion.LookRotation(post2Position.tangent, Vector3.up), parameters.Scale);
+            SpawnObject( parameters.post, post1Position.position,
+                Quaternion.LookRotation( post2Position.tangent, Vector3.up ), parameters.Scale );
         }
 
         float splineLength = parameters.spline.GetLength();
 
-
-        changeDetector = new SplineSnapshot( parameters.spline );
-        lastParameters = parameters;
-
-        if ( splineLength > 0 )
+        if( splineLength > 0 )
         {
-            int limit = Mathf.CeilToInt( 1 + splineLength / worldDistance ); // we should never need more segments than a dead straight spline needs
+            int limit = Mathf.CeilToInt( 1 + splineLength /
+                worldDistance ); // we should never need more segments than a dead straight spline needs
             while( post1Position.loopT < post2Position.loopT )
             {
                 Vector3 segmentDirection = (post2Position.position - post1Position.position).normalized;
@@ -238,20 +250,24 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
                 {
                     segmentDirection = post1Position.tangent.normalized;
                 }
+
                 Vector3 alignmentAdjustment = Vector3.Scale( segmentBounds.center, parameters.boundsAlignmentScalar );
-                Quaternion splineDirectionRotation = axisRotation * Quaternion.LookRotation( segmentDirection, Vector3.up );
+                Quaternion splineDirectionRotation =
+                    axisRotation * Quaternion.LookRotation( segmentDirection, Vector3.up );
 
-                SpawnObject(parameters.segment, segmentPosition - splineDirectionRotation * alignmentAdjustment, splineDirectionRotation, parameters.Scale);
+                SpawnObject( parameters.segment, segmentPosition - splineDirectionRotation * alignmentAdjustment,
+                    splineDirectionRotation, parameters.Scale );
 
-                if ( parameters.post != null )
+                if( parameters.post != null )
                 {
                     Vector3 nextPostPosition = post1Position.position + (segmentDirection * worldDistance);
-                    SpawnObject(parameters.post, post2Position.position, Quaternion.LookRotation( post2Position.tangent, Vector3.up), parameters.Scale);
+                    SpawnObject( parameters.post, nextPostPosition,
+                        Quaternion.LookRotation( post2Position.tangent, Vector3.up ), parameters.Scale );
                 }
 
-                Debug.DrawLine(post1Position.position, post2Position.position, Color.blue, 3);
                 post1Position = post2Position;
-                post2Position = parameters.spline.GetResultAtWorldDistanceFrom( post2Position.distance, worldDistance, step );
+                post2Position =
+                    parameters.spline.GetResultAtWorldDistanceFrom( post2Position.distance, worldDistance, step );
 
                 --limit;
                 if( limit < 0 )
@@ -265,9 +281,9 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         instanceBucket.CleanUpUnusedInstances();
     }
 
-    void SpawnObject(GameObject prefab, Vector3 position, Quaternion rotation, float scale)
+    void SpawnObject( GameObject prefab, Vector3 position, Quaternion rotation, float scale )
     {
-        GameObject postInstance = instanceBucket.GetInstance(prefab);
+        GameObject postInstance = instanceBucket.GetInstance( prefab );
         postInstance.transform.position = position;
         postInstance.transform.rotation = rotation;
         postInstance.transform.localScale = Vector3.one * scale;

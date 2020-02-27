@@ -57,9 +57,8 @@ public class SplineSeparationSpawner : MonoBehaviour
     public bool regenerate = false;
     public bool autoRegenerate = false;
 
-    SplineSnapshot splineSnapshot;
-    SpawnerParameters lastParameters = SpawnerParameters.Default;
-    SpawnerParameters warningParameters = SpawnerParameters.Default;
+    [SerializeField][HideInInspector] SplineSnapshot splineSnapshot;
+    [SerializeField][HideInInspector] SpawnerParameters lastParameters = SpawnerParameters.Default;
 
     PrefabInstanceBucket instanceBucket;
 
@@ -124,7 +123,8 @@ public class SplineSeparationSpawner : MonoBehaviour
         regenerate = false;
 
         bool escape = false;
-        bool warn = warningParameters.IsDifferentFrom( parameters );
+        bool warn = parameters.IsDifferentFrom(lastParameters) || splineSnapshot.IsDifferentFrom(parameters.spline);
+        
         if( parameters.spline == null )
         {
             escape = true;
@@ -142,17 +142,16 @@ public class SplineSeparationSpawner : MonoBehaviour
             escape = true;
             if( warn ) Debug.LogWarning( "No prefab set.", gameObject );
         }
-
-        warningParameters = parameters;
+        
+        lastParameters = parameters;
+        splineSnapshot = new SplineSnapshot( parameters.spline );
+        
         if( escape )
         {
             return;
         }
 
-        lastParameters = parameters;
-
         SplineResult splineResult = parameters.spline.GetResultAtT( 0 );
-        splineSnapshot = new SplineSnapshot( parameters.spline );
 
         while( splineResult.t < 1 )
         {
