@@ -50,39 +50,42 @@ namespace FantasticSplines
         {
             base.DoKeyframeToolHandles();
 
-            var keys = SplineNormal.Keyframes;
-            Color rotationHandleColour = Color.green;
-            using( new Handles.DrawingScope( Color.green ) )
+            if( SplineNormal.enableValueHandles )
             {
-                for( int i = 0; i < keys.Count; ++i )
+                var keys = SplineNormal.Keyframes;
+                Color rotationHandleColour = Color.green;
+                using( new Handles.DrawingScope( Color.green ) )
                 {
-                    EditorGUI.BeginChangeCheck();
-
-                    Vector3 position = keys[i].location.position;
-                    Vector3 tangent = keys[i].location.tangent;
-                    Vector3 normal = keys[i].value;
-
-                    Vector3 discNormal = tangent.normalized;
-                    float discRadius = 0.5f;
-
-                    Quaternion normalRotation = Quaternion.LookRotation( normal, tangent.normalized );
-
-                    rotationHandleColour.a = 0.5f;
-                    Handles.color = rotationHandleColour;
-
-                    if( SplineNormal.unconstrainedNormals )
+                    for( int i = 0; i < keys.Count; ++i )
                     {
-                        normalRotation = Handles.FreeRotateHandle( normalRotation, position, discRadius );
-                    }
-                    else
-                    {
-                        normalRotation = Handles.Disc( normalRotation, position, discNormal, discRadius, false, 0 );
-                    }
+                        EditorGUI.BeginChangeCheck();
 
-                    if( EditorGUI.EndChangeCheck() )
-                    {
-                        Undo.RecordObject( SplineNormal, "Rotate Spline Normal" );
-                        SplineNormal.SetKeyframeValue( i, normalRotation * Vector3.forward );
+                        Vector3 position = keys[i].location.position;
+                        Vector3 tangent = keys[i].location.tangent;
+                        Vector3 normal = keys[i].value;
+
+                        Vector3 discNormal = tangent.normalized;
+                        float discRadius = 0.5f;
+
+                        Quaternion normalRotation = Quaternion.LookRotation( normal, tangent.normalized );
+
+                        rotationHandleColour.a = 0.5f;
+                        Handles.color = rotationHandleColour;
+
+                        if( !SplineNormal.forcePerpendicularToTangent )
+                        {
+                            normalRotation = Handles.FreeRotateHandle( normalRotation, position, discRadius );
+                        }
+                        else
+                        {
+                            normalRotation = Handles.Disc( normalRotation, position, discNormal, discRadius, false, 0 );
+                        }
+
+                        if( EditorGUI.EndChangeCheck() )
+                        {
+                            Undo.RecordObject( SplineNormal, "Rotate Spline Normal" );
+                            SplineNormal.SetKeyframeValue( i, normalRotation * Vector3.forward );
+                        }
                     }
                 }
             }

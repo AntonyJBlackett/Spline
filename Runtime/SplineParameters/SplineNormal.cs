@@ -13,7 +13,8 @@ public class SplineNormal : KeyframedSplineParameter<Vector3>
     public int visualisationSamples = 50;
 
     [Header( "Spline Normal Settings" )]
-    public bool unconstrainedNormals = false;
+    public bool forceUnitLength = true;
+    public bool forcePerpendicularToTangent = true;
 
     [Header("Normal Generation")]
     public bool automaticNormals = false;
@@ -29,6 +30,12 @@ public class SplineNormal : KeyframedSplineParameter<Vector3>
     public SplineNormal()
     {
         onSplineChanged += UpdateNormalConstraints;
+        CustomInterpolator = SlerpNormals;
+    }
+
+    Vector3 SlerpNormals( ISpline spline, SplineParameterKeyframe<Vector3> first, SplineParameterKeyframe<Vector3> second, float t )
+    {
+        return Vector3.Slerp( first.value, second.value, t );
     }
 
     public override Vector3 GetDefaultKeyframeValue()
@@ -101,12 +108,26 @@ public class SplineNormal : KeyframedSplineParameter<Vector3>
 
     Vector3 ConstrainNormal( Vector3 normal, Vector3 tangentDirection )
     {
-        if( !unconstrainedNormals )
+        if( forcePerpendicularToTangent )
         {
+            float length = 1;
+            if( !forceUnitLength )
+            {
+                length = normal.magnitude;
+            }
             tangentDirection = tangentDirection.normalized;
             normal = normal.normalized;
             Vector3 biNormal = Vector3.Cross( tangentDirection, normal );
-            normal = Vector3.Cross( biNormal, tangentDirection ).normalized;
+            normal = Vector3.Cross( biNormal, tangentDirection ).normalized * length;
+        }
+
+        if( forceUnitLength )
+        {
+            if( Mathf.Approximately( normal.sqrMagnitude, 0 ) )
+            {
+                normal = GetDefaultKeyframeValue();
+            }
+            normal = normal.normalized;
         }
 
         return normal;
@@ -129,7 +150,6 @@ public class SplineNormal : KeyframedSplineParameter<Vector3>
         Vector3 normal = keyframe.value;
 
         Handles.color = Color.green;
-        Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
         Handles.DrawLine( worldPosition, worldPosition + normal, 2 );
         Handles.ConeHandleCap( 0, worldPosition + normal, Quaternion.LookRotation( normal ), SplineNormalTool.GetHandleSize( worldPosition ) * 1.3f, EventType.Repaint );
     }

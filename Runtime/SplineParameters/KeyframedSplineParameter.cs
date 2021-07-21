@@ -52,6 +52,7 @@ namespace FantasticSplines
             if( ToolActive )
             {
                 editInstance = null;
+                SplineEditor.EditorActive = true;
                 ToolManager.RestorePreviousPersistentTool();
                 EditorApplication.QueuePlayerLoopUpdate();
             }
@@ -89,9 +90,12 @@ namespace FantasticSplines
         public RepositionMode keyRepositionMode = RepositionMode.SegmentT;
 
         // Paramters to enable and disable editor functionality and gizmos.
-        [Header( "Gizmo Settings" )]
+        [Header( "Handles" )]
         public bool KeepEditorActive = false;
-        public bool enableEditorHandles = true;
+        public bool enableKeyframeHandles = true;
+        public bool enableValueHandles = true;
+
+        [Header( "Gizmos" )]
         public bool enableGizmos = true;
         public bool enableEditorValues = true;
 
@@ -181,8 +185,15 @@ namespace FantasticSplines
         // Event when a keyframe is added, edited or removed, including when the spline is moved and keys update their positions.
         void OnKeyframesChanged()
         {
+            ++updateCount;
             // do custom stuff here.
             onKeyframesChanged?.Invoke();
+        }
+
+        int updateCount = 0;
+        public int GetUpdateCount()
+        {
+            return updateCount;
         }
 
         // Creates a default keyframe
@@ -534,7 +545,9 @@ namespace FantasticSplines
                 return;
             }
 
+            Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
             DrawKeyframeGizmos();
+            Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
         }
 
         // Draws generic keyframe gizmos

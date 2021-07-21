@@ -269,6 +269,7 @@ namespace FantasticSplines
         bool IsLoop();
         int GetNodeCount();
         int GetSegmentCount();
+        SplineNode GetNode( int index );
         SplineResult GetResultAtT(float splineT);
         SplineResult GetResultAtDistance(float splineDistance);
         SplineResult GetResultAtSegmentT(int segmentIndex, float segmentT);

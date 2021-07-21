@@ -37,25 +37,36 @@ namespace FantasticSplines
 
         protected void DoKeyframeToolHandles()
         {
+            if( !Target.enableKeyframeHandles )
+            {
+                return;
+            }
+
             bool addKey = AddKeyModifiers( Event.current );
             bool removeKey = RemoveKeyModifiers( Event.current );
 
             if( addKey )
             {
                 DoAddKeyframe();
+                Selection.activeObject = Target.gameObject;
             }
             else if( removeKey )
             {
                 DoRemoveKeyframe();
+                Selection.activeObject = Target.gameObject;
             }
             else
             {
-                DoSplineKeyframeHandle();
-            }
+                bool mouseNearKeyframe = DoSplineKeyframeHandle();
 
-            if( Target.KeepEditorActive )
-            {
-                Selection.activeObject = Target.gameObject;
+                if( mouseNearKeyframe || Target.KeepEditorActive )
+                {
+                    Selection.activeObject = Target.gameObject;
+                }
+                else if( !mouseNearKeyframe && Event.current.button == 0 && Event.current.type == EventType.MouseDown )
+                {
+                    Target.ToggleEditor();
+                }
             }
         }
 
@@ -80,10 +91,11 @@ namespace FantasticSplines
         {
             using( new Handles.DrawingScope( InactiveColor ) )
             {
-                Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
                 Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
                 SplineResult result = Target.spline.GetResultClosestTo( ray );
+
                 bool click = Handles.Button( result.position, Quaternion.identity, GetHandleSize( result.position ), GetHandleSize( result.position ), KeyframeHandleCap );
+                click = click || Handles.Button( ray.origin, Quaternion.identity, 0, GetHandleSize( ray.origin ), KeyframeHandleCap );
 
                 if( click )
                 {
@@ -99,7 +111,6 @@ namespace FantasticSplines
         {
             using( new Handles.DrawingScope( DeleteColor ) )
             {
-                Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
                 var keys = Target.Keyframes;
                 for( int i = 0; i < keys.Count; ++i )
                 {
@@ -150,23 +161,28 @@ namespace FantasticSplines
             }
         }
 
-        void DoSplineKeyframeHandle()
+        bool DoSplineKeyframeHandle()
         {
+            bool mouseOverKeyframe = false;
             var keys = Target.Keyframes;
             using( new Handles.DrawingScope( ActiveColor ) )
             {
-                Handles.zTest = UnityEngine.Rendering.CompareFunction.LessEqual;
                 for( int i = 0; i < keys.Count; ++i )
                 {
-                    DoKeyframeMoveHandle( i, keys[i] );
+                    if( DoKeyframeMoveHandle( i, keys[i] ) )
+                    {
+                        mouseOverKeyframe = true;
+                    }
                 }
             }
+            return mouseOverKeyframe;
         }
 
-        void DoKeyframeMoveHandle( int keyFrameIndex, SplineParameterKeyframe<T> key )
+        bool DoKeyframeMoveHandle( int keyFrameIndex, SplineParameterKeyframe<T> key )
         {
-            EditorGUI.BeginChangeCheck();
+            Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
 
+            EditorGUI.BeginChangeCheck();
             float handleSize = GetHandleSize( key.location.position );
             float handleOffset = 0;
             SplineResult resultAfter = Target.spline.GetResultAtDistance( Target.GetKeyframe( keyFrameIndex ).location.distance + handleOffset );
@@ -175,18 +191,17 @@ namespace FantasticSplines
             if( EditorGUI.EndChangeCheck() )
             {
                 Undo.RecordObject( Target, "Move Spline Keyframe" );
-                Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
                 Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAtDistance( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
             }
+
+            return HandleUtility.DistanceToCube( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize * 10 ) <= 0; // * 3 to add some tollerance
         }
 
         // This is called for each window that your tool is active in. Put the functionality of your tool here.
         public override void OnToolGUI( EditorWindow window )
         {
-            if( Target.enableEditorHandles )
-            {
-                DoToolHandles( window );
-            }
+            Handles.zTest = Target.spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+            DoToolHandles( window );
 
             if( Target.enableEditorValues )
             {
