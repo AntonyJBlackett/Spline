@@ -285,10 +285,37 @@ namespace FantasticSplines
             return Mathf.Clamp( distance, 0f, Length );
         }
 
+        private SegmentResult GetResultAtSegmentDistanceInternal( int index, float distance )
+        {
+            if( index < 0 || index >= SegmentCount )
+            {
+                Debug.LogError( "Segment index out of range." );
+                return SegmentResult.Default;
+            }
+
+            float t = segments[index].GetT( distance );
+            Vector3 localPos = segments[index].GetPositionAtT( t );
+            Vector3 localTan = segments[index].GetTangentAtT( t );
+
+            return new SegmentResult()
+            {
+                index = index,
+                distance = distance,
+                length = segments[index].Length,
+                t = t,
+                localPosition = localPos,
+                localTangent = localTan,
+
+                // gets transformed later
+                position = localPos,
+                tangent = localTan,
+            };
+        }
+
         private SegmentResult GetSegmentResultAtDistance(float distance)
         {
             float distanceRemaining = LoopDistance( distance );
-            for( int i = 0; i < segments.Length; ++i )
+            for( int i = 0; i < SegmentCount; ++i )
             {
                 if( distanceRemaining >= segments[i].Length )
                 {
@@ -296,42 +323,11 @@ namespace FantasticSplines
                 }
                 else
                 {
-                    float t = segments[i].GetT( distanceRemaining );
-                    Vector3 localPos = segments[i].GetPositionAtT( t );
-                    Vector3 localTan = segments[i].GetTangentAtT( t );
-
-                    return new SegmentResult()
-                    {
-                        index = i,
-                        distance = distanceRemaining,
-                        length = segments[i].Length,
-                        t = t,
-                        localPosition = localPos,
-                        localTangent = localTan,
-
-                        // gets transformed later
-                        position = localPos,
-                        tangent = localTan,
-                    };
+                    return GetResultAtSegmentDistanceInternal( i, distanceRemaining );
                 }
             }
 
-            int index = segments.Length - 1;
-            Vector3 localPosition = segments[index].GetPositionAtT( 1 );
-            Vector3 localTangent = segments[index].GetTangentAtT( 1 );
-            return new SegmentResult()
-            {
-                index = index,
-                distance = segments[index].Length,
-                length = segments[index].Length,
-                t = 1,
-                localPosition = localPosition,
-                localTangent = localTangent,
-
-                // gets transformed later
-                position = localPosition,
-                tangent = localTangent,
-            };
+            return GetResultAtSegmentDistanceInternal( SegmentCount - 1, 1 );
         }
 
         private SplineResult GetSplineResult(float distance)
@@ -392,36 +388,32 @@ namespace FantasticSplines
             EnsureCacheIsUpdated();
 
             float segmentLength = segments[segmentIndex].Length;
-            segmentIndex = LoopSegmentIndex( segmentIndex );
+            int loopedSegmentIndex = LoopSegmentIndex( segmentIndex );
+            segmentDistance = Mathf.Clamp( segmentDistance, 0, segmentLength );
 
-            // we can't clamp to (0, segmentLength) here because if we use segmentLength we'll sample at distance 0 of the next segment.
-            bool isAtStart = Mathf.Approximately( 0, segmentDistance ) || segmentDistance < 0;
-            bool isAtEnd = Mathf.Approximately( segments[segmentIndex].Length, segmentDistance ) || segmentDistance > segmentLength;
-            if( isAtStart )
-            {
-                segmentDistance = 0;
-            }
-            else if( isAtEnd )
-            {
-                segmentDistance = segments[segmentIndex].Length * 0.9999f;
-            }
+            SegmentResult segmentResult = GetResultAtSegmentDistanceInternal( loopedSegmentIndex, segmentDistance );
 
-            SplineResult result = GetResultAtDistance( segments[segmentIndex].startDistanceInSpline + segmentDistance );
+            int lapCount = segmentIndex / SegmentCount;
+            float splineDistance = lapCount * Length;
+            for( int i = 0; i < loopedSegmentIndex; ++i )
+            {
+                splineDistance += segments[i].Length;
+            }
+            splineDistance += segmentResult.distance;
+            float loopSplineDistance = LoopDistance( splineDistance );
 
-            if( isAtStart )
+            SplineResult result = new SplineResult()
             {
-                result.segmentResult.index = segmentIndex;
-                result.segmentResult.length = segments[segmentIndex].Length;
-                result.segmentResult.distance = 0;
-                result.segmentResult.t = 0;
-            }
-            else if( isAtEnd )
-            {
-                result.segmentResult.index = segmentIndex;
-                result.segmentResult.length = segments[segmentIndex].Length;
-                result.segmentResult.distance = result.segmentResult.length;
-                result.segmentResult.t = 1;
-            }
+                updateCount = UpdateCount,
+                distance = splineDistance,
+                loopDistance = loopSplineDistance,
+                t = splineDistance * inverseSplineLength,
+                loopT = loopSplineDistance * inverseSplineLength,
+                lapCount = lapCount,
+                isLoop = loop,
+                length = Length,
+                segmentResult = segmentResult
+            };
 
             return result;
         }
