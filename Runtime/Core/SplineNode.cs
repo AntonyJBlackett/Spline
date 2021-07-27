@@ -194,6 +194,23 @@ namespace FantasticSplines
             }
         }
 
+        public void SetLocalControls( Vector3 localIn, Vector3 localOut )
+        {
+            localInControlPoint = localIn;
+            localOutControlPoint = localOut;
+
+            if( lastChangedControl == 1 )
+            {
+                lastChangedControl = 2;
+            }
+            else if( lastChangedControl == 2 )
+            {
+                lastChangedControl = 1;
+            }
+
+            ConstrainControlPoint( localOutControlPoint, localInControlPoint, nodeType );
+        }
+
         // Gets the node type
         public NodeType NodeType
         {

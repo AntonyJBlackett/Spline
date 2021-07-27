@@ -72,8 +72,13 @@ namespace FantasticSplines
 
         public static void KeyframeHandleCap( int controlId, Vector3 position, Quaternion rotation, float size, EventType eventType )
         {
-            Vector3 handleForward = (position - SceneView.currentDrawingSceneView.camera.transform.position).normalized;
-            Quaternion handleRotation = Quaternion.LookRotation( handleForward ) * Quaternion.AngleAxis( 45, Vector3.forward );
+            Camera camera = SceneView.currentDrawingSceneView.camera;
+            Vector3 handleForward = (position - camera.transform.position).normalized;
+            if( camera.orthographic )
+            {
+                handleForward = camera.transform.forward;
+            }
+            Quaternion handleRotation = Quaternion.AngleAxis( 45, handleForward ) * Quaternion.LookRotation( handleForward, camera.transform.up );
 
             using( new Handles.DrawingScope( Color.black ) )
             {

@@ -27,86 +27,80 @@ namespace FantasticSplines
                 } );
         }
 
-        public static void FindCorners( ref List<int> corners, ISpline spline, List<SplineResult> splinePoints, float cornerAngle )
+        public static void Sort( ref List<ExtrudePoint> results )
         {
-            corners.Clear();
-            for( int p = 1; p < splinePoints.Count; ++p )
-            {
-                SplineResult splinePoint = splinePoints[p];
-
-                // calculate the tangent at the point so we can then
-                // calculate a scalar to compensate for pinching corners on acute angled points
-                Vector3 pointTangent = splinePoint.tangent.normalized;
-                Vector3 inTangent = pointTangent;
-                Vector3 outTangent = pointTangent;
-
-                bool firstPoint = p == 0;
-                bool lastPoint = p == splinePoints.Count - 1;
-
-                if( (!firstPoint && !lastPoint) || spline.IsLoop() )
+            results.Sort(
+                ( a, b ) =>
                 {
-                    int previousIndex = p - 1;
-                    int nextIndex = p + 1;
-
-                    if( spline.IsLoop() && previousIndex < 0 )
-                    {
-                        previousIndex = splinePoints.Count - 2; // -2 because the end point is actually the 'same point'
-                    }
-                    if( spline.IsLoop() && nextIndex >= splinePoints.Count )
-                    {
-                        nextIndex = 1; // 1 because the first point is actually the 'same point'
-                    }
-
-                    SplineResult previous = splinePoints[previousIndex];
-                    SplineResult next = splinePoints[nextIndex];
-
-                    inTangent = (splinePoint.position - previous.position).normalized;
-                    outTangent = (next.position - splinePoint.position).normalized;
-                }
-                if( Vector3.Angle( inTangent, outTangent ) > cornerAngle )
-                {
-                    corners.Add( p );
-                }
-            }
+                    return a.distance.CompareTo( b.distance );
+                } );
         }
 
-        public static void AddResultsAtNodes( ref List<SplineResult> results, ISpline spline )
+        public static void AddResultsAtNodes( ref List<ExtrudePoint> results, ISpline spline, bool mergeNodeSamples )
         {
             int nodeCount = spline.GetNodeCount();
             for( int i = 0; i < nodeCount; i++ )
             {
                 SplineNode node = spline.GetNode( i );
-                SplineResult result = spline.GetResultAtNode( i );
+                SplineResult result1 = spline.GetResultAtNode( i );
+
+                ExtrudePoint point1 = new ExtrudePoint( result1, TubeGenerator.SplineNodePointPriority );
+
                 if( i != 0 )
                 {
-                    if( node.NodeType == NodeType.Point || node.NodeType == NodeType.Free && Mathf.Approximately( result.segmentResult.t, 1 ) )
+                    if( node.NodeType == NodeType.Point || node.NodeType == NodeType.Free && Mathf.Approximately( result1.segmentResult.t, 1 ) )
                     {
-                        results.Add( spline.GetResultAtSegmentT( result.segmentResult.index - 1, 1 ) ); // in node
+                        SplineResult result2 = spline.GetResultAtSegmentT( result1.segmentResult.index - 1, 1 );
+
+                        ExtrudePoint point2 = new ExtrudePoint( result2, TubeGenerator.SplineNodePointPriority );
+
+                        if( mergeNodeSamples )
+                        {
+                            point1 = ExtrudePoint.Lerp( point1, point2, 0.5f );
+                        }
+                        else
+                        {
+                            results.Add( point2 ); // in node
+                        }
                     }
                 }
 
-                results.Add( result ); // out node
+                results.Add( point1 ); // out node
             }
 
             if( spline.IsLoop() )
             {
-                results.Add( spline.GetResultAtSegmentT( nodeCount-1, 1 ) ); // out node of loop segment
+                ExtrudePoint lastPoint = new ExtrudePoint( spline.GetResultAtSegmentT( nodeCount - 1, 1 ), TubeGenerator.SplineNodePointPriority );
+
+                if( mergeNodeSamples )
+                {
+                    ExtrudePoint firstPoint = results[0];
+
+                    float firstDistance = firstPoint.distance;
+                    float lastDistance = lastPoint.distance;
+                    firstPoint = ExtrudePoint.Lerp( firstPoint, lastPoint, 0.5f );
+                    firstPoint.distance = firstDistance;
+                    lastPoint = firstPoint;
+                    lastPoint.distance = lastDistance;
+                    results[0] = firstPoint;
+                }
+                results.Add( lastPoint ); // out node of loop segment
             }
 
             Sort( ref results );
         }
 
-        public static void AddResultsAtKeys<T>( ref List<SplineResult> results, KeyframedSplineParameter<T> keyframedSplineParameter ) where T : new()
+        public static void AddResultsAtKeys<T>( ref List<ExtrudePoint> results, KeyframedSplineParameter<T> keyframedSplineParameter ) where T : new()
         {
             var keys = keyframedSplineParameter.OrderedKeyframes;
             for( int i = 0; i < keys.Count; i++ )
             {
-                results.Add( keys[i].location );
+                results.Add( new ExtrudePoint( keys[i].location, TubeGenerator.SplineKeyframePointPriority ) );
             }
             Sort( ref results );
         }
 
-        public static void AddPointsByTollerance( ref List<SplineResult> results, ISpline spline, float minStepDistance, System.Func<SplineResult,SplineResult,bool> tolleranceFunction )
+        public static void AddPointsByTollerance( ref List<ExtrudePoint> results, ISpline spline, float minStepDistance, System.Func<ExtrudePoint, ExtrudePoint, bool> tolleranceFunction )
         {
             int resultCount = results.Count;
             for( int i = 1; i < resultCount; ++i )
@@ -118,17 +112,17 @@ namespace FantasticSplines
                 int segmentDivisions = Mathf.FloorToInt( segmentLength / minStepDistance );
                 if( segmentDivisions > 1 )
                 {
-                    SplineResult previousResult = results[previousIndex];
+                    ExtrudePoint previousResult = results[previousIndex];
                     float segmentStep = segmentLength / segmentDivisions;
                     for( int s = 1; s < segmentDivisions; ++s )
                     {
                         float segmentDistance = segmentStep * s;
                         SplineResult result = spline.GetResultAtDistance( results[previousIndex].distance + segmentDistance );
-
-                        if( tolleranceFunction( previousResult, result ) )
+                        ExtrudePoint newPoint = new ExtrudePoint( result, TubeGenerator.TollerancePointPriority );
+                        if( tolleranceFunction( previousResult, newPoint ) )
                         {
-                            results.Add( result );
-                            previousResult = result;
+                            results.Add( newPoint );
+                            previousResult = newPoint;
                         }
                     }
                 }
@@ -136,7 +130,7 @@ namespace FantasticSplines
             Sort( ref results );
         }
 
-        public static void RemovePointsAtSameLocation( ref List<SplineResult> results, float tollerance = 0.1f )
+        public static void RemovePointsAtSameLocation( ref List<ExtrudePoint> results, float tollerance = 0.1f )
         {
             for( int i = results.Count - 2; i >= 0; i-- )
             {
@@ -147,6 +141,55 @@ namespace FantasticSplines
                     results.RemoveAt( i );
                 }
             }
+        }
+
+        static List<int> scratch = new List<int>();
+        public static void MergePointsAtSameLocation( ref List<SplineResult> results, float tollerance = 0.1f )
+        {
+            for( int i = 0; i < results.Count; ++i )
+            {
+                scratch.Clear();
+                for( int j = i + 1; j < results.Count; ++j )
+                {
+                    if( Mathf.Abs( results[i].distance - results[j].distance ) < tollerance )
+                    {
+                        scratch.Add( j );
+                    }
+                }
+
+                Vector3 segTangent = results[i].segmentResult.localTangent;
+                for( int j = 1; j < scratch.Count; ++j )
+                {
+                    int index = scratch[j];
+                    segTangent += results[index].segmentResult.localTangent;
+                }
+
+                for( int j = scratch.Count - 1; j >= 0; --j )
+                {
+                    int index = scratch[j];
+                    results.RemoveAt( index );
+                }
+
+                segTangent /= scratch.Count + 1;
+
+                SplineResult result = results[i];
+                SegmentResult segmentResult = result.segmentResult;
+                segmentResult.localTangent = segTangent;
+                result.segmentResult = segmentResult;
+                results[i] = result;
+            }
+        }
+
+        public static float CalculateLength( List<ExtrudePoint> points )
+        {
+            float length = 0;
+            Vector3 previous = points[0].position;
+            for( int i = 1; i < points.Count; ++i )
+            {
+                length += Vector3.Distance( points[i].position, previous );
+                previous = points[i].position;
+            }
+            return length;
         }
     }
 }

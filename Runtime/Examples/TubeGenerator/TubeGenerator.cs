@@ -27,7 +27,7 @@ public class ExtrudeShape
     public Color[] colors;
     public int[] lines;
 
-    private ExtrudeShape()
+    public ExtrudeShape()
     {
     }
 
@@ -258,6 +258,19 @@ public struct ExtrudePoint
     public Vector3 scale;
     public Color color;
     public float distance; // for sorting and uvs
+    public int priority; // higher = higher priority
+
+    public ExtrudePoint( SplineResult result, int priority )
+    {
+        position = result.position;
+        pointTangent = result.tangent;
+        inTangent = result.tangent;
+        normal = Vector3.up;
+        scale = Vector3.one;
+        color = Color.white;
+        distance = result.distance;
+        this.priority = priority;
+    }
 
     public static ExtrudePoint Lerp( ExtrudePoint a, ExtrudePoint b, float t )
     {
@@ -270,6 +283,7 @@ public struct ExtrudePoint
             scale = Vector3.Lerp( a.scale, b.scale, t ),
             color = Color.Lerp( a.color, b.color, t ),
             distance = Mathf.Lerp( a.distance, b.distance, t ),
+            priority = Mathf.Max( a.priority, b.priority ),
         };
     }
 }
@@ -287,14 +301,14 @@ public class TubeGenerator : MonoBehaviour
     [Header( "Spline Sampling" )]
     public bool sampleSplineControlPoints = true;
     public bool sampleSplineNormalKeys = true;
+    public bool enableTangentTollerance = true;
+    public bool enableNormalTollerance = true;
+    [Range( 0, 45.0f )]
+    public float tangentTolleranceAngle = 5;
+    [Range( 0, 45.0f )]
+    public float normalTolleranceAngle = 5;
     [Range( 0.1f, 10 )]
     public float tolleranceSamplingStepDistance = 0.5f;
-    public bool enableTangentTollerance = true;
-    [Range( 0.1f, 45.0f )]
-    public float tangentTolleranceAngle = 5;
-    public bool enableNormalTollerance = true;
-    [Range( 0.1f, 45.0f )]
-    public float normalTolleranceAngle = 5;
 
     [Header( "Geometry Settings" )]
     public float tubeRadius = 1;
@@ -331,21 +345,16 @@ public class TubeGenerator : MonoBehaviour
 
     Mesh mesh;
     ExtrudeShape extrudeShape;
+    public SplineExtrudeShape splineShape;
 
     private void Awake()
     {
-        Initialise();
+        regenerate = true;
     }
     void Initialise()
     {
-        if( meshFilter == null )
-        {
-            meshFilter = GetComponent<MeshFilter>();
-        }
-        if( meshCollider == null )
-        {
-            meshCollider = GetComponent<MeshCollider>();
-        }
+        meshFilter = GetComponent<MeshFilter>();
+        meshCollider = GetComponent<MeshCollider>();
 
         if( mesh == null )
         {
@@ -363,7 +372,14 @@ public class TubeGenerator : MonoBehaviour
             meshFilter.sharedMesh = mesh;
         }
 
-        extrudeShape = ExtrudeShape.GetExtrudeShape( shapeType );
+        if( splineShape != null )
+        {
+            extrudeShape = splineShape.GetExtrudeShape();
+        }
+        else
+        {
+            extrudeShape = ExtrudeShape.GetExtrudeShape( shapeType );
+        }
     }
 
     void AutoRegenerate()
@@ -387,7 +403,7 @@ public class TubeGenerator : MonoBehaviour
     public void OnValidate()
     {
         cornerRadius = Mathf.Clamp( cornerRadius, 0, cornerRadius );
-        Regenerate();
+        regenerate = true;
     }
 
     private void OnDrawGizmos()
@@ -395,15 +411,15 @@ public class TubeGenerator : MonoBehaviour
         AutoRegenerate();
     }
 
-    bool ExceedsTangetAngleTollerance( SplineResult first, SplineResult second )
+    bool ExceedsTangetAngleTollerance( ExtrudePoint first, ExtrudePoint second )
     {
-        return Vector3.Angle( first.tangent.normalized, second.tangent.normalized ) > tangentTolleranceAngle;
+        return Vector3.Angle( first.pointTangent, second.pointTangent ) > tangentTolleranceAngle;
     }
 
-    bool ExceedsNormalAngleTollerance( SplineResult first, SplineResult second )
+    bool ExceedsNormalAngleTollerance( ExtrudePoint first, ExtrudePoint second )
     {
-        Vector3 n1 = splineNormal.GetNormalAtSplineResult( first );
-        Vector3 n2 = splineNormal.GetNormalAtSplineResult( second );
+        Vector3 n1 = GetNormalAtDistance( first.distance );
+        Vector3 n2 = GetNormalAtDistance( second.distance );
         return Vector3.Angle( n1, n2 ) > normalTolleranceAngle;
     }
 
@@ -433,39 +449,29 @@ public class TubeGenerator : MonoBehaviour
         return MathsUtils.LineLineIntersection( out cornerCenter, inEdgePoint, inTangent, outEdgePoint, outTangent );
     }
 
-    List<SplineResult> splinePoints = new List<SplineResult>();
+    List<ExtrudePoint> splinePoints = new List<ExtrudePoint>();
     List<ExtrudePoint> extrudePoints = new List<ExtrudePoint>();
     void GenerateMesh()
     {
         // Sample the spline
         splinePoints.Clear();
-        if( sampleSplineControlPoints )
-        {
-            SplineProcessor.AddResultsAtNodes( ref splinePoints, spline );
-        }
-        if( sampleSplineNormalKeys )
-        {
-            SplineProcessor.AddResultsAtKeys( ref splinePoints, splineNormal );
-        }
-        if( enableTangentTollerance )
-        {
-            SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsTangetAngleTollerance );
-        }
-        if( enableNormalTollerance )
-        {
-            SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsNormalAngleTollerance );
-        }
+        if( sampleSplineControlPoints ) SplineProcessor.AddResultsAtNodes( ref splinePoints, spline, false );
+        if( sampleSplineNormalKeys ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineNormal );
+
+        if( enableTangentTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsTangetAngleTollerance );
+        if( enableNormalTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsNormalAngleTollerance );
+
         SplineProcessor.RemovePointsAtSameLocation( ref splinePoints );
 
         // generation code
         extrudePoints.Clear();
         for( int p = 0; p < splinePoints.Count; ++p )
         {
-            SplineResult splinePoint = splinePoints[p];
+            ExtrudePoint splinePoint = splinePoints[p];
 
             // calculate the tangent at the point so we can then
             // calculate a scalar to compensate for pinching corners on acute angled points
-            Vector3 pointTangent = splinePoint.tangent.normalized;
+            Vector3 pointTangent = splinePoint.pointTangent.normalized;
             Vector3 inTangent = pointTangent;
             Vector3 outTangent = pointTangent;
 
@@ -486,8 +492,8 @@ public class TubeGenerator : MonoBehaviour
                     nextIndex = 1; // 1 because the first point is actually the 'same point'
                 }
 
-                SplineResult previous = splinePoints[previousIndex];
-                SplineResult next = splinePoints[nextIndex];
+                ExtrudePoint previous = splinePoints[previousIndex];
+                ExtrudePoint next = splinePoints[nextIndex];
 
                 inTangent = (splinePoint.position - previous.position).normalized;
                 outTangent = (next.position - splinePoint.position).normalized;
@@ -501,24 +507,24 @@ public class TubeGenerator : MonoBehaviour
             }
             else
             {
-                ExtrudePoint cornerPoint = ConstructExtrudePoint( splinePoint.position, GetNormalAtDistance( splinePoint.distance ), pointTangent, inTangent, splinePoint.distance );
+                ExtrudePoint cornerPoint = ConstructExtrudePoint( splinePoint.position, GetNormalAtDistance( splinePoint.distance ), pointTangent, inTangent, splinePoint.distance, splinePoint.priority );
                 ValidateExtrudePoint( cornerPoint );
                 extrudePoints.Add( cornerPoint );
             }
         }
 
         // sometimes corners are too close to eachother and generate points inside the previous corner
-        FixIntersectingCorners( ref extrudePoints );
+        FixIntersectingSegments( ref extrudePoints );
 
         if( enableTwistSubdivision )
         {
             Subdivide( ref extrudePoints, TwistAngleSubdivisions );
         }
 
-        GenerateMesh( extrudePoints );
+        GenerateMesh( extrudePoints, spline.IsLoop() );
     }
 
-    void FixIntersectingCorners( ref List<ExtrudePoint> points )
+    void FixIntersectingSegments( ref List<ExtrudePoint> points )
     {
         if( points.Count < 2 )
         {
@@ -538,14 +544,24 @@ public class TubeGenerator : MonoBehaviour
             if( Vector3.Dot( point.inTangent, point.position - previous.position ) < 0 )
             {
                 // intersection
-                points.RemoveAt( i );
-                i--;
-                if( i > 0 )
+                // we should probably remove points with some priority huristic for better results
+                if( point.priority != CornerMidPointPriority && point.priority == previous.priority )
+                {
+                    points.RemoveAt( i );
+                    points.RemoveAt( i - 1 );
+                    i -= 2;
+                }
+                else if( point.priority > previous.priority )
+                {
+                    points.RemoveAt( i - 1 );
+                    i--;
+                }
+                else
                 {
                     points.RemoveAt( i );
                     i--;
                 }
-                i--;
+                i-=2; // we need to go back and reprocess ealier nodes now.
             }
         }
     }
@@ -565,7 +581,7 @@ public class TubeGenerator : MonoBehaviour
         points.Sort( (a,b)=> { return a.distance.CompareTo( b.distance ); } );
     }
 
-    ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector3 tangent, Vector3 inTangent, float distance )
+    ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector3 tangent, Vector3 inTangent, float distance, int priority )
     {
         return new ExtrudePoint()
         {
@@ -576,6 +592,7 @@ public class TubeGenerator : MonoBehaviour
             scale = new Vector3( 1, 1, 1 ),
             color = Color.white,
             distance = distance,
+            priority = priority,
         };
     }
 
@@ -589,7 +606,14 @@ public class TubeGenerator : MonoBehaviour
         return splineNormal.GetValueAtDistance( distance, Vector3.up );
     }
 
-    void AddCornerPoints( ref List<ExtrudePoint> extrudePoints, SplineResult splinePoint, Vector3 tangent, Vector3 inTangent, Vector3 outTangent, bool firstPoint )
+    public const int SplineNodePointPriority = 5;
+    public const int CornerMidPointPriority = 4;
+    public const int CornerEndPointPriority = 3;
+    public const int CornerOtherPointPriority = 2;
+    public const int SplineKeyframePointPriority = 1;
+    public const int TollerancePointPriority = 0;
+
+    void AddCornerPoints( ref List<ExtrudePoint> extrudePoints, ExtrudePoint splinePoint, Vector3 tangent, Vector3 inTangent, Vector3 outTangent, bool firstPoint )
     {
         CalculateCornerPoint( out Vector3 cornerCenter, splinePoint.position, inTangent, outTangent );
         Vector3 cornerAxis = Vector3.Cross( inTangent, outTangent ).normalized;
@@ -600,8 +624,8 @@ public class TubeGenerator : MonoBehaviour
         float inDistance = splinePoint.distance - halfCornerLength;
         float outDistance = splinePoint.distance + halfCornerLength;
 
-        ExtrudePoint startCorner = ConstructExtrudePoint( inPoint, GetNormalAtDistance( inDistance ), inTangent, inTangent, inDistance );
-        ExtrudePoint endCorner = ConstructExtrudePoint( outPoint, GetNormalAtDistance( outDistance ), outTangent, outTangent, outDistance );
+        ExtrudePoint startCorner = ConstructExtrudePoint( inPoint, GetNormalAtDistance( inDistance ), inTangent, inTangent, inDistance, CornerEndPointPriority );
+        ExtrudePoint endCorner = ConstructExtrudePoint( outPoint, GetNormalAtDistance( outDistance ), outTangent, outTangent, outDistance, CornerEndPointPriority );
 
         if( !firstPoint )
         {
@@ -613,7 +637,7 @@ public class TubeGenerator : MonoBehaviour
                 case CornerType.Mitre:
                     Vector3 midNormal = Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f );
                     Vector3 midTangent = Vector3.Slerp( startCorner.pointTangent, endCorner.pointTangent, 0.5f );
-                    ExtrudePoint midPoint = ConstructExtrudePoint( splinePoint.position, midNormal, midTangent, inTangent, splinePoint.distance );
+                    ExtrudePoint midPoint = ConstructExtrudePoint( splinePoint.position, midNormal, midTangent, inTangent, splinePoint.distance, CornerMidPointPriority );
                     ValidateExtrudePoint( midPoint );
                     extrudePoints.Add( midPoint );
                     break;
@@ -652,12 +676,12 @@ public class TubeGenerator : MonoBehaviour
             Vector3 tangent = directionRotation * Vector3.forward;
             Vector3 normal = directionRotation * Vector3.up;
 
-            ExtrudePoint slicePoint = ConstructExtrudePoint( point, normal, tangent, tangent, distance );
+            ExtrudePoint slicePoint = ConstructExtrudePoint( point, normal, tangent, tangent, distance, CornerOtherPointPriority );
             extrudePoints.Add( slicePoint );
         }
     }
 
-    void AddSquareCornerPoints( ref List<ExtrudePoint> extrudePoints, Vector3 cornerAxis, SplineResult splinePoint, Vector3 tangent, ExtrudePoint startCorner, ExtrudePoint endCorner, Vector3 cornerCenter )
+    void AddSquareCornerPoints( ref List<ExtrudePoint> extrudePoints, Vector3 cornerAxis, ExtrudePoint splinePoint, Vector3 tangent, ExtrudePoint startCorner, ExtrudePoint endCorner, Vector3 cornerCenter )
     {
         Vector3 midPoint = cornerCenter + (splinePoint.position - cornerCenter).normalized * CornerRadius;
         MathsUtils.LineLineIntersection( out Vector3 inSquarePoint, midPoint, tangent, startCorner.position, startCorner.pointTangent );
@@ -675,31 +699,35 @@ public class TubeGenerator : MonoBehaviour
         Vector3 p3Tangent = Vector3.Cross( outPointFromCenter.normalized, cornerAxis ) * tangentSign;
         p1Tangent *= tangentSign;
 
-        ExtrudePoint p1 = ConstructExtrudePoint( inSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.25f), p1Tangent, startCorner.inTangent, p1Distance ); ;
-        ExtrudePoint p2 = ConstructExtrudePoint( midPoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f ), tangent, tangent, splinePoint.distance );
-        ExtrudePoint p3 = ConstructExtrudePoint( outSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.75f ), p3Tangent, endCorner.inTangent, p3Distance );
+        ExtrudePoint p1 = ConstructExtrudePoint( inSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.25f), p1Tangent, startCorner.inTangent, p1Distance, CornerOtherPointPriority );
+        ExtrudePoint p2 = ConstructExtrudePoint( midPoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f ), tangent, tangent, splinePoint.distance, CornerMidPointPriority );
+        ExtrudePoint p3 = ConstructExtrudePoint( outSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.75f ), p3Tangent, endCorner.inTangent, p3Distance, CornerOtherPointPriority );
 
         extrudePoints.Add( p1 );
         extrudePoints.Add( p2 );
         extrudePoints.Add( p3 );
     }
 
-    float CalculateVScalar()
+    float CalculateVScalar( float length )
     {
         float splineVScalar = 1; // used to best fit v's so they begin and end at the end of the spline
         if( seamlessUVs )
         {
-            float splineLength = spline.GetLength();
-            float vLengthsInSpline = splineLength / (tubeRadius*2);
+            float vLengthsInSpline = length / (tubeRadius*2);
             float roundedVLength = Mathf.Round( vLengthsInSpline );
             float stretchedSplineLength = roundedVLength * (tubeRadius * 2);
-            splineVScalar = stretchedSplineLength / splineLength;
+            splineVScalar = stretchedSplineLength / length;
         }
         return splineVScalar;
     }
 
-    void GenerateMesh( List<ExtrudePoint> points ) 
+    void GenerateMesh( List<ExtrudePoint> points, bool loop ) 
     {
+        if( points.Count < 2 )
+        {
+            return;
+        }
+
         // setup mesh generation data
         int vertsInShape = extrudeShape.verts.Length;
         int segments = points.Count - 1; 
@@ -712,7 +740,8 @@ public class TubeGenerator : MonoBehaviour
         }
         int triIndexCount = triCount * 3;
 
-        float vScalar = CalculateVScalar();
+        float length = SplineProcessor.CalculateLength( points );
+        float vScalar = CalculateVScalar( length );
 
         int[] triangleIndicies = new int[triIndexCount];
         Vector3[] verticies = new Vector3[vertCount];
@@ -724,12 +753,50 @@ public class TubeGenerator : MonoBehaviour
         float inverseExtrudeShapeSize = tubeRadius / extrudeSize;
         inverseExtrudeShapeSize *= shapeFill;
 
+        float extrudeDistance = 0;
+        Vector3 previousPosiiton = points[0].position;
         for( int p = 0; p < points.Count; ++p )
         {
-            int loopIndex = p * vertsInShape;
+            int edgeLoopIndex = p * vertsInShape;
             ExtrudePoint point = points[p];
+            Vector3 segmentDirection = point.pointTangent;
 
-            Vector3 segmentDirection = point.inTangent;
+            extrudeDistance += Vector3.Distance( points[p].position, previousPosiiton );
+            previousPosiiton = points[p].position;
+
+            bool start = p == 0;
+            bool end = p == points.Count - 1;
+
+            if( loop || (!start && !end) )
+            {
+                int nextP = p + 1;
+                int previousP = p - 1;
+
+                if( nextP >= points.Count )
+                {
+                    nextP = 1; // first point is the same as the last point in a loop.
+                }
+                if( previousP < 0 )
+                {
+                    previousP = points.Count - 2; // first point is the same as the last point in a loop.
+                }
+
+                ExtrudePoint next = points[nextP];
+                ExtrudePoint previous = points[previousP];
+                segmentDirection = (next.position - point.position).normalized;
+                float nextDistance = Vector3.Distance( next.position, point.position );
+                float previousDistance = Vector3.Distance( previous.position, point.position );
+                if( nextDistance < tubeRadius * 0.1f && previousDistance < tubeRadius * 0.1f )
+                {
+                    // stop crazy projected geometry
+                    segmentDirection = point.pointTangent;
+                }
+                else if( nextDistance < previousDistance )
+                {
+                    segmentDirection = (point.position - previous.position).normalized;
+                }
+            }
+
             Matrix4x4 normalMatrix = Matrix4x4.TRS( Vector3.zero, Quaternion.LookRotation( point.pointTangent, point.normal ), inverseExtrudeShapeSize * Vector3.one );
 
             Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( point.position, Quaternion.LookRotation( segmentDirection, point.normal ), inverseExtrudeShapeSize * Vector3.one );
@@ -741,20 +808,23 @@ public class TubeGenerator : MonoBehaviour
 
             for( int sv = 0; sv < vertsInShape; ++sv )
             {
-                int index = loopIndex + sv;
+                int index = edgeLoopIndex + sv;
                 verticies[index] = MathsUtils.LinePlaneIntersection( projectToPoints[sv], segmentDirection, point.position, point.pointTangent );
                 normals[index] = normalMatrix.MultiplyVector( extrudeShape.normals[sv] );
                 colors[index] = Color.white * extrudeShape.colors[sv];
-                uvs[index] = new Vector2( extrudeShape.u[sv], point.distance * vScalar );
+                uvs[index] = new Vector2( extrudeShape.u[sv], extrudeDistance * vScalar );
             }
         }
 
+        // transform from world space to local space of the meshFilter
+        Matrix4x4 meshWorldToLocal = meshFilter.transform.worldToLocalMatrix;
         for( int v = 0; v < verticies.Length; ++v )
         {
-            verticies[v] = transform.worldToLocalMatrix.MultiplyPoint3x4( verticies[v] );
-            normals[v] = transform.worldToLocalMatrix.MultiplyVector( normals[v] );
+            verticies[v] = meshWorldToLocal.MultiplyPoint3x4( verticies[v] );
+            normals[v] = meshWorldToLocal.MultiplyVector( normals[v] );
         }
 
+        // setup triangles
         int ti = 0;
         for( int s = 0; s < segments; ++s )
         {
