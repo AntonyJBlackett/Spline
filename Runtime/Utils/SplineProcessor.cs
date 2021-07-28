@@ -32,11 +32,17 @@ namespace FantasticSplines
             results.Sort(
                 ( a, b ) =>
                 {
+                    int compare = a.segment.CompareTo( b.segment );
+                    if( compare != 0 )
+                    {
+                        return compare;
+                    }
+
                     return a.distance.CompareTo( b.distance );
                 } );
         }
 
-        public static void AddResultsAtNodes( ref List<ExtrudePoint> results, ISpline spline, bool mergeNodeSamples )
+        public static void AddResultsAtNodes( ref List<ExtrudePoint> results, ISpline spline )
         {
             int nodeCount = spline.GetNodeCount();
             for( int i = 0; i < nodeCount; i++ )
@@ -48,20 +54,11 @@ namespace FantasticSplines
 
                 if( i != 0 )
                 {
-                    if( node.NodeType == NodeType.Point || node.NodeType == NodeType.Free && Mathf.Approximately( result1.segmentResult.t, 1 ) )
+                    if( node.NodeType == NodeType.Point || node.NodeType == NodeType.Free || Mathf.Approximately( result1.segmentResult.t, 1 ) )
                     {
                         SplineResult result2 = spline.GetResultAtSegmentT( result1.segmentResult.index - 1, 1 );
-
                         ExtrudePoint point2 = new ExtrudePoint( result2, TubeGenerator.SplineNodePointPriority );
-
-                        if( mergeNodeSamples )
-                        {
-                            point1 = ExtrudePoint.Lerp( point1, point2, 0.5f );
-                        }
-                        else
-                        {
-                            results.Add( point2 ); // in node
-                        }
+                        results.Add( point2 ); // in node
                     }
                 }
 
@@ -70,21 +67,8 @@ namespace FantasticSplines
 
             if( spline.IsLoop() )
             {
-                ExtrudePoint lastPoint = new ExtrudePoint( spline.GetResultAtSegmentT( nodeCount - 1, 1 ), TubeGenerator.SplineNodePointPriority );
-
-                if( mergeNodeSamples )
-                {
-                    ExtrudePoint firstPoint = results[0];
-
-                    float firstDistance = firstPoint.distance;
-                    float lastDistance = lastPoint.distance;
-                    firstPoint = ExtrudePoint.Lerp( firstPoint, lastPoint, 0.5f );
-                    firstPoint.distance = firstDistance;
-                    lastPoint = firstPoint;
-                    lastPoint.distance = lastDistance;
-                    results[0] = firstPoint;
-                }
-                results.Add( lastPoint ); // out node of loop segment
+                SplineResult endOfSplineResult = spline.GetResultAtSegmentT( nodeCount - 1, 1 );
+                results.Add( new ExtrudePoint( endOfSplineResult, TubeGenerator.SplineNodePointPriority ) ); // out node of loop segment
             }
 
             Sort( ref results );

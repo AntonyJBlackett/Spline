@@ -5,18 +5,50 @@ using UnityEngine;
 
 namespace FantasticSplines
 {
+    [RequireComponent( typeof( SplineComponent ))]
     public class SplineExtrudeShape : MonoBehaviour
     {
-        public bool softEdges = false;
-
+        public float tangentTolleranceAngle = 5;
+        public float tolleranceStep = 0.2f;
+        public bool reverse = false;
         List<ExtrudePoint> samples = new List<ExtrudePoint>();
+
+        bool ExceedsTangetAngleTollerance( ExtrudePoint first, ExtrudePoint second )
+        {
+            return Vector3.Angle( first.pointTangent, second.pointTangent ) > tangentTolleranceAngle;
+        }
+
+        SplineComponent Spline
+        {
+            get
+            {
+                return GetComponent<SplineComponent>();
+            }
+        }
+
+        [SerializeField]
+        [HideInInspector]
+        int updateCount = 0;
+        public void OnValidate()
+        {
+            updateCount++;
+        }
+
+        public int GetUpdateCount()
+        {
+            return Spline.GetUpdateCount() + updateCount;
+        }
+
         public ExtrudeShape GetExtrudeShape()
         {
-            SplineComponent spline = GetComponent<SplineComponent>();
+            SplineComponent spline = Spline;
 
             samples.Clear();
 
-            SplineProcessor.AddResultsAtNodes( ref samples, spline, softEdges ); // returns two samples for each nodes, in and out tangents
+            SplineProcessor.AddResultsAtNodes( ref samples, spline );
+            SplineProcessor.AddPointsByTollerance( ref samples, spline, tolleranceStep, ExceedsTangetAngleTollerance );
+
+            if( reverse ) samples.Reverse();
 
             return GenerateExtrudeShape( samples );
         }
@@ -55,6 +87,8 @@ namespace FantasticSplines
                 Vector3 localPositon = transform.worldToLocalMatrix.MultiplyPoint3x4( samples[i].position );
                 Vector3 localTangent = transform.worldToLocalMatrix.MultiplyVector( samples[i].pointTangent );
 
+                if( reverse ) localTangent = -localTangent;
+
                 Vector2 position = ConvertToVector2( localPositon );
                 Vector2 normal = GenerateNormal( ConvertToVector2( localTangent ) );
 
@@ -64,52 +98,22 @@ namespace FantasticSplines
                 points.Add( new ShapePoint() { position = position, normal = normal, u = distance * inverseLength, color = Color.white } );
             }
 
-            /*if( softEdges )
-            {
-                SoftenEdges( ref points, loop );
-            }*/
-
-            return GenerateExtrudeShape( points, softEdges );
+            return GenerateExtrudeShape( points );
         }
 
-        void SoftenEdges( ref List<ShapePoint> points, bool loop )
-        {
-            for( int i = 0; i < points.Count-1; i+=2 )
-            {
-                int inPointIndex = i - 1;
-                if( inPointIndex < 0 )
-                {
-                    if( loop )
-                    {
-                        inPointIndex = points.Count - 1;
-                    }
-                    else
-                    {
-                        continue;
-                    }
-                }
-                int outPointIndex = i;
-
-                ShapePoint softPoint = ShapePoint.Lerp( points[inPointIndex], points[outPointIndex], 0.5f );
-                points[inPointIndex] = softPoint;
-                points[outPointIndex] = softPoint;
-            }
-        }
-
-        public static ExtrudeShape GenerateExtrudeShape( List<ShapePoint> points, bool softEdges )
+        static List<int> lines = new List<int>();
+        public static ExtrudeShape GenerateExtrudeShape( List<ShapePoint> points )
         {
             if( points.Count < 2 )
             {
                 return ExtrudeShape.Line;
             }
 
+            lines.Clear();
             Vector2[] verts = new Vector2[points.Count];
             Vector2[] normals = new Vector2[points.Count];
             Color[] colors = new Color[points.Count];
             float[] u = new float[points.Count];
-            int segmentCount = softEdges ? points.Count - 1 : (points.Count / 2);
-
-            int[] lines = new int[segmentCount*2];
 
             for( int i = 0; i < points.Count; ++i )
             {
@@ -117,20 +121,16 @@ namespace FantasticSplines
                 normals[i] = points[i].normal;
                 u[i] = points[i].u;
                 colors[i] = Color.white;
-            }
 
-            int vertIndex = 0;
-            for( int s = 0; s < segmentCount; s++ )
-            {
-                int l = s * 2;
-                lines[l] = vertIndex;
-                ++vertIndex;
-                vertIndex %= points.Count;
-                lines[l + 1] = vertIndex;
-                if( !softEdges )
+                if( i < points.Count - 1 )
                 {
-                    ++vertIndex;
-                    vertIndex %= points.Count;
+                    Vector3 next = points[i + 1].position;
+                    Vector3 current = points[i].position;
+                    if( Vector3.Distance( next, current ) > ExtrudeShape.LineLengthThreshold )
+                    {
+                        lines.Add( i );
+                        lines.Add( i + 1 );
+                    }
                 }
             }
 
@@ -140,7 +140,7 @@ namespace FantasticSplines
                 normals = normals,
                 colors = colors,
                 u = u,
-                lines = lines
+                lines = lines.ToArray()
             };
         }
 

@@ -655,10 +655,10 @@ namespace FantasticSplines{
             Vector3 dirAnchorAToB = (endNode.position - startNode.position).normalized;
             float dstBetweenAnchors = (startNode.position - endNode.position).magnitude;
             Vector3 perp = Vector3.Cross( dirAnchorAToB, Vector3.up );
-            startNode.LocalOutControlPoint = perp * dstBetweenAnchors * startNode.automaticTangentLength;
-            startNode.LocalInControlPoint = -perp * dstBetweenAnchors * startNode.automaticTangentLength;
-            endNode.LocalInControlPoint = perp * dstBetweenAnchors * startNode.automaticTangentLength;
-            endNode.LocalOutControlPoint = -perp * dstBetweenAnchors * startNode.automaticTangentLength;
+            startNode.LocalOutControlPoint = -perp * dstBetweenAnchors * startNode.automaticTangentLength;
+            startNode.LocalInControlPoint = perp * dstBetweenAnchors * startNode.automaticTangentLength;
+            endNode.LocalInControlPoint = -perp * dstBetweenAnchors * startNode.automaticTangentLength;
+            endNode.LocalOutControlPoint = perp * dstBetweenAnchors * startNode.automaticTangentLength;
 
             if( startNodeCompare.IsDifferentFrom( startNode )
                 || endNodeCompare.IsDifferentFrom( endNode ) )
