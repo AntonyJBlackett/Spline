@@ -18,7 +18,7 @@ namespace FantasticSplines
 
             SplineProcessor.AddResultsAtNodes( ref samples, spline, softEdges ); // returns two samples for each nodes, in and out tangents
 
-            return GenerateExtrudeShape( samples, spline.IsLoop() );
+            return GenerateExtrudeShape( samples );
         }
 
         public struct ShapePoint
@@ -41,7 +41,7 @@ namespace FantasticSplines
         }
 
         List<ShapePoint> points = new List<ShapePoint>();
-        ExtrudeShape GenerateExtrudeShape( List<ExtrudePoint> samples, bool loop )
+        ExtrudeShape GenerateExtrudeShape( List<ExtrudePoint> samples )
         {
             float length = SplineProcessor.CalculateLength( samples );
             float inverseLength = 1 / length;
@@ -69,7 +69,7 @@ namespace FantasticSplines
                 SoftenEdges( ref points, loop );
             }*/
 
-            return GenerateExtrudeShape( points, softEdges, loop );
+            return GenerateExtrudeShape( points, softEdges );
         }
 
         void SoftenEdges( ref List<ShapePoint> points, bool loop )
@@ -96,7 +96,7 @@ namespace FantasticSplines
             }
         }
 
-        public static ExtrudeShape GenerateExtrudeShape( List<ShapePoint> points, bool softEdges, bool loop )
+        public static ExtrudeShape GenerateExtrudeShape( List<ShapePoint> points, bool softEdges )
         {
             if( points.Count < 2 )
             {
@@ -108,7 +108,6 @@ namespace FantasticSplines
             Color[] colors = new Color[points.Count];
             float[] u = new float[points.Count];
             int segmentCount = softEdges ? points.Count - 1 : (points.Count / 2);
-            if( loop ) segmentCount += 1;
 
             int[] lines = new int[segmentCount*2];
 

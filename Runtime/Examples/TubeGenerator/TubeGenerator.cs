@@ -113,7 +113,6 @@ public class ExtrudeShape
                 4,5,
                 6,7,
                 };
-
             return shape;
         }
     }
@@ -190,7 +189,7 @@ public class ExtrudeShape
         }
     }
 
-    public static ExtrudeShape GetExtrudeShape( ShapeType type )
+    public static ExtrudeShape ConstructExtrudeShape( ShapeType type )
     {
         switch( type )
         {
@@ -237,6 +236,61 @@ public class ExtrudeShape
         }
 
         return bounds.extents.magnitude;
+    }
+
+    void GenerateCapVerts()
+    {
+        capVerts.Clear();
+        for( int i = 1; i < lines.Length; ++i )
+        {
+            Vector2 vert = verts[ lines[i] ];
+            bool addVert = true;
+            for( int v = 0; v < capVerts.Count; ++v )
+            {
+                if( Vector2.Distance( capVerts[v], vert ) <= 0.001f )
+                {
+                    // we already have a vert at this location.
+                    addVert = false;
+                    break;
+                }
+            }
+            if( addVert ) capVerts.Add( vert );
+        }
+    }
+
+    void GenerateCapTriangles()
+    {
+        triangles.Clear();
+        Triangulator.Triangulate( capVerts, ref triangles );
+        UnityEngine.Assertions.Assert.IsTrue( capVerts.Count - 2 == triangles.Count / 3 );
+    }
+
+    bool capGenerated = false;
+    public void GenerateCap()
+    {
+        capGenerated = true;
+        GenerateCapVerts();
+        GenerateCapTriangles();
+    }
+
+    List<int> triangles = new List<int>();
+    public List<int> CapTriangles
+    {
+        get
+        {
+            if( !capGenerated ) GenerateCap();
+            return triangles;
+        }
+    }
+
+    List<Vector2> capVerts = new List<Vector2>();
+    public List<Vector2> CapVerts
+    {
+        get
+        {
+            if( !capGenerated ) GenerateCap();
+            return capVerts;
+        }
     }
 }
 
@@ -378,7 +432,7 @@ public class TubeGenerator : MonoBehaviour
         }
         else
         {
-            extrudeShape = ExtrudeShape.GetExtrudeShape( shapeType );
+            extrudeShape = ExtrudeShape.ConstructExtrudeShape( shapeType );
         }
     }
 
@@ -721,26 +775,42 @@ public class TubeGenerator : MonoBehaviour
         return splineVScalar;
     }
 
-    void GenerateMesh( List<ExtrudePoint> points, bool loop ) 
+    public bool startCap = false;
+    public bool endCap = false;
+
+    void GenerateMesh( List<ExtrudePoint> tubePoints, bool loop ) 
     {
-        if( points.Count < 2 )
+        if( tubePoints.Count < 2 )
         {
             return;
         }
 
+        bool hasStartCap = startCap && !loop;
+        bool hasEndCap = endCap && !loop;
+
+        int capCount = 0;
+        if( hasStartCap && !loop ) capCount++;
+        if( hasEndCap && !loop ) capCount++;
+
+        List<Vector2> capVerts = extrudeShape.CapVerts;
+        int capVertCount = capVerts.Count * capCount;
+        List<int> endCapTriangles = extrudeShape.CapTriangles;
+        int endCapTriIndexCount = endCapTriangles.Count * capCount;
+
         // setup mesh generation data
         int vertsInShape = extrudeShape.verts.Length;
-        int segments = points.Count - 1; 
+        int segments = tubePoints.Count - 1; 
         int edgeLoops = segments + 1;
-        int vertCount = vertsInShape * edgeLoops;
-        int triCount = extrudeShape.lines.Length * segments;
+        int vertCount = vertsInShape * edgeLoops + capVertCount;
+        int tubeTriCount = extrudeShape.lines.Length * segments;
         if( backfaces )
         {
-            triCount *= 2;
+            tubeTriCount *= 2;
+            endCapTriIndexCount *= 2;
         }
-        int triIndexCount = triCount * 3;
+        int triIndexCount = (tubeTriCount * 3) + endCapTriIndexCount;
 
-        float length = SplineProcessor.CalculateLength( points );
+        float length = SplineProcessor.CalculateLength( tubePoints );
         float vScalar = CalculateVScalar( length );
 
         int[] triangleIndicies = new int[triIndexCount];
@@ -754,35 +824,35 @@ public class TubeGenerator : MonoBehaviour
         inverseExtrudeShapeSize *= shapeFill;
 
         float extrudeDistance = 0;
-        Vector3 previousPosiiton = points[0].position;
-        for( int p = 0; p < points.Count; ++p )
+        Vector3 previousPosiiton = tubePoints[0].position;
+        for( int p = 0; p < tubePoints.Count; ++p )
         {
             int edgeLoopIndex = p * vertsInShape;
-            ExtrudePoint point = points[p];
+            ExtrudePoint point = tubePoints[p];
             Vector3 segmentDirection = point.pointTangent;
 
-            extrudeDistance += Vector3.Distance( points[p].position, previousPosiiton );
-            previousPosiiton = points[p].position;
+            extrudeDistance += Vector3.Distance( tubePoints[p].position, previousPosiiton );
+            previousPosiiton = tubePoints[p].position;
 
             bool start = p == 0;
-            bool end = p == points.Count - 1;
+            bool end = p == tubePoints.Count - 1;
 
             if( loop || (!start && !end) )
             {
                 int nextP = p + 1;
                 int previousP = p - 1;
 
-                if( nextP >= points.Count )
+                if( nextP >= tubePoints.Count )
                 {
                     nextP = 1; // first point is the same as the last point in a loop.
                 }
                 if( previousP < 0 )
                 {
-                    previousP = points.Count - 2; // first point is the same as the last point in a loop.
+                    previousP = tubePoints.Count - 2; // first point is the same as the last point in a loop.
                 }
 
-                ExtrudePoint next = points[nextP];
-                ExtrudePoint previous = points[previousP];
+                ExtrudePoint next = tubePoints[nextP];
+                ExtrudePoint previous = tubePoints[previousP];
                 segmentDirection = (next.position - point.position).normalized;
                 float nextDistance = Vector3.Distance( next.position, point.position );
                 float previousDistance = Vector3.Distance( previous.position, point.position );
@@ -814,14 +884,6 @@ public class TubeGenerator : MonoBehaviour
                 colors[index] = Color.white * extrudeShape.colors[sv];
                 uvs[index] = new Vector2( extrudeShape.u[sv], extrudeDistance * vScalar );
             }
-        }
-
-        // transform from world space to local space of the meshFilter
-        Matrix4x4 meshWorldToLocal = meshFilter.transform.worldToLocalMatrix;
-        for( int v = 0; v < verticies.Length; ++v )
-        {
-            verticies[v] = meshWorldToLocal.MultiplyPoint3x4( verticies[v] );
-            normals[v] = meshWorldToLocal.MultiplyVector( normals[v] );
         }
 
         // setup triangles
@@ -867,6 +929,98 @@ public class TubeGenerator : MonoBehaviour
                     ti++;
                 }
             }
+        }
+
+        if( hasStartCap )
+        {
+            int capStartIndex = vertCount - capVertCount;
+
+            // add cap verts
+            Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( tubePoints[0].position, Quaternion.LookRotation( tubePoints[0].pointTangent, tubePoints[0].normal ), inverseExtrudeShapeSize * Vector3.one );
+            Vector3[] projectToPoints = new Vector3[capVerts.Count];
+            for( int cv = 0; cv < capVerts.Count; ++cv )
+            {
+                projectToPoints[cv] = sectionSpaceMatrix.MultiplyPoint( capVerts[cv] );
+            }
+
+            for( int cv = 0; cv < capVerts.Count; ++cv )
+            {
+                int index = capStartIndex + cv;
+
+                verticies[index] = MathsUtils.LinePlaneIntersection( projectToPoints[cv], tubePoints[0].pointTangent, tubePoints[0].position, tubePoints[0].pointTangent );
+                normals[index] = -tubePoints[0].pointTangent;
+                colors[index] = colors[0]; // * extrudeShape.CapColors[i];
+                uvs[index] = uvs[0];// new Vector2( extrudeShape.capUs[i], uvs[0].y );
+            }
+
+            // add cap tris
+            for( int i = 0; i < endCapTriangles.Count; ++i )
+            {
+                triangleIndicies[ti] = capStartIndex + endCapTriangles[i];
+                ti++;
+            }
+            if( backfaces )
+            {
+                // add cap tris
+                for( int i = endCapTriangles.Count-1; i >= 0; --i )
+                {
+                    triangleIndicies[ti] = capStartIndex + endCapTriangles[i];
+                    ti++;
+                }
+            }
+        }
+
+        if( hasEndCap )
+        {
+            int endCapIndex = vertCount - capVertCount;
+            if( startCap ) endCapIndex += capVerts.Count;
+
+            int p = tubePoints.Count - 1;
+
+            // add cap verts
+            Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( tubePoints[p].position, Quaternion.LookRotation( tubePoints[p].pointTangent, tubePoints[p].normal ), inverseExtrudeShapeSize * Vector3.one );
+            Vector3[] projectToPoints = new Vector3[capVerts.Count];
+            for( int cv = 0; cv < capVerts.Count; ++cv )
+            {
+                projectToPoints[cv] = sectionSpaceMatrix.MultiplyPoint( capVerts[cv] );
+            }
+
+            for( int cv = 0; cv < capVerts.Count; ++cv )
+            {
+                int index = endCapIndex + cv;
+
+                verticies[index] = MathsUtils.LinePlaneIntersection( projectToPoints[cv], tubePoints[p].pointTangent, tubePoints[p].position, tubePoints[p].pointTangent );
+                normals[index] = tubePoints[p].pointTangent;
+
+
+                int edgeLoopIndex = p * vertsInShape;
+                colors[index] = colors[edgeLoopIndex]; // * extrudeShape.CapColors[i];
+                uvs[index] = uvs[edgeLoopIndex];// new Vector2( extrudeShape.capUs[i], uvs[0].y );
+            }
+
+            // add cap tris
+            // end cap is reversed
+            for( int i = endCapTriangles.Count - 1; i >= 0; --i )
+            {
+                triangleIndicies[ti] = endCapIndex + endCapTriangles[i];
+                ti++;
+            }
+            if( backfaces )
+            {
+                for( int i = 0; i < endCapTriangles.Count; ++i )
+                {
+                    triangleIndicies[ti] = endCapIndex + endCapTriangles[i];
+                    ti++;
+                }
+            }
+        }
+
+        // transform from world space to local space of the meshFilter
+        Matrix4x4 meshWorldToLocal = meshFilter.transform.worldToLocalMatrix;
+        for( int v = 0; v < verticies.Length; ++v )
+        {
+            verticies[v] = meshWorldToLocal.MultiplyPoint3x4( verticies[v] );
+            normals[v] = meshWorldToLocal.MultiplyVector( normals[v] );
         }
 
         // set the mesh

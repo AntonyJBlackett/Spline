@@ -38,7 +38,7 @@ namespace FantasticSplines
                 }
                 else
                 {
-                    onNodeRemoved( GetNodeCount() );
+                    onNodeRemoved?.Invoke( GetNodeCount() );
                 }
             }
 
