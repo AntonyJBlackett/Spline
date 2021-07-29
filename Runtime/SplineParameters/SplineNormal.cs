@@ -6,15 +6,30 @@ using FantasticSplines;
 using UnityEditor;
 #endif
 
-// Spline Keyframe track that stores local spline space directions that represent the normal (up direction) of the spline
-public class SplineNormal : KeyframedSplineParameter<Vector3>
+public enum NormalBlendType
 {
+    FloatLerp,
+    AngleLerp,
+    VertorSlerp
+}
+
+[System.Serializable]
+public struct Normal
+{
+    public float angle;
+    public NormalBlendType blendType;
+}
+
+// Spline Keyframe track that stores local spline space directions that represent the normal (up direction) of the spline
+public class SplineNormal : KeyframedSplineParameter<Normal>
+{
+    [Header( "Spline Normal Settings" )]
+    public bool enableSlerped180DegreeAngles = true;
+    public bool enableWindingNormals = true;
+    public bool loopWindingOnLoopedSpline = true;
+
     [Range( 1, 100 )]
     public int visualisationSamples = 50;
-
-    [Header( "Spline Normal Settings" )]
-    public bool forceUnitLength = true;
-    public bool forcePerpendicularToTangent = true;
 
     [Header("Normal Generation")]
     public bool automaticNormals = false;
@@ -29,71 +44,81 @@ public class SplineNormal : KeyframedSplineParameter<Vector3>
 
     public SplineNormal()
     {
-        onSplineChanged += UpdateNormalConstraints;
         CustomInterpolator = SlerpNormals;
     }
 
-    Vector3 SlerpNormals( ISpline spline, SplineParameterKeyframe<Vector3> first, SplineParameterKeyframe<Vector3> second, float t )
+    Normal SlerpNormals( ISpline spline, SplineParameterKeyframe<Normal> first, SplineParameterKeyframe<Normal> second, float t )
     {
-        return Vector3.Slerp( first.value, second.value, t );
+        float angle1 = first.value.angle;
+        float angle2 = second.value.angle;
+
+        float angle = 0;
+
+        switch( second.value.blendType )
+        {
+            case NormalBlendType.FloatLerp:
+                angle = Mathf.Lerp( angle1, angle2, t );
+                break;
+            case NormalBlendType.AngleLerp:
+                angle = Mathf.LerpAngle( angle1, angle2, t );
+                break;
+            case NormalBlendType.VertorSlerp:
+                Vector3 n1 = GetNormal( first.location.tangent, angle1 );
+                Vector3 n2 = GetNormal( second.location.tangent, angle2 );
+                Vector3 slerpedNormal = Vector3.Slerp( n1, n2, t );
+                Vector3 tangentAtT = spline.GetResultAtDistance( Mathf.Lerp( first.location.distance, second.location.distance, t ) ).tangent;
+                Vector3 right = Vector3.Cross( tangentAtT.normalized, slerpedNormal.normalized );
+                Vector3 trueNormal = Vector3.Cross( right, tangentAtT.normalized );
+                angle = GetAngleFromNormal( tangentAtT, trueNormal );
+                break;
+        }
+
+        return new Normal() { blendType = second.value.blendType, angle = angle };
     }
 
-    public override Vector3 GetDefaultKeyframeValue()
+    public override Normal GetDefaultKeyframeValue()
     {
-        return Vector3.up;
-    }
-
-    // transform to world space and constrain the normal
-    public override SplineParameterKeyframe<Vector3> TransformKeyframe( SplineParameterKeyframe<Vector3> keyframe )
-    {
-        keyframe.value = ConstrainNormal( spline.TransformDirection( keyframe.value ), keyframe.location.tangent );
-        return keyframe;
-    }
-
-    // transform to local space and constrain the normal
-    public override SplineParameterKeyframe<Vector3> InverseTransformKeyframe( SplineParameterKeyframe<Vector3> keyframe )
-    {
-        keyframe.value = spline.InverseTransformDirection( ConstrainNormal( keyframe.value, keyframe.location.tangent ) );
-        return keyframe;
-    }
-
-    public override Vector3 GetValueAtDistance( float distance, Vector3 defaultValue )
-    {
-        SplineResult result = spline.GetResultAtDistance( distance );
-        return GetNormalAtSplineResult( result );
+        return new Normal() { blendType = NormalBlendType.FloatLerp, angle = 0 };
     }
     #endregion
 
-    public Vector3 GetNormalAtSplineResult( SplineResult splineResult)
+    public float GetAngleFromNormal( Vector3 tangent, Vector3 normal )
     {
-        if( automaticNormals )
-        {
-            return CalculateAutomaticNormal( splineResult);
-        }
-        else
-        {
-            return InterpolateKeyframeNormals( splineResult);
-        }
+        Vector3 defaultNormal = GetNormal( tangent, 0 );
+        return Vector3.SignedAngle( defaultNormal, normal, tangent );
     }
 
-    public Vector3 InterpolateKeyframeNormals( SplineResult splineResult)
+    public Vector3 GetNormal( Vector3 tangent, float angle )
     {
-        Vector3 normal = base.GetValueAtDistance( splineResult.distance, GetDefaultKeyframeValue() );
-        return ConstrainNormal( normal, splineResult.tangent );
+        return Quaternion.LookRotation( tangent.normalized, transform.up ) * Quaternion.AngleAxis( angle, Vector3.forward ) * Vector3.up;
     }
 
-    public Vector3 CalculateAutomaticNormal( SplineResult splineResult)
+    public Vector3 GetNormal( SplineParameterKeyframe<Normal> keyframe )
+    {
+        return GetNormal( keyframe.location.tangent.normalized, keyframe.value.angle );
+    }
+
+    public Vector3 GetNormalAtSplineResult( SplineResult splineResult )
+    {
+        return GetNormal( splineResult.tangent, GetValueAtDistance( splineResult.distance, new Normal() ).angle );
+    }
+
+    public Vector3 GetNormalAtDistance( float distance )
+    {
+        return GetNormalAtSplineResult( spline.GetResultAtDistance( distance ) );
+    }
+
+    public Vector3 CalculateAutomaticNormal( SplineResult splineResult )
     {
         // everything here is calculated in world space.
-        Vector3 tangentDirection = splineResult.tangent.normalized;
-        Vector3 biNormal = Vector3.Cross( tangentDirection, Vector3.up ).normalized;
-        Vector3 normal = Vector3.Cross( biNormal, tangentDirection );
+        Vector3 normal = GetNormalAtSplineResult( splineResult );
 
         if( bankingStrength > 0.01f )
         {
             SplineResult bankingResult = spline.GetResultAtDistance( splineResult.distance + bankingBlendStep );
             Vector3 bankingTangentDirection = bankingResult.tangent.normalized;
 
+            Vector3 tangentDirection = splineResult.tangent.normalized;
             if( Vector3.Dot( tangentDirection, bankingTangentDirection ) < 0.999f )
             {
                 Vector3 bankingBiNormal = Vector3.Cross( tangentDirection, bankingTangentDirection ).normalized;
@@ -106,55 +131,19 @@ public class SplineNormal : KeyframedSplineParameter<Vector3>
         return normal;
     }
 
-    Vector3 ConstrainNormal( Vector3 normal, Vector3 tangentDirection )
-    {
-        if( forcePerpendicularToTangent )
-        {
-            float length = 1;
-            if( !forceUnitLength )
-            {
-                length = normal.magnitude;
-            }
-            tangentDirection = tangentDirection.normalized;
-            normal = normal.normalized;
-            Vector3 biNormal = Vector3.Cross( tangentDirection, normal );
-            normal = Vector3.Cross( biNormal, tangentDirection ).normalized * length;
-        }
-
-        if( forceUnitLength )
-        {
-            if( Mathf.Approximately( normal.sqrMagnitude, 0 ) )
-            {
-                normal = GetDefaultKeyframeValue();
-            }
-            normal = normal.normalized;
-        }
-
-        return normal;
-    }
-
-    void UpdateNormalConstraints()
-    {
-        var keys = Keyframes;
-        for( int i = 0; i < keys.Count; ++i )
-        {
-            SetKeyframeValue( i, keys[i].value ); // calls InverseTransformKeyframe
-        }
-    }
-
     #region Gizmos
 #if UNITY_EDITOR
-    protected override void DrawKeyframeValueGizmo( SplineParameterKeyframe<Vector3> keyframe )
+    protected override void DrawKeyframeValueGizmo( SplineParameterKeyframe<Normal> keyframe )
     {
         Vector3 worldPosition = keyframe.location.position;
-        Vector3 normal = keyframe.value;
+        Vector3 normal = GetNormalAtSplineResult( keyframe.location );
 
         Handles.color = Color.green;
         Handles.DrawLine( worldPosition, worldPosition + normal, 2 );
         Handles.ConeHandleCap( 0, worldPosition + normal, Quaternion.LookRotation( normal ), SplineNormalTool.GetHandleSize( worldPosition ) * 1.3f, EventType.Repaint );
     }
 
-    private void OnDrawGizmosSelected()
+    void OnDrawGizmosSelected()
     {
         if( spline == null )
         {

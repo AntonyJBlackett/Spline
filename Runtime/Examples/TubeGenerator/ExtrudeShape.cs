@@ -15,6 +15,7 @@ namespace FantasticSplines
 
         public enum ShapeType
         {
+            SplineShape,
             Line,
             LineSubdivided,
             Rectangle,

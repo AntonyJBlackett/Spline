@@ -12,13 +12,17 @@ namespace FantasticSplines
     [System.Serializable]
     public struct SplineParameterKeyframe<T>
     {
+        public float inTangent;
+        public float outTangent;
         public SplineResult location;
         public T value;
 
-        public SplineParameterKeyframe( T value, SplineResult location )
+        public SplineParameterKeyframe( T value, SplineResult location, float inT, float outT )
         {
             this.value = value;
             this.location = location;
+            inTangent = inT;
+            outTangent = outT;
         }
     }
 
@@ -197,9 +201,9 @@ namespace FantasticSplines
         }
 
         // Creates a default keyframe
-        SplineParameterKeyframe<T> CreateKeyframe( T value, SplineResult location )
+        SplineParameterKeyframe<T> CreateKeyframe( T value, SplineResult location, float inTangent, float outTangent )
         {
-            return new SplineParameterKeyframe<T>( value, location );
+            return new SplineParameterKeyframe<T>( value, location, inTangent, outTangent );
         }
 
         // Returns true if the the editor for this KeyframedSplineParameter<T> is active.
@@ -267,19 +271,29 @@ namespace FantasticSplines
         // Sets the spline location of the keyframe at index
         public void SetKeyframeLocation( int index, SplineResult location )
         {
-            SetKeyframe( index, CreateKeyframe( TransformKeyframe( rawKeyframes[index] ).value, location ) );
+            var key = rawKeyframes[index];
+            SetKeyframe( index, CreateKeyframe( TransformKeyframe( key ).value, location, key.inTangent, key.outTangent ) );
         }
 
         // Sets value stored of the keyframe at index
         public void SetKeyframeValue( int index, T value )
         {
-            SetKeyframe( index, CreateKeyframe( value, rawKeyframes[index].location ) );
+            var key = rawKeyframes[index];
+            SetKeyframe( index, CreateKeyframe( value, key.location, key.inTangent, key.outTangent ) );
         }
 
         // Sets value stored and the spline location of the keyframe at index
         public void SetKeyframe( int index, T value, SplineResult location )
         {
-            SetKeyframe( index, CreateKeyframe( value, location ) );
+            var key = rawKeyframes[index];
+            SetKeyframe( index, CreateKeyframe( value, location, key.inTangent, key.outTangent ) );
+        }
+
+        // Sets value stored and the spline location of the keyframe at index
+        public void SetKeyframeTangents( int index, float inTangent, float outTangent )
+        {
+            var key = rawKeyframes[index];
+            SetKeyframe( index, CreateKeyframe( TransformKeyframe( key ).value, key.location, key.inTangent, key.outTangent ) );
         }
 
         // Sets the keyframe at index
@@ -306,7 +320,7 @@ namespace FantasticSplines
         // Creates a new keyframe at the given spline location
         public int Insert( T value, SplineResult location )
         {
-            return Insert( CreateKeyframe( value, location ) );
+            return Insert( CreateKeyframe( value, location, 0, 0 ) );
         }
 
         // Adds the given keyframe
@@ -374,7 +388,17 @@ namespace FantasticSplines
                 distance -= first.location.length;
             }
 
-            float t = Mathf.InverseLerp( firstDistance, secondDistance, distance );
+            // t = A*(1-x)^3+3*B*(1-x)^2*x+3*C*(1-x)*x^2+D*x^3
+            float x = Mathf.InverseLerp( firstDistance, secondDistance, distance );
+            float A = 0;
+            // remap these so that tangent = 0 is linear, tangent = 1 is smooth.
+            float B = 1- MathsUtils.Remap( first.outTangent, 0, 1, 0.66f, 1 );
+            float C = MathsUtils.Remap( second.inTangent, 0, 1, 0.66f, 1);
+            float D = 1;
+
+            float oneMinusX = 1 - x;
+            float t = A * (oneMinusX*oneMinusX*oneMinusX) + 3 * B * (oneMinusX*oneMinusX) * x + 3 * C * oneMinusX * (x*x) + D * (x*x*x);
+
             return Interpolate( first, second, t );
         }
 
@@ -486,10 +510,18 @@ namespace FantasticSplines
             }
         }
 
+        void OnValidate()
+        {
+            OnKeyframesChanged();
+        }
+
         // Updates the keyframe at index's location on the spline using the specified location reposition mode
         void UpdateKeyframeLocation( int index, SplineParameterKeyframe<T> key )
         {
-            SetKeyframeLocation(index, SplineChangedEventHelper.OnSplineLengthChanged(key.location, spline, keyRepositionMode));
+            if( key.location.updateCount != spline.GetUpdateCount() )
+            {
+                SetKeyframeLocation( index, SplineChangedEventHelper.OnSplineLengthChanged( key.location, spline, keyRepositionMode ) );
+            }
         }
 
         // Updates keyframes locations on the spline.

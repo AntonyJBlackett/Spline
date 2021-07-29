@@ -183,6 +183,7 @@ namespace FantasticSplines
             return mouseOverKeyframe;
         }
 
+        float length = 0.1f;
         bool DoKeyframeMoveHandle( int keyFrameIndex, SplineParameterKeyframe<T> key )
         {
             Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
@@ -197,6 +198,36 @@ namespace FantasticSplines
             {
                 Undo.RecordObject( Target, "Move Spline Keyframe" );
                 Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAtDistance( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
+            }
+
+            EditorGUI.BeginChangeCheck();
+            float minHandleLength = handleSize;
+
+            Vector3 outHandleOrigin = resultAfter.position + resultAfter.tangent.normalized * minHandleLength;
+            Vector3 inHandleOrigin = resultAfter.position - resultAfter.tangent.normalized * minHandleLength;
+
+            Vector3 outHandlePosition = outHandleOrigin + resultAfter.tangent.normalized * key.outTangent;
+            Vector3 intHandlePosition = inHandleOrigin - resultAfter.tangent.normalized * key.inTangent;
+            Vector3 outTangent = Handles.Slider( outHandlePosition, resultAfter.tangent, handleSize, Handles.CubeHandleCap, 0 ) - outHandleOrigin;
+            Vector3 inTangent = Handles.Slider( intHandlePosition, resultAfter.tangent, handleSize, Handles.CubeHandleCap, 0 ) - inHandleOrigin;
+            if( EditorGUI.EndChangeCheck() )
+            {
+                if( Vector3.Dot( outTangent, resultAfter.tangent ) < 0 )
+                {
+                    outTangent = Vector3.zero;
+                }
+                if( Vector3.Dot( inTangent, resultAfter.tangent ) > 0 )
+                {
+                    inTangent = Vector3.zero;
+                }
+
+                key.outTangent = outTangent.magnitude;
+                key.inTangent = inTangent.magnitude;
+
+                key.outTangent = Mathf.Clamp( key.outTangent, 0, 1 );
+                key.inTangent = Mathf.Clamp( key.inTangent,0, 1 );
+                Undo.RecordObject( Target, "Edit Spline Keyframe Tangent" );
+                Target.SetKeyframe( keyFrameIndex, key );
             }
 
             return HandleUtility.DistanceToCube( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize * 10 ) <= 0; // * 3 to add some tollerance
@@ -233,7 +264,7 @@ namespace FantasticSplines
             {
                 SerializedProperty keySP = rawKeysSP.GetArrayElementAtIndex( i );
                 SerializedProperty keyValue = keySP.FindPropertyRelative( "value" );
-                float propertyHeight = EditorGUI.GetPropertyHeight( keyValue.propertyType, new GUIContent( "" ) );
+                float propertyHeight = EditorGUI.GetPropertyHeight( keyValue, new GUIContent( "" ), true );
 
                 Vector2 guiPosition = HandleUtility.WorldToGUIPoint( keys[i].location.position ) + new Vector2( 0.5f, 0.5f) * SplineHandleUtility.GetNodeHandleSize( keys[i].location.position );
                 Vector2 rectSize = new Vector2( GetGUIPropertyWidth(), propertyHeight );
@@ -248,7 +279,7 @@ namespace FantasticSplines
                 EditorGUI.DrawRect( new Rect(Vector2.zero, rectSize + border * 2 ), EditorColor );
 
                 GUILayout.BeginArea( new Rect( border, rectSize ) );
-                EditorGUILayout.PropertyField( keyValue, new GUIContent() );
+                EditorGUILayout.PropertyField( keyValue, new GUIContent(), true );
                 GUILayout.EndArea();
 
                 GUILayout.EndArea();

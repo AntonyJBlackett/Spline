@@ -338,16 +338,20 @@ namespace FantasticSplines
 #if UNITY_EDITOR
         void OnDrawGizmos()
         {
+            Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+            Gizmos.matrix = transform.localToWorldMatrix;
+            Handles.matrix = transform.localToWorldMatrix;
             if( Selection.activeObject != gameObject )
             {
-                Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-                Gizmos.matrix = transform.localToWorldMatrix;
-                Handles.matrix = transform.localToWorldMatrix;
                 localSpline.OnDrawGizmos( GetColor(), gizmoScale );
-                Gizmos.matrix = Matrix4x4.identity;
-                Handles.matrix = Matrix4x4.identity;
-                Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
             }
+            else
+            {
+                localSpline.DrawDirecitonIndicators( GetColor(), gizmoScale );
+            }
+            Gizmos.matrix = Matrix4x4.identity;
+            Handles.matrix = Matrix4x4.identity;
+            Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
         }
 #endif
 

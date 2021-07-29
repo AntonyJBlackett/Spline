@@ -547,7 +547,7 @@ namespace FantasticSplines
             return GetResultAtSegmentT( nodeIndex, 0 );
         }
 
-        public void OnDrawGizmos(Color color, float gizmoScale)
+        public void OnDrawGizmos( Color color, float gizmoScale )
         {
 #if UNITY_EDITOR
             EnsureCacheIsUpdated();
@@ -563,8 +563,32 @@ namespace FantasticSplines
                 Gizmos.color = Color.white;
                 for( int i = 0; i < NodeCount; ++i )
                 {
-                    Vector3 handleForward = (Handles.matrix.MultiplyPoint( nodes[i].position ) - SceneView.currentDrawingSceneView.camera.transform.position).normalized;
-                    Gizmos.DrawSphere( nodes[i].position, SplineHandleUtility.GetNodeHandleSize( nodes[i].position ) * 0.25f * gizmoScale );
+                    float size = SplineHandleUtility.GetNodeHandleSize( nodes[i].position );
+                    Gizmos.DrawSphere( nodes[i].position, size * 0.25f * gizmoScale );
+                }
+            }
+
+            DrawDirecitonIndicators( color, gizmoScale );
+#endif
+        }
+
+        public void DrawDirecitonIndicators( Color color, float gizmoScale )
+        {
+#if UNITY_EDITOR
+            using( new Handles.DrawingScope( color ) )
+            {
+                Handles.color = color;
+                for( int i = 0; i < SegmentCount; ++i )
+                {
+                    if( loop && i == SegmentCount - 1 )
+                    {
+                        // differentiate the looped section
+                        break;
+                    }
+                    // direction indicators
+                    SplineResult result = GetResultAtSegmentT( i, 0.5f );
+                    float arrowSize = SplineHandleUtility.GetNodeHandleSize( result.position ) * 0.3f;
+                    Handles.ConeHandleCap( 0, result.position + result.localTangent.normalized * arrowSize, Quaternion.LookRotation( result.localTangent.normalized, Vector3.up ), arrowSize * gizmoScale, EventType.Repaint );
                 }
             }
 #endif

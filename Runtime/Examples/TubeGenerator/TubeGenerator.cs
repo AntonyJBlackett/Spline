@@ -101,6 +101,7 @@ namespace FantasticSplines
         [Header( "Extrude Shape" )]
         public ExtrudeShape.ShapeSizeType shapeSizeType = ExtrudeShape.ShapeSizeType.Extents;
         public ExtrudeShape.ShapeType shapeType = ExtrudeShape.ShapeType.Line;
+        public SplineExtrudeShape splineShape;
 
         [Header( "UVs" )]
         public bool seamlessUVs = true;
@@ -111,7 +112,6 @@ namespace FantasticSplines
 
         Mesh mesh;
         ExtrudeShape extrudeShape;
-        public SplineExtrudeShape splineShape;
 
         private void Awake()
         {
@@ -138,7 +138,7 @@ namespace FantasticSplines
                 meshFilter.sharedMesh = mesh;
             }
 
-            if( splineShape != null )
+            if( splineShape != null && shapeType == ExtrudeShape.ShapeType.SplineShape )
             {
                 extrudeShape = splineShape.GetExtrudeShape();
             }
@@ -424,7 +424,7 @@ namespace FantasticSplines
                 return Vector3.up;
             }
 
-            return splineNormal.GetValueAtDistance( distance, Vector3.up );
+            return splineNormal.GetNormalAtDistance( distance );
         }
 
         public const int SplineNodePointPriority = 5;
