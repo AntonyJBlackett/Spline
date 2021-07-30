@@ -26,6 +26,13 @@ namespace FantasticSplines
         }
     }
 
+    public enum KeyframeInterpolationModes
+    {
+        Linear,
+        SmoothStep,
+        Tangents
+    }
+
     // A collection of data points along a spline
     [System.Serializable]
     [ExecuteInEditMode]
@@ -98,6 +105,16 @@ namespace FantasticSplines
         public bool KeepEditorActive = false;
         public bool enableKeyframeHandles = true;
         public bool enableValueHandles = true;
+
+        [Header( "Interpolation" )]
+        public KeyframeInterpolationModes keyframeInterpolationMode = KeyframeInterpolationModes.Linear;
+        public bool EnableKeyframeTangents
+        {
+            get
+            {
+                return keyframeInterpolationMode == KeyframeInterpolationModes.Tangents;
+            }
+        }
 
         [Header( "Gizmos" )]
         public bool enableGizmos = true;
@@ -362,6 +379,28 @@ namespace FantasticSplines
             OnKeyframesChanged();
         }
 
+        float GetBlend( SplineParameterKeyframe<T> first, SplineParameterKeyframe<T> second, float x )
+        {
+            switch( keyframeInterpolationMode )
+            {
+                case KeyframeInterpolationModes.Linear:
+                    return x;
+                case KeyframeInterpolationModes.SmoothStep:
+                    return Mathf.SmoothStep( 0, 1, x );
+                case KeyframeInterpolationModes.Tangents:
+                    // t = A*(1-x)^3+3*B*(1-x)^2*x+3*C*(1-x)*x^2+D*x^3
+                    float A = 0;
+                    // remap these so that tangent = 0 is linear, tangent = 1 is smooth.
+                    float B = 1 - MathsUtils.Remap( first.outTangent, 0, 1, 0.66f, 1 );
+                    float C = MathsUtils.Remap( second.inTangent, 0, 1, 0.66f, 1 );
+                    float D = 1;
+
+                    float oneMinusX = 1 - x;
+                    return A * (oneMinusX * oneMinusX * oneMinusX) + 3 * B * (oneMinusX * oneMinusX) * x + 3 * C * oneMinusX * (x * x) + D * (x * x * x);
+            }
+            return x;
+        }
+
         // Returns an interpolated keyframe value of T at distance on the spline
         T InterpolateWithDistance( float distance )
         {
@@ -388,18 +427,10 @@ namespace FantasticSplines
                 distance -= first.location.length;
             }
 
-            // t = A*(1-x)^3+3*B*(1-x)^2*x+3*C*(1-x)*x^2+D*x^3
-            float x = Mathf.InverseLerp( firstDistance, secondDistance, distance );
-            float A = 0;
-            // remap these so that tangent = 0 is linear, tangent = 1 is smooth.
-            float B = 1- MathsUtils.Remap( first.outTangent, 0, 1, 0.66f, 1 );
-            float C = MathsUtils.Remap( second.inTangent, 0, 1, 0.66f, 1);
-            float D = 1;
+            float t = Mathf.InverseLerp( firstDistance, secondDistance, distance );
+            float blend = GetBlend( first, second, t );
 
-            float oneMinusX = 1 - x;
-            float t = A * (oneMinusX*oneMinusX*oneMinusX) + 3 * B * (oneMinusX*oneMinusX) * x + 3 * C * oneMinusX * (x*x) + D * (x*x*x);
-
-            return Interpolate( first, second, t );
+            return Interpolate( first, second, blend );
         }
 
         // Returns an interpolated keyframe value of T between two keyframes

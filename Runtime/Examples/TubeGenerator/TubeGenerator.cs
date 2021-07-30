@@ -76,35 +76,45 @@ namespace FantasticSplines
         [Range( 0.1f, 10 )]
         public float tolleranceSamplingStepDistance = 0.5f;
 
-        [Header( "Geometry Settings" )]
-        public float tubeRadius = 1;
-        public float CornerRadius
-        {
-            get
-            {
-                return tubeRadius + cornerRadius;
-            }
-        }
-        [Range( 0, 1 )]
-        public float shapeFill = 1;
-        public CornerType cornerType = CornerType.Mitre;
-        [Range( 2, 16 )]
-        public int roundCornerSegments = 5;
-        public float cornerRadius = 0;
-        [Range( 1, 180 )]
-        public float cornerAngle = 10;
-        public bool backfaces = false;
-        public bool enableTwistSubdivision = true;
-        [Range( 0.1f, 45.0f )]
-        public float twistSubdivisionAngle = 5;
-
         [Header( "Extrude Shape" )]
         public ExtrudeShape.ShapeSizeType shapeSizeType = ExtrudeShape.ShapeSizeType.Extents;
         public ExtrudeShape.ShapeType shapeType = ExtrudeShape.ShapeType.Line;
         public SplineExtrudeShape splineShape;
+        [Range( 0, 1 )]
+        public float shapeFill = 1;
 
+        [Header( "Tube Geometry Settings" )]
+        public float tubeRadius = 1;
+        public float cornerRadius = 0;
+        public CornerType cornerType = CornerType.Mitre;
+        [Range( 2, 16 )]
+        public int roundCornerSegments = 5;
+        [Range( 1, 180 )]
+        public float cornerAngleThreshold = 10;
+
+        [Header( "Detail Subdivisions" )]
+        public bool enableTwistSubdivision = true;
+        [Range( 0.1f, 45.0f )]
+        public float twistSubdivisionAngle = 5;
+
+        public enum VSpace
+        {
+            SplineDistance,
+            SplineT
+        }
         [Header( "UVs" )]
-        public bool seamlessUVs = true;
+        public VSpace vSpace = VSpace.SplineDistance;
+        public float vTiling = 1;
+        public float vOffset = 0;
+        public bool seamlessVs = true;
+        public bool swapUVs = false;
+        public bool mirrorU = false;
+        public bool mirrorV = false;
+
+        [Header( "Faces" )]
+        public bool backfaces = false;
+        public bool startCap = false;
+        public bool endCap = false;
 
         [Header( "Output" )]
         public MeshFilter meshFilter;
@@ -112,6 +122,14 @@ namespace FantasticSplines
 
         Mesh mesh;
         ExtrudeShape extrudeShape;
+
+        public float CornerRadius
+        {
+            get
+            {
+                return tubeRadius + cornerRadius;
+            }
+        }
 
         private void Awake()
         {
@@ -321,7 +339,7 @@ namespace FantasticSplines
                     pointTangent = (inTangent + outTangent) * 0.5f;
                 }
 
-                bool isCorner = Vector3.Angle( inTangent, outTangent ) > cornerAngle;
+                bool isCorner = Vector3.Angle( inTangent, outTangent ) > cornerAngleThreshold;
                 if( isCorner && cornerType != CornerType.Simple )
                 {
                     AddCornerPoints( ref extrudePoints, splinePoint, pointTangent, inTangent, outTangent, firstPoint );
@@ -436,6 +454,7 @@ namespace FantasticSplines
 
         void AddCornerPoints( ref List<ExtrudePoint> extrudePoints, ExtrudePoint splinePoint, Vector3 tangent, Vector3 inTangent, Vector3 outTangent, bool firstPoint )
         {
+            // default values
             CalculateCornerPoint( out Vector3 cornerCenter, splinePoint.position, inTangent, outTangent );
             Vector3 cornerAxis = Vector3.Cross( inTangent, outTangent ).normalized;
             Vector3 inPoint = MathsUtils.ProjectPointOnLine( splinePoint.position, inTangent, cornerCenter );
@@ -444,8 +463,11 @@ namespace FantasticSplines
             float inDistance = splinePoint.distance - halfCornerLength;
             float outDistance = splinePoint.distance + halfCornerLength;
 
-            /* experimental code, trying to find a better corner start and end position for concave entry spline arcs.
-            float angle = Vector3.Angle( inTangent, outTangent );
+            ExtrudePoint startCorner = ConstructExtrudePoint( inPoint, GetNormalAtDistance( inDistance ), inTangent, inTangent, inDistance, CornerEndPointPriority );
+            ExtrudePoint endCorner = ConstructExtrudePoint( outPoint, GetNormalAtDistance( outDistance ), outTangent, outTangent, outDistance, CornerEndPointPriority );
+
+            //experimental code, trying to find a better corner start and end position for concave entry spline arcs.
+            /*float angle = Vector3.Angle( inTangent, outTangent );
             float halfArcDistance = Mathf.PI * CornerRadius * (angle / 360);
             float halfCordLegnth = CornerRadius * Mathf.Sin( angle * Mathf.Deg2Rad * 0.5f );
             int seekIterations = 10;
@@ -487,8 +509,44 @@ namespace FantasticSplines
             }*/
 
 
-            ExtrudePoint startCorner = ConstructExtrudePoint( inPoint, GetNormalAtDistance( inDistance ), inTangent, inTangent, inDistance, CornerEndPointPriority );
-            ExtrudePoint endCorner = ConstructExtrudePoint( outPoint, GetNormalAtDistance( outDistance ), outTangent, outTangent, outDistance, CornerEndPointPriority );
+            /* SplineResult inResult;
+             SplineResult outResult;
+
+             //experimental code, trying to find a better corner start and end position for concave entry spline arcs.
+             float CornetFitThreshold = 0.05f; // this is a percenage of actual corner cord length compared to the correct corner arc length
+             float angle = Vector3.Angle( inTangent, outTangent );
+             float halfCordLegnth = CornerRadius * Mathf.Sin( angle * Mathf.Deg2Rad * 0.5f );
+             float otherAngle = (180 - angle) * 0.5f;
+             float seekDistance = halfCordLegnth * Mathf.Sin( angle ) / Mathf.Sin( otherAngle );
+             int maxIterations = 10;
+             int i = 0;
+             do
+             {
+                 inResult = spline.GetResultAtDistance( splinePoint.distance - seekDistance );
+                 outResult = spline.GetResultAtDistance( splinePoint.distance + seekDistance );
+
+                 float distance = (inResult.position - outResult.position).magnitude;
+                 angle = Vector3.Angle( inResult.tangent, outResult.tangent );
+                 halfCordLegnth = CornerRadius * Mathf.Sin( angle * Mathf.Deg2Rad * 0.5f );
+
+                 float test = distance / (halfCordLegnth * 2);
+                 if( test > 0 && test < CornetFitThreshold )
+                 {
+                     // good enough, let's build the corner!
+                     break;
+                 }
+
+                 // let's keep seeking.
+                 seekDistance += (halfCordLegnth * 2) - distance;
+                 ++i;
+             } while( i < maxIterations );
+
+             ExtrudePoint startCorner = ConstructExtrudePoint( inResult.position, GetNormalAtDistance( inResult.distance ), inResult.tangent.normalized, inResult.tangent.normalized, inResult.distance, CornerEndPointPriority );
+             ExtrudePoint endCorner = ConstructExtrudePoint( outResult.position, GetNormalAtDistance( outResult.distance ), outResult.tangent.normalized, outResult.tangent.normalized, outResult.distance, CornerEndPointPriority );
+             Vector3 cornerAxis = Vector3.Cross( inResult.tangent.normalized, outResult.tangent.normalized ).normalized;
+             Vector3 cornerCenter1 = inResult.position + Vector3.Cross( cornerAxis, inResult.tangent.normalized ).normalized * CornerRadius;
+             Vector3 cornerCenter2 = outResult.position + Vector3.Cross( cornerAxis, outResult.tangent.normalized ).normalized * CornerRadius;
+             Vector3 cornerCenter = (cornerCenter1 + cornerCenter2) * 0.5f;*/
 
             if( !firstPoint )
             {
@@ -574,19 +632,15 @@ namespace FantasticSplines
 
         float CalculateVScalar( float length )
         {
-            float splineVScalar = 1; // used to best fit v's so they begin and end at the end of the spline
-            if( seamlessUVs )
+            float splineVScalar = length / vTiling;
+            if( seamlessVs )
             {
-                float vLengthsInSpline = length / (tubeRadius * 2);
-                float roundedVLength = Mathf.Round( vLengthsInSpline );
-                float stretchedSplineLength = roundedVLength * (tubeRadius * 2);
+                float roundedVLength = Mathf.Round( splineVScalar );
+                float stretchedSplineLength = roundedVLength * vTiling;
                 splineVScalar = stretchedSplineLength / length;
             }
             return splineVScalar;
         }
-
-        public bool startCap = false;
-        public bool endCap = false;
 
         void GenerateMesh( List<ExtrudePoint> tubePoints, bool loop )
         {
@@ -620,8 +674,16 @@ namespace FantasticSplines
             }
             int triIndexCount = (tubeTriCount * 3) + endCapTriIndexCount;
 
-            float length = SplineProcessor.CalculateLength( tubePoints );
-            float vScalar = CalculateVScalar( length );
+            float tubeLength = Mathf.Max( 0.001f, SplineProcessor.CalculateLength( tubePoints ) );
+            float vScalar = (vSpace == VSpace.SplineT) ? vTiling / tubeLength : vTiling;
+            if( seamlessVs )
+            {
+                tubeLength = (vSpace == VSpace.SplineT) ? 1 : tubeLength;
+
+                float tiles = tubeLength / (1/vTiling);
+                float roundedTiles = Mathf.Round( tiles );
+                vScalar *= roundedTiles / tiles;
+            }
 
             int[] triangleIndicies = new int[triIndexCount];
             Vector3[] verticies = new Vector3[vertCount];
@@ -692,7 +754,12 @@ namespace FantasticSplines
                     verticies[index] = MathsUtils.LinePlaneIntersection( projectToPoints[sv], segmentDirection, point.position, point.pointTangent );
                     normals[index] = normalMatrix.MultiplyVector( extrudeShape.normals[sv] );
                     colors[index] = Color.white * extrudeShape.colors[sv];
-                    uvs[index] = new Vector2( extrudeShape.u[sv], extrudeDistance * vScalar );
+
+                    float u = extrudeShape.u[sv];
+                    float v = (extrudeDistance+vOffset) * vScalar;
+                    if( mirrorU ) u *= -1;
+                    if( mirrorV ) v *= -1;
+                    uvs[index] = swapUVs ? new Vector2( v, u ) : new Vector2( u, v );
                 }
             }
 

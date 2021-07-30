@@ -87,6 +87,23 @@ namespace FantasticSplines
             Handles.CubeHandleCap( controlId, position, handleRotation, size, eventType ); // fill
         }
 
+        public static void KeyframeTangentCap( int controlId, Vector3 position, Quaternion rotation, float size, EventType eventType )
+        {
+            Camera camera = SceneView.currentDrawingSceneView.camera;
+            Vector3 handleForward = (position - camera.transform.position).normalized;
+            if( camera.orthographic )
+            {
+                handleForward = camera.transform.forward;
+            }
+            Quaternion handleRotation = Quaternion.LookRotation( handleForward, camera.transform.up );
+
+            using( new Handles.DrawingScope( Color.black ) )
+            {
+                Handles.SphereHandleCap( controlId, position, handleRotation, size * 1.3f, eventType ); // outline
+            }
+            Handles.SphereHandleCap( controlId, position, handleRotation, size, eventType ); // fill
+        }
+
         public static float GetHandleSize( Vector3 position )
         {
             return HandleUtility.GetHandleSize( position ) * 0.1f;
@@ -188,46 +205,54 @@ namespace FantasticSplines
         {
             Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
 
-            EditorGUI.BeginChangeCheck();
             float handleSize = GetHandleSize( key.location.position );
             float handleOffset = 0;
             SplineResult resultAfter = Target.spline.GetResultAtDistance( Target.GetKeyframe( keyFrameIndex ).location.distance + handleOffset );
+
+            if( Target.EnableKeyframeTangents )
+            {
+                EditorGUI.BeginChangeCheck();
+                float minHandleLength = handleSize * 1.5f;
+                Vector3 outHandleOrigin = resultAfter.position + resultAfter.tangent.normalized * minHandleLength;
+                Vector3 inHandleOrigin = resultAfter.position - resultAfter.tangent.normalized * minHandleLength;
+                Vector3 outHandlePosition = outHandleOrigin + resultAfter.tangent.normalized * key.outTangent;
+                Vector3 inHandlePosition = inHandleOrigin - resultAfter.tangent.normalized * key.inTangent;
+
+                using( new Handles.DrawingScope( Color.black ) )
+                {
+                    Handles.DrawLine( outHandlePosition, inHandlePosition, 1 );
+                }
+
+                Vector3 outTangent = Handles.Slider( outHandlePosition, resultAfter.tangent, handleSize * 0.75f, KeyframeTangentCap, 0 ) - outHandleOrigin;
+                Vector3 inTangent = Handles.Slider( inHandlePosition, resultAfter.tangent, handleSize * 0.75f, KeyframeTangentCap, 0 ) - inHandleOrigin;
+                if( EditorGUI.EndChangeCheck() )
+                {
+                    if( Vector3.Dot( outTangent, resultAfter.tangent ) < 0 )
+                    {
+                        outTangent = Vector3.zero;
+                    }
+                    if( Vector3.Dot( inTangent, resultAfter.tangent ) > 0 )
+                    {
+                        inTangent = Vector3.zero;
+                    }
+
+                    key.outTangent = outTangent.magnitude;
+                    key.inTangent = inTangent.magnitude;
+
+                    key.outTangent = Mathf.Clamp( key.outTangent, 0, 1 );
+                    key.inTangent = Mathf.Clamp( key.inTangent, 0, 1 );
+                    Undo.RecordObject( Target, "Edit Spline Keyframe Tangent" );
+                    Target.SetKeyframe( keyFrameIndex, key );
+                }
+            }
+
+            EditorGUI.BeginChangeCheck();
             // free move handle is used to check drag input. We'll recalculate the position ourselves with the mouse position
             Handles.FreeMoveHandle( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize, Vector3.zero, KeyframeHandleCap );
             if( EditorGUI.EndChangeCheck() )
             {
                 Undo.RecordObject( Target, "Move Spline Keyframe" );
                 Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAtDistance( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
-            }
-
-            EditorGUI.BeginChangeCheck();
-            float minHandleLength = handleSize;
-
-            Vector3 outHandleOrigin = resultAfter.position + resultAfter.tangent.normalized * minHandleLength;
-            Vector3 inHandleOrigin = resultAfter.position - resultAfter.tangent.normalized * minHandleLength;
-
-            Vector3 outHandlePosition = outHandleOrigin + resultAfter.tangent.normalized * key.outTangent;
-            Vector3 intHandlePosition = inHandleOrigin - resultAfter.tangent.normalized * key.inTangent;
-            Vector3 outTangent = Handles.Slider( outHandlePosition, resultAfter.tangent, handleSize, Handles.CubeHandleCap, 0 ) - outHandleOrigin;
-            Vector3 inTangent = Handles.Slider( intHandlePosition, resultAfter.tangent, handleSize, Handles.CubeHandleCap, 0 ) - inHandleOrigin;
-            if( EditorGUI.EndChangeCheck() )
-            {
-                if( Vector3.Dot( outTangent, resultAfter.tangent ) < 0 )
-                {
-                    outTangent = Vector3.zero;
-                }
-                if( Vector3.Dot( inTangent, resultAfter.tangent ) > 0 )
-                {
-                    inTangent = Vector3.zero;
-                }
-
-                key.outTangent = outTangent.magnitude;
-                key.inTangent = inTangent.magnitude;
-
-                key.outTangent = Mathf.Clamp( key.outTangent, 0, 1 );
-                key.inTangent = Mathf.Clamp( key.inTangent,0, 1 );
-                Undo.RecordObject( Target, "Edit Spline Keyframe Tangent" );
-                Target.SetKeyframe( keyFrameIndex, key );
             }
 
             return HandleUtility.DistanceToCube( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize * 10 ) <= 0; // * 3 to add some tollerance
