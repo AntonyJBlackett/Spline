@@ -564,7 +564,7 @@ namespace FantasticSplines
                 for( int i = 0; i < NodeCount; ++i )
                 {
                     float size = SplineHandleUtility.GetNodeHandleSize( nodes[i].position );
-                    Gizmos.DrawSphere( nodes[i].position, size * 0.25f * gizmoScale );
+                    Gizmos.DrawSphere( nodes[i].position, size * 0.5f * gizmoScale );
                 }
             }
 

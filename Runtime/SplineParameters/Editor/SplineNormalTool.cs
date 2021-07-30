@@ -45,7 +45,7 @@ namespace FantasticSplines
         {
             base.DoKeyframeToolHandles();
 
-            if( SplineNormal.enableValueHandles )
+            if( SplineNormal.enableKeyframeHandles )
             {
                 var keys = SplineNormal.Keyframes;
                 Color rotationHandleColour = Color.green;
@@ -60,7 +60,7 @@ namespace FantasticSplines
                         Vector3 normal = SplineNormal.GetNormal( keys[i] );
 
                         Vector3 discNormal = tangent.normalized;
-                        float discRadius = 0.5f;
+                        float discRadius = 0.5f * SplineNormal.GetNormalGizmoScale();
 
                         Quaternion normalRotation = Quaternion.LookRotation( normal, tangent.normalized );
 
@@ -126,7 +126,6 @@ namespace FantasticSplines
                     Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, HandleUtility.GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
                 }
             }
-
             so.ApplyModifiedProperties();
         }
         #endregion

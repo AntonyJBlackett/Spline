@@ -116,8 +116,9 @@ namespace FantasticSplines
                 Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
                 SplineResult result = Target.spline.GetResultClosestTo( ray );
 
-                bool click = Handles.Button( result.position, Quaternion.identity, GetHandleSize( result.position ), GetHandleSize( result.position ), KeyframeHandleCap );
-                click = click || Handles.Button( ray.origin, Quaternion.identity, 0, GetHandleSize( ray.origin ), KeyframeHandleCap );
+                float size = GetHandleSize( result.position ) * Target.spline.GetGizmoScale();
+                bool click = Handles.Button( result.position, Quaternion.identity, size, size, KeyframeHandleCap );
+                click = click || Handles.Button( ray.origin, Quaternion.identity, 0, GetHandleSize( ray.origin ) * Target.spline.GetGizmoScale(), KeyframeHandleCap );
 
                 if( click )
                 {
@@ -136,7 +137,8 @@ namespace FantasticSplines
                 var keys = Target.Keyframes;
                 for( int i = 0; i < keys.Count; ++i )
                 {
-                    bool click = Handles.Button( keys[i].location.position, Quaternion.identity, GetHandleSize( keys[i].location.position ), GetHandleSize( keys[i].location.position ), KeyframeHandleCap );
+                    float size = GetHandleSize( keys[i].location.position ) * Target.spline.GetGizmoScale();
+                    bool click = Handles.Button( keys[i].location.position, Quaternion.identity, size, size, KeyframeHandleCap );
                     if( click )
                     {
                         Undo.RecordObject( Target, "Delete Spline Keyframe" );
@@ -205,24 +207,36 @@ namespace FantasticSplines
         {
             Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
 
-            float handleSize = GetHandleSize( key.location.position );
+            float handleSize = GetHandleSize( key.location.position ) * Target.spline.GetGizmoScale();
             float handleOffset = 0;
             SplineResult resultAfter = Target.spline.GetResultAtDistance( Target.GetKeyframe( keyFrameIndex ).location.distance + handleOffset );
 
+            float minHandleLength = handleSize * 1.5f * Target.spline.GetGizmoScale();
+            Vector3 outHandleOrigin = resultAfter.position + resultAfter.tangent.normalized * minHandleLength;
+            Vector3 inHandleOrigin = resultAfter.position - resultAfter.tangent.normalized * minHandleLength;
+            Vector3 outHandlePosition = outHandleOrigin + resultAfter.tangent.normalized * key.outTangent;
+            Vector3 inHandlePosition = inHandleOrigin - resultAfter.tangent.normalized * key.inTangent;
+
             if( Target.EnableKeyframeTangents )
             {
-                EditorGUI.BeginChangeCheck();
-                float minHandleLength = handleSize * 1.5f;
-                Vector3 outHandleOrigin = resultAfter.position + resultAfter.tangent.normalized * minHandleLength;
-                Vector3 inHandleOrigin = resultAfter.position - resultAfter.tangent.normalized * minHandleLength;
-                Vector3 outHandlePosition = outHandleOrigin + resultAfter.tangent.normalized * key.outTangent;
-                Vector3 inHandlePosition = inHandleOrigin - resultAfter.tangent.normalized * key.inTangent;
-
                 using( new Handles.DrawingScope( Color.black ) )
                 {
                     Handles.DrawLine( outHandlePosition, inHandlePosition, 1 );
                 }
+            }
 
+            EditorGUI.BeginChangeCheck();
+            // free move handle is used to check drag input. We'll recalculate the position ourselves with the mouse position
+            Handles.FreeMoveHandle( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize, Vector3.zero, KeyframeHandleCap );
+            if( EditorGUI.EndChangeCheck() )
+            {
+                Undo.RecordObject( Target, "Move Spline Keyframe" );
+                Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAtDistance( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
+            }
+
+            if( Target.EnableKeyframeTangents )
+            {
+                EditorGUI.BeginChangeCheck();
                 Vector3 outTangent = Handles.Slider( outHandlePosition, resultAfter.tangent, handleSize * 0.75f, KeyframeTangentCap, 0 ) - outHandleOrigin;
                 Vector3 inTangent = Handles.Slider( inHandlePosition, resultAfter.tangent, handleSize * 0.75f, KeyframeTangentCap, 0 ) - inHandleOrigin;
                 if( EditorGUI.EndChangeCheck() )
@@ -246,15 +260,6 @@ namespace FantasticSplines
                 }
             }
 
-            EditorGUI.BeginChangeCheck();
-            // free move handle is used to check drag input. We'll recalculate the position ourselves with the mouse position
-            Handles.FreeMoveHandle( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize, Vector3.zero, KeyframeHandleCap );
-            if( EditorGUI.EndChangeCheck() )
-            {
-                Undo.RecordObject( Target, "Move Spline Keyframe" );
-                Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAtDistance( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
-            }
-
             return HandleUtility.DistanceToCube( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize * 10 ) <= 0; // * 3 to add some tollerance
         }
 
@@ -262,9 +267,12 @@ namespace FantasticSplines
         public override void OnToolGUI( EditorWindow window )
         {
             Handles.zTest = Target.spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-            DoToolHandles( window );
 
-            if( Target.enableEditorValues )
+            if( Target.enableKeyframeHandles )
+            {
+                DoToolHandles( window );
+            }
+            if( Target.enableValuesGui )
             {
                 DoToolGUI( window );
             }
@@ -291,17 +299,17 @@ namespace FantasticSplines
                 SerializedProperty keyValue = keySP.FindPropertyRelative( "value" );
                 float propertyHeight = EditorGUI.GetPropertyHeight( keyValue, new GUIContent( "" ), true );
 
-                Vector2 guiPosition = HandleUtility.WorldToGUIPoint( keys[i].location.position ) + new Vector2( 0.5f, 0.5f) * SplineHandleUtility.GetNodeHandleSize( keys[i].location.position );
+                Vector2 guiPosition = HandleUtility.WorldToGUIPoint( keys[i].location.position ) + new Vector2( 0.5f, 0.5f ) * SplineHandleUtility.GetNodeHandleSize( keys[i].location.position );
                 Vector2 rectSize = new Vector2( GetGUIPropertyWidth(), propertyHeight );
                 guiPosition.y += propertyHeight * 0.5f;
                 Vector2 border = new Vector2( 2, 2 );
-                Rect guiRect = new Rect( guiPosition, rectSize + border*2 );
+                Rect guiRect = new Rect( guiPosition, rectSize + border * 2 );
 
                 Handles.BeginGUI();
                 GUILayout.BeginArea( guiRect );
 
                 GUISkin skin = EditorGUIUtility.GetBuiltinSkin( EditorSkin.Inspector );
-                EditorGUI.DrawRect( new Rect(Vector2.zero, rectSize + border * 2 ), EditorColor );
+                EditorGUI.DrawRect( new Rect( Vector2.zero, rectSize + border * 2 ), EditorColor );
 
                 GUILayout.BeginArea( new Rect( border, rectSize ) );
                 EditorGUILayout.PropertyField( keyValue, new GUIContent(), true );

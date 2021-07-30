@@ -18,7 +18,7 @@ namespace FantasticSplines
         public Vector3 pointTangent;
         public Vector3 inTangent;
         public Vector3 normal;
-        public Vector3 scale;
+        public Vector2 scale; // scales the shape along x,y
         public Color color;
         public float distance; // for sorting and uvs
         public float priority; // higher = higher priority
@@ -57,22 +57,31 @@ namespace FantasticSplines
     [ExecuteInEditMode]
     public class TubeGenerator : MonoBehaviour
     {
-        [Header( "Setup" )]
+        [InspectorButton( "Regenerate" )]
+        public bool regenerate;
+        public bool autoRegenerate = true;
+        [HideInInspector]
+        [SerializeField]
+        int lastUpdateCount = 0;
+
+        [Header( "Inputs" )]
         public SplineComponent spline;
         public SplineNormal splineNormal;
-        public bool autoRegenerate = true;
-        public bool regenerate = false;
-        public int lastUpdateCount = 0;
+        public KeyframedSplineParameter<Vector2> splineScale;
 
         [Header( "Spline Sampling" )]
         public bool sampleSplineControlPoints = true;
         public bool sampleSplineNormalKeys = true;
+        public bool sampleSplineScaleKeys = true;
         public bool enableTangentTollerance = true;
         public bool enableNormalTollerance = true;
+        public bool enableScaleTollerance = true;
         [Range( 0, 45.0f )]
         public float tangentTolleranceAngle = 5;
         [Range( 0, 45.0f )]
         public float normalTolleranceAngle = 5;
+        [Range( 0.01f, 1f )]
+        public float scaleTollerance = 0.1f;
         [Range( 0.1f, 10 )]
         public float tolleranceSamplingStepDistance = 0.5f;
 
@@ -116,7 +125,7 @@ namespace FantasticSplines
         public bool startCap = false;
         public bool endCap = false;
 
-        [Header( "Output" )]
+        [Header( "Outputs" )]
         public MeshFilter meshFilter;
         public MeshCollider meshCollider;
 
@@ -168,17 +177,17 @@ namespace FantasticSplines
 
         [SerializeField]
         [HideInInspector]
-        int updateCount = 0;
+        int selfUpdateCount = 0;
         public int UpdateCount
         {
             get
             {
-                int update = spline.GetUpdateCount() + splineNormal.GetUpdateCount() + updateCount;
-                if( splineShape != null )
-                {
-                    update += splineShape.GetUpdateCount();
-                }
-                return update;
+                int update = spline.GetUpdateCount();
+
+                if( splineNormal != null ) update += splineNormal.GetUpdateCount();
+                if( splineScale != null ) update += splineScale.GetUpdateCount();
+                if( splineShape != null ) update += splineShape.GetUpdateCount();
+                return update + selfUpdateCount;
             }
         }
 
@@ -205,7 +214,7 @@ namespace FantasticSplines
 
         public void OnValidate()
         {
-            updateCount++;
+            selfUpdateCount++;
             cornerRadius = Mathf.Clamp( cornerRadius, 0, cornerRadius );
         }
 
@@ -224,6 +233,13 @@ namespace FantasticSplines
             Vector3 n1 = GetNormalAtDistance( first.distance );
             Vector3 n2 = GetNormalAtDistance( second.distance );
             return Vector3.Angle( n1, n2 ) > normalTolleranceAngle;
+        }
+
+        bool ExceedsVector2Tollerance( ExtrudePoint first, ExtrudePoint second )
+        {
+            Vector2 a = GetScaleAtDistance( first.distance );
+            Vector2 b = GetScaleAtDistance( second.distance );
+            return Vector2.Distance( a, b ) > scaleTollerance;
         }
 
         int TwistAngleSubdivisions( ExtrudePoint first, ExtrudePoint second )
@@ -260,9 +276,11 @@ namespace FantasticSplines
             splinePoints.Clear();
             if( sampleSplineControlPoints ) SplineProcessor.AddResultsAtNodes( ref splinePoints, spline );
             if( sampleSplineNormalKeys ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineNormal );
+            if( sampleSplineScaleKeys ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineScale );
 
             if( enableTangentTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsTangetAngleTollerance );
             if( enableNormalTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsNormalAngleTollerance );
+            if( enableScaleTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsVector2Tollerance );
 
             SplineProcessor.RemovePointsAtSameLocation( ref splinePoints );
 
@@ -346,7 +364,7 @@ namespace FantasticSplines
                 }
                 else
                 {
-                    ExtrudePoint cornerPoint = ConstructExtrudePoint( splinePoint.position, GetNormalAtDistance( splinePoint.distance ), pointTangent, inTangent, splinePoint.distance, splinePoint.priority );
+                    ExtrudePoint cornerPoint = ConstructExtrudePoint( splinePoint.position, pointTangent, inTangent, splinePoint.distance, splinePoint.priority );
                     ValidateExtrudePoint( cornerPoint );
                     extrudePoints.Add( cornerPoint );
                 }
@@ -420,7 +438,12 @@ namespace FantasticSplines
             points.Sort( ( a, b ) => { return a.distance.CompareTo( b.distance ); } );
         }
 
-        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector3 tangent, Vector3 inTangent, float distance, float priority )
+        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 pointTangent, Vector3 inTangent, float distance, float priority )
+        {
+            return ConstructExtrudePoint( point, GetNormalAtDistance( distance ), GetScaleAtDistance( distance ), pointTangent, inTangent, distance, priority );
+        }
+
+        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector2 scale, Vector3 tangent, Vector3 inTangent, float distance, float priority )
         {
             return new ExtrudePoint()
             {
@@ -428,7 +451,7 @@ namespace FantasticSplines
                 pointTangent = tangent,
                 inTangent = inTangent,
                 normal = normal,
-                scale = new Vector3( 1, 1, 1 ),
+                scale = scale,
                 color = Color.white,
                 distance = distance,
                 priority = priority,
@@ -443,6 +466,16 @@ namespace FantasticSplines
             }
 
             return splineNormal.GetNormalAtDistance( distance );
+        }
+
+        Vector2 GetScaleAtDistance( float distance )
+        {
+            if( splineScale == null )
+            {
+                return Vector2.one;
+            }
+
+            return splineScale.GetValueAtDistance( distance, Vector2.one );
         }
 
         public const int SplineNodePointPriority = 5;
@@ -463,8 +496,8 @@ namespace FantasticSplines
             float inDistance = splinePoint.distance - halfCornerLength;
             float outDistance = splinePoint.distance + halfCornerLength;
 
-            ExtrudePoint startCorner = ConstructExtrudePoint( inPoint, GetNormalAtDistance( inDistance ), inTangent, inTangent, inDistance, CornerEndPointPriority );
-            ExtrudePoint endCorner = ConstructExtrudePoint( outPoint, GetNormalAtDistance( outDistance ), outTangent, outTangent, outDistance, CornerEndPointPriority );
+            ExtrudePoint startCorner = ConstructExtrudePoint( inPoint, inTangent, inTangent, inDistance, CornerEndPointPriority );
+            ExtrudePoint endCorner = ConstructExtrudePoint( outPoint, outTangent, outTangent, outDistance, CornerEndPointPriority );
 
             //experimental code, trying to find a better corner start and end position for concave entry spline arcs.
             /*float angle = Vector3.Angle( inTangent, outTangent );
@@ -557,9 +590,10 @@ namespace FantasticSplines
                 {
                     case CornerType.Mitre:
                         Vector3 midNormal = Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f );
+                        Vector3 midScale = Vector3.Lerp( startCorner.scale, endCorner.scale, 0.5f );
                         Vector3 midTangent = Vector3.Slerp( startCorner.pointTangent, endCorner.pointTangent, 0.5f );
                         float midDistance = Mathf.Lerp( startCorner.distance, endCorner.distance, 0.5f );
-                        ExtrudePoint midPoint = ConstructExtrudePoint( splinePoint.position, midNormal, midTangent, inTangent, midDistance, CornerMidPointPriority );
+                        ExtrudePoint midPoint = ConstructExtrudePoint( splinePoint.position, midNormal, midScale, midTangent, inTangent, midDistance, CornerMidPointPriority );
                         ValidateExtrudePoint( midPoint );
                         extrudePoints.Add( midPoint );
                         break;
@@ -597,8 +631,9 @@ namespace FantasticSplines
                 Matrix4x4 directionRotation = Matrix4x4.TRS( Vector3.zero, Quaternion.Slerp( startRotation, endRotation, t ), Vector3.one );
                 Vector3 tangent = directionRotation * Vector3.forward;
                 Vector3 normal = directionRotation * Vector3.up;
+                Vector2 scale = Vector2.Lerp( startCorner.scale, endCorner.scale, t );
 
-                ExtrudePoint slicePoint = ConstructExtrudePoint( point, normal, tangent, tangent, distance, CornerOtherPointPriority );
+                ExtrudePoint slicePoint = ConstructExtrudePoint( point, normal, scale, tangent, tangent, distance, CornerOtherPointPriority );
                 extrudePoints.Add( slicePoint );
             }
         }
@@ -621,9 +656,9 @@ namespace FantasticSplines
             Vector3 p3Tangent = Vector3.Cross( outPointFromCenter.normalized, cornerAxis ) * tangentSign;
             p1Tangent *= tangentSign;
 
-            ExtrudePoint p1 = ConstructExtrudePoint( inSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.25f ), p1Tangent, startCorner.inTangent, p1Distance, CornerOtherPointPriority );
-            ExtrudePoint p2 = ConstructExtrudePoint( midPoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f ), tangent, tangent, splinePoint.distance, CornerMidPointPriority );
-            ExtrudePoint p3 = ConstructExtrudePoint( outSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.75f ), p3Tangent, endCorner.inTangent, p3Distance, CornerOtherPointPriority );
+            ExtrudePoint p1 = ConstructExtrudePoint( inSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.25f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.25f ), p1Tangent, startCorner.inTangent, p1Distance, CornerOtherPointPriority );
+            ExtrudePoint p2 = ConstructExtrudePoint( midPoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.5f ), tangent, tangent, splinePoint.distance, CornerMidPointPriority );
+            ExtrudePoint p3 = ConstructExtrudePoint( outSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.75f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.75f ), p3Tangent, endCorner.inTangent, p3Distance, CornerOtherPointPriority );
 
             extrudePoints.Add( p1 );
             extrudePoints.Add( p2 );
@@ -741,7 +776,7 @@ namespace FantasticSplines
 
                 Matrix4x4 normalMatrix = Matrix4x4.TRS( Vector3.zero, Quaternion.LookRotation( point.pointTangent, point.normal ), inverseExtrudeShapeSize * Vector3.one );
 
-                Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( point.position, Quaternion.LookRotation( segmentDirection, point.normal ), inverseExtrudeShapeSize * Vector3.one );
+                Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( point.position, Quaternion.LookRotation( segmentDirection, point.normal ), inverseExtrudeShapeSize * point.scale );
                 Vector3[] projectToPoints = new Vector3[vertsInShape];
                 for( int sv = 0; sv < vertsInShape; ++sv )
                 {
@@ -813,7 +848,7 @@ namespace FantasticSplines
                 int capStartIndex = vertCount - capVertCount;
 
                 // add cap verts
-                Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( tubePoints[0].position, Quaternion.LookRotation( tubePoints[0].pointTangent, tubePoints[0].normal ), inverseExtrudeShapeSize * Vector3.one );
+                Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( tubePoints[0].position, Quaternion.LookRotation( tubePoints[0].pointTangent, tubePoints[0].normal ), inverseExtrudeShapeSize * tubePoints[0].scale );
                 Vector3[] projectToPoints = new Vector3[capVerts.Count];
                 for( int cv = 0; cv < capVerts.Count; ++cv )
                 {
@@ -855,7 +890,7 @@ namespace FantasticSplines
                 int p = tubePoints.Count - 1;
 
                 // add cap verts
-                Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( tubePoints[p].position, Quaternion.LookRotation( tubePoints[p].pointTangent, tubePoints[p].normal ), inverseExtrudeShapeSize * Vector3.one );
+                Matrix4x4 sectionSpaceMatrix = Matrix4x4.TRS( tubePoints[p].position, Quaternion.LookRotation( tubePoints[p].pointTangent, tubePoints[p].normal ), inverseExtrudeShapeSize * tubePoints[p].scale );
                 Vector3[] projectToPoints = new Vector3[capVerts.Count];
                 for( int cv = 0; cv < capVerts.Count; ++cv )
                 {

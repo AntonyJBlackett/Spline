@@ -244,7 +244,10 @@ namespace FantasticSplines
         void InsertNode(SplineNode node, int index); // inserts a node at node index
         int InsertNode(float t); // inserts a point on the curve without changing its shape and return it
         void RemoveNode(int index); // removes a Curve Point at index
-        
+
+        SplineResult GetResultAtNode( int index );
+        SplineResult GetResultAtDistance( float distance );
+        SplineResult GetResultAtT( float t );
         SplineResult GetResultClosestTo(Vector3 point);
         SplineResult GetResultClosestTo(Ray ray);
 

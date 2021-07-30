@@ -104,25 +104,16 @@ namespace FantasticSplines
         [Header( "Handles" )]
         public bool KeepEditorActive = false;
         public bool enableKeyframeHandles = true;
-        public bool enableValueHandles = true;
+        public bool enableValuesGui = false;
 
         [Header( "Interpolation" )]
         public KeyframeInterpolationModes keyframeInterpolationMode = KeyframeInterpolationModes.Linear;
-        public bool EnableKeyframeTangents
-        {
-            get
-            {
-                return keyframeInterpolationMode == KeyframeInterpolationModes.Tangents;
-            }
-        }
 
-        [Header( "Gizmos" )]
-        public bool enableGizmos = true;
-        public bool enableEditorValues = true;
 
         // A function that when set is used to override the default interpolator.
         // Set this to handle interpolation of any arbitrary type or to interpolate in a different way, such as Mathf.SmoothStep()
         public System.Func<ISpline, SplineParameterKeyframe<T>, SplineParameterKeyframe<T>, float, T> CustomInterpolator { get; set; }
+
 
         // The raw keyframe values. This is the core data of the KeyframedSpineParamter<T> and is serialised.
         [HideInInspector]
@@ -194,6 +185,15 @@ namespace FantasticSplines
                 }
 
                 return keyframesExternal;
+            }
+        }
+
+        // Returns true if keyframe tangent handles are enabled
+        public bool EnableKeyframeTangents
+        {
+            get
+            {
+                return keyframeInterpolationMode == KeyframeInterpolationModes.Tangents;
             }
         }
 
@@ -598,7 +598,7 @@ namespace FantasticSplines
         // override this to draw completely custom gizmos
         protected void OnDrawGizmos()
         {
-            if( !enableGizmos )
+            if( !enableKeyframeHandles )
             {
                 return;
             }
@@ -610,7 +610,6 @@ namespace FantasticSplines
 
             Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
             DrawKeyframeGizmos();
-            Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
         }
 
         // Draws generic keyframe gizmos
@@ -633,7 +632,7 @@ namespace FantasticSplines
             // keyframe colour, same as the animator window
             using( new Handles.DrawingScope( ToolActive ? KeyframedSplineParameterTool<Vector3>.ActiveColor : KeyframedSplineParameterTool<Vector3>.InactiveColor ) )
             {
-                KeyframedSplineParameterTool<Vector3>.KeyframeHandleCap( 0, key.location.position, Quaternion.identity, KeyframedSplineParameterTool<Vector3>.GetHandleSize( key.location.position ), EventType.Repaint );
+                KeyframedSplineParameterTool<Vector3>.KeyframeHandleCap( 0, key.location.position, Quaternion.identity, KeyframedSplineParameterTool<Vector3>.GetHandleSize( key.location.position ) * spline.GetGizmoScale(), EventType.Repaint );
             }
 #endif
         }

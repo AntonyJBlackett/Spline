@@ -23,7 +23,7 @@ public class SplineColor : KeyframedSplineParameter<Color>
     #region Gizmos
     protected override void DrawKeyframeValueGizmo( SplineParameterKeyframe<Color> keyframe )
     {
-        float size = SplineNormalTool.GetHandleSize( keyframe.location.position );
+        float size = SplineNormalTool.GetHandleSize( keyframe.location.position ) * spline.GetGizmoScale();
         Handles.color = Color.black;
         Vector3 up = SceneView.currentDrawingSceneView.camera.transform.up;
         Handles.DrawLine( keyframe.location.position, keyframe.location.position + up * size * 2.5f, 2 );
