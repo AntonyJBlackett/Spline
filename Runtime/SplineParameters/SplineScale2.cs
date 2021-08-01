@@ -6,8 +6,7 @@ using FantasticSplines;
 public class SplineScale2 : KeyframedSplineParameter<Vector2>
 {
     [Header( "Visualisation" )]
-    [Range( 1, 100 )]
-    public int visualisationSamples = 50;
+    public bool enableVisualisation = false;
 
     #region SplineDataTrack specialisation
     public override Vector2 GetDefaultKeyframeValue()
@@ -44,9 +43,16 @@ public class SplineScale2 : KeyframedSplineParameter<Vector2>
 
     void DrawInterpolatedValue()
     {
+        if( !enableVisualisation )
+        {
+            return;
+        }
+
+        Gizmos.color = Color.white;
+
         float distance = 0;
         float length = spline.GetLength();
-        float step = length / visualisationSamples;
+        float step = 0.1f;
         while( distance < length )
         {
             SplineResult location = spline.GetResultAtDistance( distance );
@@ -57,6 +63,10 @@ public class SplineScale2 : KeyframedSplineParameter<Vector2>
 
             distance += step;
         }
+
+        SplineResult locationEnd = spline.GetResultAtDistance( length );
+        Vector2 scaleEnd = GetValueAtDistance( locationEnd.distance, GetDefaultKeyframeValue() );
+        DrawGizmos( locationEnd.position, Quaternion.LookRotation( locationEnd.tangent, transform.up ), scaleEnd );
     }
     #endregion
 }

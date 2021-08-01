@@ -49,7 +49,8 @@ namespace FantasticSplines
             {
                 var keys = SplineNormal.Keyframes;
                 Color rotationHandleColour = Color.green;
-                using( new Handles.DrawingScope( Color.green ) )
+                rotationHandleColour.a = 0.5f;
+                using( new Handles.DrawingScope( rotationHandleColour ) )
                 {
                     for( int i = 0; i < keys.Count; ++i )
                     {
@@ -63,10 +64,6 @@ namespace FantasticSplines
                         float discRadius = 0.5f * SplineNormal.GetNormalGizmoScale();
 
                         Quaternion normalRotation = Quaternion.LookRotation( normal, tangent.normalized );
-
-                        rotationHandleColour.a = 0.5f;
-                        Handles.color = rotationHandleColour;
-
                         Quaternion changedRotation = Handles.Disc( normalRotation, position, discNormal, discRadius, false, 0 );
 
                         if( EditorGUI.EndChangeCheck() )

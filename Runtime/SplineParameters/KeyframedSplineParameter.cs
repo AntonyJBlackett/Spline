@@ -30,7 +30,8 @@ namespace FantasticSplines
     {
         Linear,
         SmoothStep,
-        Tangents
+        Tangents,
+        Constant
     }
 
     // A collection of data points along a spline
@@ -397,6 +398,8 @@ namespace FantasticSplines
 
                     float oneMinusX = 1 - x;
                     return A * (oneMinusX * oneMinusX * oneMinusX) + 3 * B * (oneMinusX * oneMinusX) * x + 3 * C * oneMinusX * (x * x) + D * (x * x * x);
+                case KeyframeInterpolationModes.Constant:
+                    return 1;
             }
             return x;
         }
