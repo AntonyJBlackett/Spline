@@ -12,6 +12,7 @@ public class SplineColor : KeyframedSplineParameter<Color>
     #region SplineDataTrack specialisation
     public override Color GetDefaultKeyframeValue()
     {
+        enableValuesGui = true;
         return Color.white;
     }
 
@@ -42,15 +43,25 @@ public class SplineColor : KeyframedSplineParameter<Color>
     {
         int nodeCount = spline.GetNodeCount();
         pointDistances.Clear();
-        for( int i = 1; i < nodeCount; ++i )
+        for( int i = 0; i < nodeCount; ++i )
         {
+            if( i == 0 && !spline.IsLoop( ) )
+            {
+                continue;
+            }
+
             SplineResult start = spline.GetResultAtNode( i - 1 );
             SplineResult end = spline.GetResultAtNode( i );
+
+            if( i == 0 )
+            {
+                end.distance += end.length;
+            }
 
             int segments = 10;
             for( int s = 0; s < segments; ++s )
             {
-                pointDistances.Add( Mathf.Lerp( start.distance, end.distance, Mathf.InverseLerp(0, segments, s) ) );
+                pointDistances.Add( Mathf.Lerp( start.distance, end.distance, Mathf.InverseLerp(0, segments-1, s) ) );
             }
         }
 

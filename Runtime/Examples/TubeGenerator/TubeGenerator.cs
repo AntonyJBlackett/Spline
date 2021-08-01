@@ -68,20 +68,25 @@ namespace FantasticSplines
         public SplineComponent spline;
         public SplineNormal splineNormal;
         public KeyframedSplineParameter<Vector2> splineScale;
+        public KeyframedSplineParameter<Color> splineColor;
 
         [Header( "Spline Sampling" )]
         public bool sampleSplineControlPoints = true;
         public bool sampleSplineNormalKeys = true;
         public bool sampleSplineScaleKeys = true;
+        public bool sampleSplineColorKeys = true;
         public bool enableTangentTollerance = true;
         public bool enableNormalTollerance = true;
         public bool enableScaleTollerance = true;
+        public bool enableColorTollerance = true;
         [Range( 0, 45.0f )]
         public float tangentTolleranceAngle = 5;
         [Range( 0, 45.0f )]
         public float normalTolleranceAngle = 5;
         [Range( 0.01f, 1f )]
         public float scaleTollerance = 0.1f;
+        [Range( 0.01f, 1f )]
+        public float colorTollerance = 0.1f;
         [Range( 0.1f, 10 )]
         public float tolleranceSamplingStepDistance = 0.5f;
 
@@ -187,6 +192,7 @@ namespace FantasticSplines
                 if( splineNormal != null ) update += splineNormal.GetUpdateCount();
                 if( splineScale != null ) update += splineScale.GetUpdateCount();
                 if( splineShape != null ) update += splineShape.GetUpdateCount();
+                if( splineColor != null ) update += splineColor.GetUpdateCount();
                 return update + selfUpdateCount;
             }
         }
@@ -242,6 +248,14 @@ namespace FantasticSplines
             return Vector2.Distance( a, b ) > scaleTollerance;
         }
 
+        bool ExceedsColorTollerance( ExtrudePoint first, ExtrudePoint second )
+        {
+            Color a = GetColorAtDstance( first.distance );
+            Color b = GetColorAtDstance( second.distance );
+            float difference = Mathf.Abs( a.r - b.r ) + Mathf.Abs( a.g - b.g ) + Mathf.Abs( a.b - b.b ) + Mathf.Abs( a.a - b.a );
+            return difference > colorTollerance;
+        }
+
         int TwistAngleSubdivisions( ExtrudePoint first, ExtrudePoint second )
         {
             return Mathf.FloorToInt( Vector3.Angle( first.normal, second.normal ) / twistSubdivisionAngle );
@@ -272,15 +286,22 @@ namespace FantasticSplines
         List<ExtrudePoint> extrudePoints = new List<ExtrudePoint>();
         void GenerateMesh()
         {
+            if( spline == null )
+            {
+                return;
+            }
+
             // Sample the spline
-            splinePoints.Clear();
+                splinePoints.Clear();
             if( sampleSplineControlPoints ) SplineProcessor.AddResultsAtNodes( ref splinePoints, spline );
-            if( sampleSplineNormalKeys ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineNormal );
-            if( sampleSplineScaleKeys ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineScale );
+            if( sampleSplineNormalKeys && splineNormal ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineNormal );
+            if( sampleSplineScaleKeys && splineScale ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineScale );
+            if( sampleSplineColorKeys && splineColor ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineColor );
 
             if( enableTangentTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsTangetAngleTollerance );
             if( enableNormalTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsNormalAngleTollerance );
             if( enableScaleTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsVector2Tollerance );
+            if( enableColorTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsColorTollerance );
 
             SplineProcessor.RemovePointsAtSameLocation( ref splinePoints );
 
@@ -440,10 +461,10 @@ namespace FantasticSplines
 
         ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 pointTangent, Vector3 inTangent, float distance, float priority )
         {
-            return ConstructExtrudePoint( point, GetNormalAtDistance( distance ), GetScaleAtDistance( distance ), pointTangent, inTangent, distance, priority );
+            return ConstructExtrudePoint( point, GetNormalAtDistance( distance ), GetScaleAtDistance( distance ), GetColorAtDstance( distance ), pointTangent, inTangent, distance, priority );
         }
 
-        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector2 scale, Vector3 tangent, Vector3 inTangent, float distance, float priority )
+        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector2 scale, Color color, Vector3 tangent, Vector3 inTangent, float distance, float priority )
         {
             return new ExtrudePoint()
             {
@@ -452,7 +473,7 @@ namespace FantasticSplines
                 inTangent = inTangent,
                 normal = normal,
                 scale = scale,
-                color = Color.white,
+                color = color,
                 distance = distance,
                 priority = priority,
             };
@@ -476,6 +497,16 @@ namespace FantasticSplines
             }
 
             return splineScale.GetValueAtDistance( distance, Vector2.one );
+        }
+
+        Color GetColorAtDstance( float distance )
+        {
+            if( splineColor == null )
+            {
+                return Color.white;
+            }
+
+            return splineColor.GetValueAtDistance( distance, Color.white );
         }
 
         public const int SplineNodePointPriority = 5;
@@ -590,10 +621,11 @@ namespace FantasticSplines
                 {
                     case CornerType.Mitre:
                         Vector3 midNormal = Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f );
-                        Vector3 midScale = Vector3.Lerp( startCorner.scale, endCorner.scale, 0.5f );
                         Vector3 midTangent = Vector3.Slerp( startCorner.pointTangent, endCorner.pointTangent, 0.5f );
+                        Vector2 midScale = Vector2.Lerp( startCorner.scale, endCorner.scale, 0.5f );
+                        Color midColor = Color.Lerp( startCorner.color, endCorner.color, 0.5f );
                         float midDistance = Mathf.Lerp( startCorner.distance, endCorner.distance, 0.5f );
-                        ExtrudePoint midPoint = ConstructExtrudePoint( splinePoint.position, midNormal, midScale, midTangent, inTangent, midDistance, CornerMidPointPriority );
+                        ExtrudePoint midPoint = ConstructExtrudePoint( splinePoint.position, midNormal, midScale, midColor, midTangent, inTangent, midDistance, CornerMidPointPriority );
                         ValidateExtrudePoint( midPoint );
                         extrudePoints.Add( midPoint );
                         break;
@@ -632,8 +664,9 @@ namespace FantasticSplines
                 Vector3 tangent = directionRotation * Vector3.forward;
                 Vector3 normal = directionRotation * Vector3.up;
                 Vector2 scale = Vector2.Lerp( startCorner.scale, endCorner.scale, t );
+                Color color = Color.Lerp( startCorner.color, endCorner.color, t );
 
-                ExtrudePoint slicePoint = ConstructExtrudePoint( point, normal, scale, tangent, tangent, distance, CornerOtherPointPriority );
+                ExtrudePoint slicePoint = ConstructExtrudePoint( point, normal, scale, color, tangent, tangent, distance, CornerOtherPointPriority );
                 extrudePoints.Add( slicePoint );
             }
         }
@@ -656,9 +689,9 @@ namespace FantasticSplines
             Vector3 p3Tangent = Vector3.Cross( outPointFromCenter.normalized, cornerAxis ) * tangentSign;
             p1Tangent *= tangentSign;
 
-            ExtrudePoint p1 = ConstructExtrudePoint( inSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.25f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.25f ), p1Tangent, startCorner.inTangent, p1Distance, CornerOtherPointPriority );
-            ExtrudePoint p2 = ConstructExtrudePoint( midPoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.5f ), tangent, tangent, splinePoint.distance, CornerMidPointPriority );
-            ExtrudePoint p3 = ConstructExtrudePoint( outSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.75f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.75f ), p3Tangent, endCorner.inTangent, p3Distance, CornerOtherPointPriority );
+            ExtrudePoint p1 = ConstructExtrudePoint( inSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.25f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.25f ), Color.Lerp( startCorner.color, endCorner.color, 0.25f ), p1Tangent, startCorner.inTangent, p1Distance, CornerOtherPointPriority );
+            ExtrudePoint p2 = ConstructExtrudePoint( midPoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.5f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.5f ), Color.Lerp( startCorner.color, endCorner.color, 0.5f ), tangent, tangent, splinePoint.distance, CornerMidPointPriority );
+            ExtrudePoint p3 = ConstructExtrudePoint( outSquarePoint, Vector3.Slerp( startCorner.normal, endCorner.normal, 0.75f ), Vector2.Lerp( startCorner.scale, endCorner.scale, 0.75f ), Color.Lerp( startCorner.color, endCorner.color, 0.75f ), p3Tangent, endCorner.inTangent, p3Distance, CornerOtherPointPriority );
 
             extrudePoints.Add( p1 );
             extrudePoints.Add( p2 );
@@ -788,7 +821,7 @@ namespace FantasticSplines
                     int index = edgeLoopIndex + sv;
                     verticies[index] = MathsUtils.LinePlaneIntersection( projectToPoints[sv], segmentDirection, point.position, point.pointTangent );
                     normals[index] = normalMatrix.MultiplyVector( extrudeShape.normals[sv] );
-                    colors[index] = Color.white * extrudeShape.colors[sv];
+                    colors[index] = point.color * extrudeShape.colors[sv];
 
                     float u = extrudeShape.u[sv];
                     float v = (extrudeDistance+vOffset) * vScalar;
