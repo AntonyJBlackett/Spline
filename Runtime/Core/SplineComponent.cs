@@ -134,10 +134,20 @@ namespace FantasticSplines
 
         SplineResult TransformResult(SplineResult toTransform)
         {
-            SplineResult result = toTransform;
-            result.segmentResult.position = TransformPoint( toTransform.position );
-            result.segmentResult.tangent = TransformVector( toTransform.tangent );
-            return result;
+            toTransform.segmentResult.position = TransformPoint( toTransform.segmentResult.position );
+            toTransform.segmentResult.tangent = TransformVector( toTransform.segmentResult.tangent );
+            return toTransform;
+        }
+
+        SplineNodeResult TransformNodeResult( SplineNodeResult toTransform )
+        {
+            toTransform.splineResult.segmentResult.position = TransformPoint( toTransform.splineResult.segmentResult.position );
+            toTransform.splineResult.segmentResult.tangent = TransformVector( toTransform.splineResult.segmentResult.tangent );
+
+            toTransform.inTangent = TransformVector( toTransform.inTangent );
+            toTransform.outTangent = TransformVector( toTransform.outTangent );
+
+            return toTransform;
         }
 
         public void AppendNode(SplineNode node)
@@ -310,6 +320,12 @@ namespace FantasticSplines
         {
             nodeIndex = LoopIndex( nodeIndex );
             return TransformResult( localSpline.GetResultAtNode( nodeIndex ) );
+        }
+
+        public SplineNodeResult GetNodeResult( int nodeIndex )
+        {
+            nodeIndex = LoopIndex( nodeIndex );
+            return TransformNodeResult( localSpline.GetNodeResult( nodeIndex ) );
         }
 
         // Editor related things

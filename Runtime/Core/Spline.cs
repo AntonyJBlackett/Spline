@@ -293,14 +293,18 @@ namespace FantasticSplines
                 return SegmentResult.Default;
             }
 
-            float t = segments[index].GetT( distance );
+            return GetResultAtSegmentTInternal( index, segments[index].GetT( distance ) );
+        }
+
+        private SegmentResult GetResultAtSegmentTInternal( int index, float t )
+        {
             Vector3 localPos = segments[index].GetPositionAtT( t );
             Vector3 localTan = segments[index].GetTangentAtT( t );
 
             return new SegmentResult()
             {
                 index = index,
-                distance = distance,
+                distance = segments[index].GetDistance(t),
                 length = segments[index].Length,
                 t = t,
                 localPosition = localPos,
@@ -327,7 +331,7 @@ namespace FantasticSplines
                 }
             }
 
-            return GetResultAtSegmentDistanceInternal( SegmentCount - 1, 1 );
+            return GetResultAtSegmentTInternal( SegmentCount - 1, 1 );
         }
 
         private SplineResult GetSplineResult(float distance)
@@ -533,9 +537,8 @@ namespace FantasticSplines
 
         public SplineResult GetResultAtNode( int nodeIndex )
         {
-            if( segments.Length == 0 )
+            if( SegmentCount == 0 )
             {
-                Debug.LogError( "Node index out of range." );
                 return new SplineResult();
             }
 
@@ -545,6 +548,37 @@ namespace FantasticSplines
             }
 
             return GetResultAtSegmentT( nodeIndex, 0 );
+        }
+
+        public SplineNodeResult GetNodeResult( int nodeIndex )
+        {
+            if( SegmentCount == 0 )
+            {
+                return new SplineNodeResult();
+            }
+
+            SplineResult result = GetResultAtNode( nodeIndex );
+
+            SplineResult beforeResult = GetResultAtDistance( result.distance - 0.01f );
+            SplineResult afterResult = GetResultAtDistance( result.distance + 0.01f );
+
+            Vector3 inTangent = beforeResult.tangent;
+            Vector3 outTangent = afterResult.tangent;
+            SegmentResult segmentResult = result.segmentResult;
+            segmentResult.localTangent = segmentResult.tangent = (inTangent + outTangent) * 0.5f;
+            result.segmentResult = segmentResult;
+
+            SplineNodeResult nodeResult = new SplineNodeResult()
+            {
+                nodeIndex = nodeIndex,
+                loopNodeIndex = LoopNodeIndex( nodeIndex ),
+                inTangent = inTangent,
+                outTangent = outTangent,
+                splineNode = GetNode(nodeIndex),
+                splineResult = result,
+            };
+
+            return nodeResult;
         }
 
         public void OnDrawGizmos( Color color, float gizmoScale )

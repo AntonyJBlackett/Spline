@@ -95,7 +95,7 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
 
     public Vector3 GetNormalAtSplineResult( SplineResult splineResult )
     {
-        return GetNormal( splineResult.tangent, GetValueAtDistance( splineResult.distance, new Normal() ).angle );
+        return GetNormal( splineResult.tangent, GetValueAtDistance( splineResult.distance, GetDefaultKeyframeValue() ).angle );
     }
 
     public Vector3 GetNormalAtDistance( float distance )

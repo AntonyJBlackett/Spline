@@ -99,6 +99,33 @@ namespace FantasticSplines
         }
     }
 
+    [System.Serializable]
+    public struct SplineNodeResult
+    {
+        public SplineResult splineResult;
+
+        public SplineNode splineNode;
+        public int nodeIndex;
+        public int loopNodeIndex;
+        public Vector3 inTangent;
+        public Vector3 outTangent;
+
+        public static SplineNodeResult Default
+        {
+            get
+            {
+                return new SplineNodeResult()
+                {
+                    splineResult = SplineResult.Default,
+                    nodeIndex = 0,
+                    inTangent = Vector3.forward,
+                    outTangent = Vector3.forward,
+                    splineNode = new SplineNode(),
+                };
+            }
+        }
+    }
+
     // Functions used to update objects on a spline when a spline changes.
     public static class SplineChangedEventHelper
     {
@@ -282,6 +309,7 @@ namespace FantasticSplines
         SplineResult GetResultClosestToSegment( int segmentIndex, Vector3 point );
         SplineResult GetResultAtWorldDistanceFrom(float startDistance, float worldDistance, float stepDistance);
         SplineResult GetResultAtNode( int nodeIndex );
+        SplineNodeResult GetNodeResult( int nodeIndex );
         int LoopIndex(int index);
     }
 
