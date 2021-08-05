@@ -60,15 +60,13 @@ namespace FantasticSplines
         [InspectorButton( "Regenerate" )]
         public bool regenerate;
         public bool autoRegenerate = true;
-        [HideInInspector]
-        [SerializeField]
-        int lastUpdateCount = 0;
+        public int lastUpdateCount = 0;
 
         [Header( "Inputs" )]
         public SplineComponent spline;
         public SplineNormal splineNormal;
-        public KeyframedSplineParameter<Vector2> splineScale;
-        public KeyframedSplineParameter<Color> splineColor;
+        public SplineScale2 splineScale;
+        public SplineColor splineColor;
 
         [Header( "Spline Sampling" )]
         public bool sampleSplineControlPoints = true;
@@ -183,24 +181,22 @@ namespace FantasticSplines
         [SerializeField]
         [HideInInspector]
         int selfUpdateCount = 0;
-        public int UpdateCount
+        public int GetUpdateCount()
         {
-            get
-            {
-                int update = spline.GetUpdateCount();
+            int update = spline.GetUpdateCount();
 
-                if( splineNormal != null ) update += splineNormal.GetUpdateCount();
-                if( splineScale != null ) update += splineScale.GetUpdateCount();
-                if( splineShape != null ) update += splineShape.GetUpdateCount();
-                if( splineColor != null ) update += splineColor.GetUpdateCount();
-                return update + selfUpdateCount;
-            }
+            if( splineNormal != null ) update += splineNormal.GetUpdateCount();
+            if( splineScale != null ) update += splineScale.GetUpdateCount();
+            if( splineShape != null ) update += splineShape.GetUpdateCount();
+            if( splineColor != null ) update += splineColor.GetUpdateCount();
+            if( splineShape != null ) update += splineShape.GetUpdateCount();
+            return update + selfUpdateCount;
         }
 
         void AutoRegenerate()
         {
             if( regenerate ||
-                (UpdateCount != lastUpdateCount && autoRegenerate) )
+                (GetUpdateCount() != lastUpdateCount && autoRegenerate) )
             {
                 Regenerate();
             }
@@ -208,7 +204,7 @@ namespace FantasticSplines
 
         void Regenerate()
         {
-            lastUpdateCount = UpdateCount;
+            lastUpdateCount = GetUpdateCount();
             Initialise();
             GenerateMesh();
             regenerate = false;
@@ -976,6 +972,12 @@ namespace FantasticSplines
             mesh.colors = colors;
             mesh.triangles = triangleIndicies;
             mesh.RecalculateBounds();
+
+
+            if( meshCollider != null )
+            {
+                meshCollider.sharedMesh = mesh;
+            }
         }
     }
 }

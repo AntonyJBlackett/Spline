@@ -81,11 +81,11 @@ namespace FantasticSplines
 
                         Vector3 xDirection = rotation * Vector3.right * scale.x * 0.5f;
                         Vector3 xScaleHandle = position + xDirection;
-                        Vector3 newxScaleHandle = Handles.Slider( xScaleHandle, xDirection, SplineScale2.spline.GetGizmoScale() * 0.05f, ScaleCubeCap, 0 );
+                        Vector3 newxScaleHandle = Handles.Slider( xScaleHandle, xDirection, SplineScale2.spline.GetGizmoScale() * 0.1f, ScaleCubeCap, 0 );
 
                         Vector3 yDirection = rotation * Vector3.up * scale.y * 0.5f;
                         Vector3 yScaleHandle = position + yDirection;
-                        Vector3 newyScaleHandle = Handles.Slider( yScaleHandle, yDirection, SplineScale2.spline.GetGizmoScale() * 0.05f, ScaleCubeCap, 0 );
+                        Vector3 newyScaleHandle = Handles.Slider( yScaleHandle, yDirection, SplineScale2.spline.GetGizmoScale() * 0.1f, ScaleCubeCap, 0 );
 
 
                         if( EditorGUI.EndChangeCheck() )

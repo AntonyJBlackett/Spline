@@ -167,7 +167,7 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
         float gizmosScale = GetNormalGizmoScale();
         float distance = 0;
         float length = spline.GetLength();
-        float step = 0.1f;
+        float step = length / 50f;
         while( distance < length )
         {
             SplineResult location = spline.GetResultAtDistance( distance );

@@ -11,7 +11,7 @@ namespace FantasticSplines
         public float tangentTolleranceAngle = 5;
         public float tolleranceStep = 0.2f;
         public bool reverse = false;
-        List<ExtrudePoint> samples = new List<ExtrudePoint>();
+        public List<ExtrudePoint> samples = new List<ExtrudePoint>();
 
         bool ExceedsTangetAngleTollerance( ExtrudePoint first, ExtrudePoint second )
         {
@@ -26,17 +26,15 @@ namespace FantasticSplines
             }
         }
 
-        [SerializeField]
-        [HideInInspector]
-        int updateCount = 0;
+        public int UpdateCount { get; set; }
         public void OnValidate()
         {
-            updateCount++;
+            UpdateCount++;
         }
 
         public int GetUpdateCount()
         {
-            return Spline.GetUpdateCount() + updateCount;
+            return Spline.GetUpdateCount() + UpdateCount;
         }
 
         public ExtrudeShape GetExtrudeShape()

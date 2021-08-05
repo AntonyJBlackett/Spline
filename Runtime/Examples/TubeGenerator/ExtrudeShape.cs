@@ -3,6 +3,7 @@ using UnityEngine;
 
 namespace FantasticSplines
 {
+    [System.Serializable]
     public class ExtrudeShape
     {
         public enum ShapeSizeType

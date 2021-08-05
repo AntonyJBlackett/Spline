@@ -84,6 +84,7 @@ namespace FantasticSplines
             Sort( ref results );
         }
 
+        static int MaxSegmentDivisions = 500;
         public static void AddPointsByTollerance( ref List<ExtrudePoint> results, ISpline spline, float minStepDistance, System.Func<ExtrudePoint, ExtrudePoint, bool> tolleranceFunction )
         {
             int resultCount = results.Count;
@@ -94,6 +95,7 @@ namespace FantasticSplines
 
                 float segmentLength = results[index].distance - results[previousIndex].distance;
                 int segmentDivisions = Mathf.FloorToInt( segmentLength / minStepDistance );
+                segmentDivisions = Mathf.Min( segmentDivisions, MaxSegmentDivisions );
                 if( segmentDivisions > 1 )
                 {
                     ExtrudePoint previousResult = results[previousIndex];
