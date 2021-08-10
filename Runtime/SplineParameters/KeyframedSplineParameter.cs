@@ -34,27 +34,17 @@ namespace FantasticSplines
         Constant
     }
 
+    public static class KeyframedSplineParameterEditorInstance
+    {
+        public static Object editInstance;
+    }
+
     // A collection of data points along a spline
     [System.Serializable]
     [ExecuteInEditMode]
     public class KeyframedSplineParameter<T> : MonoBehaviour, ISplineParameter<T> where T : new()
     {
 #if UNITY_EDITOR
-        // Active KeyframedSplineParameter<T> instance being edited by the
-        // KeyframedSplineParameter<T> tool
-        static KeyframedSplineParameter<T> editInstance;
-        public KeyframedSplineParameter<T> EditInstance
-        {
-            get
-            {
-                if( editInstance == null )
-                {
-                    editInstance = this;
-                }
-                return editInstance;
-            }
-        }
-
         // Button displayed in the inspector to quickly select the
         // Correct editor tool for this KeyframedSplineParameter<T>
         [InspectorButton( "ToggleEditor" )]
@@ -63,17 +53,20 @@ namespace FantasticSplines
         {
             if( ToolActive )
             {
-                editInstance = null;
+                KeyframedSplineParameterEditorInstance.editInstance = null;
                 SplineEditor.EditorActive = true;
                 ToolManager.RestorePreviousPersistentTool();
                 EditorApplication.QueuePlayerLoopUpdate();
             }
             else
             {
-                editInstance = this;
-                SplineEditor.EditorActive = false;
-                ToolManager.SetActiveTool( GetToolType() );
-                EditorApplication.QueuePlayerLoopUpdate();
+                if( Selection.activeObject == gameObject )
+                {
+                    KeyframedSplineParameterEditorInstance.editInstance = this;
+                    SplineEditor.EditorActive = false;
+                    ToolManager.SetActiveTool( GetToolType() );
+                    EditorApplication.QueuePlayerLoopUpdate();
+                }
             }
         }
 
@@ -229,7 +222,7 @@ namespace FantasticSplines
         {
             get
             {
-                return Selection.activeObject == gameObject && editInstance == this && ToolManager.activeToolType == GetToolType();
+                return Selection.activeObject == gameObject && KeyframedSplineParameterEditorInstance.editInstance == this && ToolManager.activeToolType == GetToolType();
             }
         }
 
@@ -526,6 +519,37 @@ namespace FantasticSplines
                 lastSimple = spline;
                 RegisterListeners( spline );
             }
+
+
+            //SceneView.duringSceneGui -= DetectInput;            //SceneView.duringSceneGui += DetectInput;
+        }
+
+        void OnDisable()
+        {
+           // SceneView.duringSceneGui -= DetectInput;
+        }
+
+        void DetectInput( SceneView view )
+        {
+#if UNITY_EDITOR
+            List<SplineParameterKeyframe<T>> keys = rawKeyframes;
+            for( int i = 0; i < keys.Count; ++i )
+            {
+                float handleSize = KeyframedSplineParameterTool<Vector3>.GetHandleSize( keys[i].location.position ) * spline.GetGizmoScale();
+                if( HandleUtility.DistanceToCube( keys[i].location.position, Quaternion.identity, handleSize ) <= 0
+                    && Event.current.type == EventType.MouseDown && Event.current.button == 0 )
+                {
+                   if( !ToolActive 
+                        && !SplineEditor.EditorActive
+                        && Selection.activeObject == gameObject 
+                        && KeyframedSplineParameterEditorInstance.editInstance == null )
+                    {
+                        ToggleEditor();
+                    }
+                    return;
+                }
+            }
+#endif
         }
 
         // Monitors the spline set as the parent spline and handles
@@ -599,7 +623,7 @@ namespace FantasticSplines
 
         // Draws generic keyframe gizmos
         // override this to draw completely custom gizmos
-        protected void OnDrawGizmos()
+        protected void OnDrawGizmosSelected()
         {
             if( !enableKeyframeHandles )
             {
@@ -633,9 +657,10 @@ namespace FantasticSplines
 #if UNITY_EDITOR
             // default keyframe gizmos
             // keyframe colour, same as the animator window
+            float handleSize = KeyframedSplineParameterTool<Vector3>.GetHandleSize( key.location.position ) * spline.GetGizmoScale();
             using( new Handles.DrawingScope( ToolActive ? KeyframedSplineParameterTool<Vector3>.ActiveColor : KeyframedSplineParameterTool<Vector3>.InactiveColor ) )
             {
-                KeyframedSplineParameterTool<Vector3>.KeyframeHandleCap( 0, key.location.position, Quaternion.identity, KeyframedSplineParameterTool<Vector3>.GetHandleSize( key.location.position ) * spline.GetGizmoScale(), EventType.Repaint );
+                KeyframedSplineParameterTool<Vector3>.KeyframeHandleCap( 0, key.location.position, Quaternion.identity, handleSize, EventType.Repaint );
             }
 #endif
         }

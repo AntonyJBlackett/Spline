@@ -13,7 +13,7 @@ namespace FantasticSplines
         {
             get
             {
-                return (target as KeyframedSplineParameter<T>).EditInstance;
+                return KeyframedSplineParameterEditorInstance.editInstance as KeyframedSplineParameter<T>;
             }
         }
 
@@ -35,11 +35,11 @@ namespace FantasticSplines
 #endif
         }
 
-        protected void DoKeyframeToolHandles()
+        protected bool DoKeyframeToolHandles()
         {
             if( !Target.enableKeyframeHandles )
             {
-                return;
+                return false;
             }
 
             bool addKey = AddKeyModifiers( Event.current );
@@ -49,24 +49,17 @@ namespace FantasticSplines
             {
                 DoAddKeyframe();
                 Selection.activeObject = Target.gameObject;
+                return true;
             }
             else if( removeKey )
             {
                 DoRemoveKeyframe();
                 Selection.activeObject = Target.gameObject;
+                return true;
             }
             else
             {
-                bool mouseNearKeyframe = DoSplineKeyframeHandle();
-
-                if( mouseNearKeyframe || Target.KeepEditorActive )
-                {
-                    Selection.activeObject = Target.gameObject;
-                }
-                else if( !mouseNearKeyframe && Event.current.button == 0 && Event.current.type == EventType.MouseDown )
-                {
-                    Target.ToggleEditor();
-                }
+                return DoSplineKeyframeHandle();
             }
         }
 
@@ -202,9 +195,10 @@ namespace FantasticSplines
             return mouseOverKeyframe;
         }
 
-        float length = 0.1f;
         bool DoKeyframeMoveHandle( int keyFrameIndex, SplineParameterKeyframe<T> key )
         {
+            bool interacted = false;
+
             Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
 
             float handleSize = GetHandleSize( key.location.position ) * Target.spline.GetGizmoScale();
@@ -230,6 +224,7 @@ namespace FantasticSplines
             Handles.FreeMoveHandle( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize, Vector3.zero, KeyframeHandleCap );
             if( EditorGUI.EndChangeCheck() )
             {
+                interacted = true;
                 Undo.RecordObject( Target, "Move Spline Keyframe" );
                 Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAtDistance( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
             }
@@ -241,6 +236,7 @@ namespace FantasticSplines
                 Vector3 inTangent = Handles.Slider( inHandlePosition, resultAfter.tangent, handleSize * 0.75f, KeyframeTangentCap, 0 ) - inHandleOrigin;
                 if( EditorGUI.EndChangeCheck() )
                 {
+                    interacted = true;
                     if( Vector3.Dot( outTangent, resultAfter.tangent ) < 0 )
                     {
                         outTangent = Vector3.zero;
@@ -260,7 +256,7 @@ namespace FantasticSplines
                 }
             }
 
-            return HandleUtility.DistanceToCube( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize * 10 ) <= 0; // * 3 to add some tollerance
+            return interacted;
         }
 
         // This is called for each window that your tool is active in. Put the functionality of your tool here.
@@ -268,13 +264,26 @@ namespace FantasticSplines
         {
             Handles.zTest = Target.spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
 
+            bool keepActive = false;
             if( Target.enableKeyframeHandles )
             {
-                DoToolHandles( window );
+                if( DoToolHandles( window ) )
+                {
+                    keepActive = true;
+                }
             }
             if( Target.enableValuesGui )
             {
-                DoToolGUI( window );
+                if( DoToolGUI( window ) )
+                {
+                    keepActive = true;
+                }
+            }
+
+            Selection.activeObject = Target.gameObject;
+            if( !keepActive && Event.current.button == 0 && Event.current.type == EventType.MouseDown )
+            {
+                Target.ToggleEditor();
             }
         }
 
@@ -283,12 +292,12 @@ namespace FantasticSplines
             return 50;
         }
 
-        protected virtual void DoToolHandles( EditorWindow window )
+        protected virtual bool DoToolHandles( EditorWindow window )
         {
-            DoKeyframeToolHandles();
+            return DoKeyframeToolHandles();
         }
 
-        protected virtual void DoToolGUI( EditorWindow window )
+        protected virtual bool DoToolGUI( EditorWindow window )
         {
             SerializedObject so = new SerializedObject( Target );
             var rawKeysSP = so.FindProperty( "rawKeyframes" );
@@ -312,6 +321,7 @@ namespace FantasticSplines
                 EditorGUI.DrawRect( new Rect( Vector2.zero, rectSize + border * 2 ), EditorColor );
 
                 GUILayout.BeginArea( new Rect( border, rectSize ) );
+
                 EditorGUILayout.PropertyField( keyValue, new GUIContent(), true );
                 GUILayout.EndArea();
 
@@ -326,7 +336,14 @@ namespace FantasticSplines
                 }
             }
 
-            so.ApplyModifiedProperties();
+            bool keepActive = false;
+            if( so.hasModifiedProperties )
+            {
+                so.ApplyModifiedProperties();
+                keepActive = true;
+            }
+
+            return keepActive;
         }
     }
 }

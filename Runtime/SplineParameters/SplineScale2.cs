@@ -36,8 +36,9 @@ public class SplineScale2 : KeyframedSplineParameter<Vector2>
 
     }
 
-    private void OnDrawGizmosSelected()
+    private new void OnDrawGizmosSelected()
     {
+        base.OnDrawGizmosSelected();
         DrawInterpolatedValue();
     }
 

@@ -60,9 +60,9 @@ namespace FantasticSplines
             Handles.CubeHandleCap( controlId, position, Quaternion.LookRotation( forward, camera.transform.up ), size, eventType );
         }
 
-        protected override void DoToolHandles( EditorWindow window )
+        protected override bool DoToolHandles( EditorWindow window )
         {
-            base.DoKeyframeToolHandles();
+            bool keepActive = base.DoKeyframeToolHandles();
 
             if( SplineScale2.enableKeyframeHandles )
             {
@@ -90,6 +90,7 @@ namespace FantasticSplines
 
                         if( EditorGUI.EndChangeCheck() )
                         {
+                            keepActive = true;
                             scale.x += Vector3.Distance( xScaleHandle, newxScaleHandle ) * Vector3.Dot( xDirection.normalized, (newxScaleHandle - xScaleHandle).normalized );
                             scale.y += Vector3.Distance( yScaleHandle, newyScaleHandle ) * Vector3.Dot( yDirection.normalized, (newyScaleHandle - yScaleHandle).normalized );
 
@@ -99,6 +100,7 @@ namespace FantasticSplines
                     }
                 }
             }
+            return keepActive;
         }
 
         #endregion

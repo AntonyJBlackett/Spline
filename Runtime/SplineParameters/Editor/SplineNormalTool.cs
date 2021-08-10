@@ -41,9 +41,9 @@ namespace FantasticSplines
         #endregion
 
         #region Custom tool handles
-        protected override void DoToolHandles( EditorWindow window )
+        protected override bool DoToolHandles( EditorWindow window )
         {
-            base.DoKeyframeToolHandles();
+            bool keepActive = base.DoKeyframeToolHandles();
 
             if( SplineNormal.enableKeyframeHandles )
             {
@@ -68,12 +68,15 @@ namespace FantasticSplines
 
                         if( EditorGUI.EndChangeCheck() )
                         {
+                            keepActive = true;
                             Undo.RecordObject( SplineNormal, "Rotate Spline Normal" );
                             SplineNormal.SetKeyframeValue( i, new Normal() { blendType = keys[i].value.blendType, angle = keys[i].value.angle + Vector3.SignedAngle( normalRotation * Vector3.forward, changedRotation * Vector3.forward, keys[i].location.tangent ) } );
                         }
                     }
                 }
             }
+
+            return keepActive;
         }
 
         protected override float GetGUIPropertyWidth()
@@ -81,7 +84,7 @@ namespace FantasticSplines
             return 100;
         }
 
-        protected override void DoToolGUI( EditorWindow window )
+        protected override bool DoToolGUI( EditorWindow window )
         {
             SerializedObject so = new SerializedObject( Target );
             var rawKeysSP = so.FindProperty( "rawKeyframes" );
@@ -123,7 +126,15 @@ namespace FantasticSplines
                     Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, HandleUtility.GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
                 }
             }
-            so.ApplyModifiedProperties();
+
+            bool keepActive = false;
+            if( so.hasModifiedProperties )
+            {
+                keepActive = true;
+                so.ApplyModifiedProperties();
+            }
+
+            return keepActive;
         }
         #endregion
     }

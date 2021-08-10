@@ -145,13 +145,14 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
         Handles.ConeHandleCap( 0, worldPosition + normal * gizmosScale, Quaternion.LookRotation( normal ), SplineNormalTool.GetHandleSize( worldPosition ) * gizmosScale * 3f, EventType.Repaint );
     }
 
-    void OnDrawGizmosSelected()
+    protected new void OnDrawGizmosSelected()
     {
         if( spline == null )
         {
             return;
         }
 
+        base.OnDrawGizmosSelected();
         DrawInterpolatedNormals();
     }
 
