@@ -44,7 +44,7 @@ namespace FantasticSplines
 
         public static void AddResultsAtNodes( ref List<ExtrudePoint> results, ISpline spline )
         {
-            int nodeCount = spline.GetNodeCount();
+            int nodeCount = spline.NodeCount;
             for( int i = 0; i < nodeCount; i++ )
             {
                 SplineNode node = spline.GetNode( i );
@@ -54,9 +54,9 @@ namespace FantasticSplines
 
                 if( i != 0 )
                 {
-                    if( node.NodeType == NodeType.Point || node.NodeType == NodeType.Free || Mathf.Approximately( result1.segmentResult.t, 1 ) )
+                    if( node.NodeType == NodeType.Point || node.NodeType == NodeType.Free || result1.segmentResult.AtSegmentEnd )
                     {
-                        SplineResult result2 = spline.GetResultAtSegmentT( result1.segmentResult.index - 1, 1 );
+                        SplineResult result2 = spline.GetResultAtSegment( result1.segmentResult.index - 1, SegmentPercent.End );
                         ExtrudePoint point2 = new ExtrudePoint( result2, TubeGenerator.SplineNodePointPriority );
                         results.Add( point2 ); // in node
                     }
@@ -65,9 +65,9 @@ namespace FantasticSplines
                 results.Add( point1 ); // out node
             }
 
-            if( spline.IsLoop() )
+            if( spline.IsLoop )
             {
-                SplineResult endOfSplineResult = spline.GetResultAtSegmentT( nodeCount - 1, 1 );
+                SplineResult endOfSplineResult = spline.GetResultAtSegment( nodeCount - 1, SegmentPercent.End );
                 results.Add( new ExtrudePoint( endOfSplineResult, TubeGenerator.SplineNodePointPriority ) ); // out node of loop segment
             }
 
@@ -85,7 +85,7 @@ namespace FantasticSplines
         }
 
         static int MaxSegmentDivisions = 500;
-        public static void AddPointsByTollerance( ref List<ExtrudePoint> results, ISpline spline, float minStepDistance, System.Func<ExtrudePoint, ExtrudePoint, bool> tolleranceFunction )
+        public static void AddPointsByTollerance( ref List<ExtrudePoint> results, ISpline spline, SplineDistance minStepDistance, System.Func<ExtrudePoint, ExtrudePoint, bool> tolleranceFunction )
         {
             int resultCount = results.Count;
             for( int i = 1; i < resultCount; ++i )
@@ -93,17 +93,17 @@ namespace FantasticSplines
                 int index = i;
                 int previousIndex = i - 1;
 
-                float segmentLength = results[index].distance - results[previousIndex].distance;
+                var segmentLength = results[index].distance - results[previousIndex].distance;
                 int segmentDivisions = Mathf.FloorToInt( segmentLength / minStepDistance );
                 segmentDivisions = Mathf.Min( segmentDivisions, MaxSegmentDivisions );
                 if( segmentDivisions > 1 )
                 {
                     ExtrudePoint previousResult = results[previousIndex];
-                    float segmentStep = segmentLength / segmentDivisions;
+                    var segmentStep = segmentLength / segmentDivisions;
                     for( int s = 1; s < segmentDivisions; ++s )
                     {
-                        float segmentDistance = segmentStep * s;
-                        SplineResult result = spline.GetResultAtDistance( results[previousIndex].distance + segmentDistance );
+                        var segmentDistance = segmentStep * s;
+                        SplineResult result = spline.GetResultAt( results[previousIndex].distance + segmentDistance );
                         ExtrudePoint newPoint = new ExtrudePoint( result, TubeGenerator.TollerancePointPriority );
                         if( tolleranceFunction( previousResult, newPoint ) )
                         {
@@ -122,7 +122,7 @@ namespace FantasticSplines
             {
                 int previousIndex = i + 1;
 
-                if( Mathf.Abs( results[i].distance - results[previousIndex].distance ) < tollerance )
+                if( Mathf.Abs( results[i].distance.value - results[previousIndex].distance.value ) < tollerance )
                 {
                     results.RemoveAt( i );
                 }
@@ -137,7 +137,7 @@ namespace FantasticSplines
                 scratch.Clear();
                 for( int j = i + 1; j < results.Count; ++j )
                 {
-                    if( Mathf.Abs( results[i].distance - results[j].distance ) < tollerance )
+                    if( Mathf.Abs( results[i].distance.value - results[j].distance.value ) < tollerance )
                     {
                         scratch.Add( j );
                     }

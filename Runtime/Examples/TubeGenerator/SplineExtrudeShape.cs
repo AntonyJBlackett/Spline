@@ -34,7 +34,7 @@ namespace FantasticSplines
 
         public int GetUpdateCount()
         {
-            return Spline.GetUpdateCount() + UpdateCount;
+            return Spline.UpdateCount + UpdateCount;
         }
 
         public ExtrudeShape GetExtrudeShape()
@@ -44,7 +44,7 @@ namespace FantasticSplines
             samples.Clear();
 
             SplineProcessor.AddResultsAtNodes( ref samples, spline );
-            SplineProcessor.AddPointsByTollerance( ref samples, spline, tolleranceStep, ExceedsTangetAngleTollerance );
+            SplineProcessor.AddPointsByTollerance( ref samples, spline, new SplineDistance( tolleranceStep ), ExceedsTangetAngleTollerance );
 
             if( reverse ) samples.Reverse();
 

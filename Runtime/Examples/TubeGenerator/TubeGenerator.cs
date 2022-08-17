@@ -20,7 +20,7 @@ namespace FantasticSplines
         public Vector3 normal;
         public Vector2 scale; // scales the shape along x,y
         public Color color;
-        public float distance; // for sorting and uvs
+        public SplineDistance distance; // for sorting and uvs
         public float priority; // higher = higher priority
         public float segment; // for sorting.
 
@@ -47,7 +47,7 @@ namespace FantasticSplines
                 normal = Vector3.Slerp( a.normal, b.normal, t ),
                 scale = Vector3.Lerp( a.scale, b.scale, t ),
                 color = Color.Lerp( a.color, b.color, t ),
-                distance = Mathf.Lerp( a.distance, b.distance, t ),
+                distance = SplineDistance.Lerp( a.distance, b.distance, t ),
                 priority = Mathf.Lerp( a.priority, b.priority, t ),
                 segment = Mathf.Lerp( a.segment, b.segment, t )
             };
@@ -55,6 +55,8 @@ namespace FantasticSplines
     }
 
     [ExecuteInEditMode]
+    [RequireComponent(typeof(MeshFilter))]
+    [RequireComponent( typeof( MeshRenderer ) )]
     public class TubeGenerator : MonoBehaviour
     {
         [InspectorButton( "Regenerate" )]
@@ -127,6 +129,7 @@ namespace FantasticSplines
         public bool backfaces = false;
         public bool startCap = false;
         public bool endCap = false;
+        public bool physicsCaps = true; // if true the physics mesh will also have end caps.
 
         [Header( "Outputs" )]
         public MeshFilter meshFilter;
@@ -146,24 +149,72 @@ namespace FantasticSplines
         private void Awake()
         {
             regenerate = true;
+            if( spline == null )
+            {
+                spline = GetComponent<SplineComponent>();
+                if( spline == null && transform.parent != null )
+                {
+                    spline = transform.parent.GetComponentInChildren<SplineComponent>();
+                }
+            }
+
+            if( splineNormal == null )
+            {
+                splineNormal = GetComponent<SplineNormal>();
+                if( splineNormal == null )
+                {
+                    splineNormal = transform.GetComponentInChildren<SplineNormal>();
+                }
+                if( splineNormal == null && transform.parent != null )
+                {
+                    splineNormal = transform.parent.GetComponentInChildren<SplineNormal>();
+                }
+            }
+
+            if( splineColor == null )
+            {
+                splineColor = GetComponent<SplineColor>();
+                if( splineColor == null )
+                {
+                    splineColor = transform.GetComponentInChildren<SplineColor>();
+                }
+                if( splineColor == null && transform.parent != null )
+                {
+                    splineColor = transform.parent.GetComponentInChildren<SplineColor>();
+                }
+            }
+
+            if( splineScale == null )
+            {
+                splineScale = GetComponent<SplineScale2>();
+                if( splineScale == null )
+                {
+                    splineScale = transform.GetComponentInChildren<SplineScale2>();
+                }
+                if( splineScale == null && transform.parent != null )
+                {
+                    splineScale = transform.parent.GetComponentInChildren<SplineScale2>();
+                }
+            }
         }
+
         void Initialise()
         {
             meshFilter = GetComponent<MeshFilter>();
             meshCollider = GetComponent<MeshCollider>();
 
-            if( mesh == null )
+            if( mesh == null && meshFilter != null )
             {
                 mesh = new Mesh();
                 mesh.MarkDynamic();
                 meshFilter.mesh = mesh;
             }
 
-            if( meshFilter == null )
+            if( meshFilter != null )
             {
                 meshFilter.sharedMesh = mesh;
             }
-            if( meshCollider == null )
+            if( meshCollider != null )
             {
                 meshFilter.sharedMesh = mesh;
             }
@@ -183,7 +234,12 @@ namespace FantasticSplines
         int selfUpdateCount = 0;
         public int GetUpdateCount()
         {
-            int update = spline.GetUpdateCount();
+            if( spline == null )
+            {
+                return 0;
+            }
+
+            int update = spline.UpdateCount;
 
             if( splineNormal != null ) update += splineNormal.GetUpdateCount();
             if( splineScale != null ) update += splineScale.GetUpdateCount();
@@ -218,6 +274,11 @@ namespace FantasticSplines
         {
             selfUpdateCount++;
             cornerRadius = Mathf.Clamp( cornerRadius, 0, cornerRadius );
+        }
+
+        private void Update()
+        {
+            AutoRegenerate();
         }
 
         private void OnDrawGizmos()
@@ -294,10 +355,11 @@ namespace FantasticSplines
             if( sampleSplineScaleKeys && splineScale ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineScale );
             if( sampleSplineColorKeys && splineColor ) SplineProcessor.AddResultsAtKeys( ref splinePoints, splineColor );
 
-            if( enableTangentTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsTangetAngleTollerance );
-            if( enableNormalTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsNormalAngleTollerance );
-            if( enableScaleTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsVector2Tollerance );
-            if( enableColorTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, tolleranceSamplingStepDistance, ExceedsColorTollerance );
+            var step = new SplineDistance( tolleranceSamplingStepDistance );
+            if( enableTangentTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, step, ExceedsTangetAngleTollerance );
+            if( enableNormalTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, step, ExceedsNormalAngleTollerance );
+            if( enableScaleTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, step, ExceedsVector2Tollerance );
+            if( enableColorTollerance ) SplineProcessor.AddPointsByTollerance( ref splinePoints, spline, step, ExceedsColorTollerance );
 
             SplineProcessor.RemovePointsAtSameLocation( ref splinePoints );
 
@@ -316,16 +378,16 @@ namespace FantasticSplines
                 bool firstPoint = p == 0;
                 bool lastPoint = p == splinePoints.Count - 1;
 
-                if( (!firstPoint && !lastPoint) || spline.IsLoop() )
+                if( (!firstPoint && !lastPoint) || spline.IsLoop )
                 {
                     int previousIndex = p - 1;
                     int nextIndex = p + 1;
 
-                    if( spline.IsLoop() && previousIndex < 0 )
+                    if( spline.IsLoop && previousIndex < 0 )
                     {
                         previousIndex = splinePoints.Count - 2; // -2 because the end point is actually the 'same point'
                     }
-                    if( spline.IsLoop() && nextIndex >= splinePoints.Count )
+                    if( spline.IsLoop && nextIndex >= splinePoints.Count )
                     {
                         nextIndex = 1; // 1 because the first point is actually the 'same point'
                     }
@@ -395,7 +457,7 @@ namespace FantasticSplines
                 Subdivide( ref extrudePoints, TwistAngleSubdivisions );
             }
 
-            GenerateMesh( extrudePoints, spline.IsLoop() );
+            GenerateMesh( extrudePoints, spline.IsLoop );
         }
 
         void FixIntersectingSegments( ref List<ExtrudePoint> points )
@@ -455,12 +517,12 @@ namespace FantasticSplines
             points.Sort( ( a, b ) => { return a.distance.CompareTo( b.distance ); } );
         }
 
-        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 pointTangent, Vector3 inTangent, float distance, float priority )
+        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 pointTangent, Vector3 inTangent, SplineDistance distance, float priority )
         {
             return ConstructExtrudePoint( point, GetNormalAtDistance( distance ), GetScaleAtDistance( distance ), GetColorAtDstance( distance ), pointTangent, inTangent, distance, priority );
         }
 
-        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector2 scale, Color color, Vector3 tangent, Vector3 inTangent, float distance, float priority )
+        ExtrudePoint ConstructExtrudePoint( Vector3 point, Vector3 normal, Vector2 scale, Color color, Vector3 tangent, Vector3 inTangent, SplineDistance distance, float priority )
         {
             return new ExtrudePoint()
             {
@@ -475,7 +537,7 @@ namespace FantasticSplines
             };
         }
 
-        Vector3 GetNormalAtDistance( float distance )
+        Vector3 GetNormalAtDistance( SplineDistance distance )
         {
             if( splineNormal == null )
             {
@@ -485,24 +547,24 @@ namespace FantasticSplines
             return splineNormal.GetNormalAtDistance( distance );
         }
 
-        Vector2 GetScaleAtDistance( float distance )
+        Vector2 GetScaleAtDistance( SplineDistance distance )
         {
             if( splineScale == null )
             {
                 return Vector2.one;
             }
 
-            return splineScale.GetValueAtDistance( distance, Vector2.one );
+            return splineScale.GetValueAt( distance, Vector2.one );
         }
 
-        Color GetColorAtDstance( float distance )
+        Color GetColorAtDstance( SplineDistance distance )
         {
             if( splineColor == null )
             {
                 return Color.white;
             }
 
-            return splineColor.GetValueAtDistance( distance, Color.white );
+            return splineColor.GetValueAt( distance, Color.white );
         }
 
         public const int SplineNodePointPriority = 5;
@@ -519,9 +581,9 @@ namespace FantasticSplines
             Vector3 cornerAxis = Vector3.Cross( inTangent, outTangent ).normalized;
             Vector3 inPoint = MathsUtils.ProjectPointOnLine( splinePoint.position, inTangent, cornerCenter );
             Vector3 outPoint = MathsUtils.ProjectPointOnLine( splinePoint.position, outTangent, cornerCenter );
-            float halfCornerLength = Vector3.Distance( inPoint, splinePoint.position );
-            float inDistance = splinePoint.distance - halfCornerLength;
-            float outDistance = splinePoint.distance + halfCornerLength;
+            var halfCornerLength = new SplineDistance( Vector3.Distance( inPoint, splinePoint.position ) );
+            var inDistance = splinePoint.distance - halfCornerLength;
+            var outDistance = splinePoint.distance + halfCornerLength;
 
             ExtrudePoint startCorner = ConstructExtrudePoint( inPoint, inTangent, inTangent, inDistance, CornerEndPointPriority );
             ExtrudePoint endCorner = ConstructExtrudePoint( outPoint, outTangent, outTangent, outDistance, CornerEndPointPriority );
@@ -620,7 +682,7 @@ namespace FantasticSplines
                         Vector3 midTangent = Vector3.Slerp( startCorner.pointTangent, endCorner.pointTangent, 0.5f );
                         Vector2 midScale = Vector2.Lerp( startCorner.scale, endCorner.scale, 0.5f );
                         Color midColor = Color.Lerp( startCorner.color, endCorner.color, 0.5f );
-                        float midDistance = Mathf.Lerp( startCorner.distance, endCorner.distance, 0.5f );
+                        var midDistance = SplineDistance.Lerp( startCorner.distance, endCorner.distance, 0.5f );
                         ExtrudePoint midPoint = ConstructExtrudePoint( splinePoint.position, midNormal, midScale, midColor, midTangent, inTangent, midDistance, CornerMidPointPriority );
                         ValidateExtrudePoint( midPoint );
                         extrudePoints.Add( midPoint );
@@ -651,7 +713,7 @@ namespace FantasticSplines
                 float slerpAngle = cornerAngle * t;
                 Matrix4x4 pointStepRotation = Matrix4x4.TRS( Vector3.zero, Quaternion.AngleAxis( slerpAngle, cornerAxis ), Vector3.one );
                 Matrix4x4 pointStepMatrix = centerToWorld * pointStepRotation * centerToWorld.inverse;
-                float distance = Mathf.Lerp( startCorner.distance, endCorner.distance, t );
+                var distance = SplineDistance.Lerp( startCorner.distance, endCorner.distance, t );
                 Vector3 point = pointStepMatrix.MultiplyPoint( startCorner.position );
 
                 Quaternion startRotation = Quaternion.LookRotation( startCorner.pointTangent, startCorner.normal );
@@ -676,9 +738,9 @@ namespace FantasticSplines
             Vector3 inPointFromCenter = inSquarePoint - cornerCenter;
             Vector3 outPointFromCenter = outSquarePoint - cornerCenter;
 
-            float squareToEndDistance = Vector3.Distance( inSquarePoint, startCorner.position );
-            float p1Distance = startCorner.distance + squareToEndDistance;
-            float p3Distance = endCorner.distance - squareToEndDistance;
+            var squareToEndDistance = new SplineDistance( Vector3.Distance( inSquarePoint, startCorner.position ) );
+            var p1Distance = startCorner.distance + squareToEndDistance;
+            var p3Distance = endCorner.distance - squareToEndDistance;
 
             Vector3 p1Tangent = Vector3.Cross( inPointFromCenter.normalized, cornerAxis );
             float tangentSign = Mathf.Sign( Vector3.Dot( p1Tangent, tangent ) );
@@ -694,20 +756,13 @@ namespace FantasticSplines
             extrudePoints.Add( p3 );
         }
 
-        float CalculateVScalar( float length )
-        {
-            float splineVScalar = length / vTiling;
-            if( seamlessVs )
-            {
-                float roundedVLength = Mathf.Round( splineVScalar );
-                float stretchedSplineLength = roundedVLength * vTiling;
-                splineVScalar = stretchedSplineLength / length;
-            }
-            return splineVScalar;
-        }
-
         void GenerateMesh( List<ExtrudePoint> tubePoints, bool loop )
         {
+            if( meshFilter == null )
+            {
+                return;
+            }
+
             if( tubePoints.Count < 2 )
             {
                 return;

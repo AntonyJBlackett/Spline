@@ -232,9 +232,10 @@ namespace FantasticSplines
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public Vector3 GetPosition(float t)
+        public Vector3 GetPosition( SegmentT segmentT )
         {
-            return A + 3.0f * t * (B - A) + 3.0f * t * t * (C - 2.0f * B + A) + t * t * t * (D - 3.0f * C + 3.0f * B - A);
+            float t = segmentT.value;
+            return A + (3.0f * t) * (B - A) + (3.0f * t * t) * (C - 2.0f * B + A) + (t * t * t) * (D - 3.0f * C + 3.0f * B - A);
         }
 
         /// <summary>
@@ -242,9 +243,10 @@ namespace FantasticSplines
         /// </summary>
         /// <param name="t"></param>
         /// <returns></returns>
-        public Vector3 GetTangent(float t)
+        public Vector3 GetTangent(SegmentT segmentT )
         {
-            t = Mathf.Clamp( t, 0.0001f, 0.9999f ); // clamp like this of there is no tangent at position exactly on the curve point
+            float t = segmentT.value;
+            t = Mathf.Clamp( t, 0.0001f, 0.9999f ); // clamp like this of there is no tangent at position exactly on the curve start or end point
             float oneMinusT = 1f - t;
             return
                 3f * oneMinusT * oneMinusT * (B - A) +
@@ -257,7 +259,7 @@ namespace FantasticSplines
         /// </summary>
         private Vector3 Q
         {
-            get { return (3.0f * C - D + 3.0f * B - A) / 4.0f; }
+            get { return (3.0f * C - D + 3.0f * B - A) * 0.25f; }
         }
 
         /// <summary>
@@ -284,53 +286,56 @@ namespace FantasticSplines
         /// <remarks>
         /// (De Casteljau's algorithm, see: http://caffeineowl.com/graphics/2d/vectorial/bezierintro.html)
         /// </remarks>
-        public void SplitAt(float t, out Bezier3 left, out Bezier3 right)
+        public void SplitAt(SegmentT segmentT, out Bezier3 left, out Bezier3 right)
         {
+            float t = segmentT.value;
             Vector3 a = Vector3.Lerp( A, B, t );
             Vector3 b = Vector3.Lerp( B, C, t );
             Vector3 c = Vector3.Lerp( C, D, t );
             Vector3 m = Vector3.Lerp( a, b, t );
             Vector3 n = Vector3.Lerp( b, c, t );
-            Vector3 p = GetPosition( t );
+            Vector3 p = GetPosition( segmentT );
 
             left = new Bezier3( A, a, m, p );
             right = new Bezier3( p, n, c, D );
         }
 
-        public Bezier3 MiddleSplitAt(float t1, float t2)
+        public Bezier3 MiddleSplitAt( SegmentT t1, SegmentT t2 )
         {
             Bezier3 right = RightSplitAt( t1 );
-            float newT = Mathf.InverseLerp( t1, 1f, t2 );
+            var newT = new SegmentT( Mathf.InverseLerp( t1.value, 1f, t2.value ) );
 #if DEBUG
             Debug.Assert( (right.GetPosition( newT ) - GetPosition( t2 )).sqrMagnitude < 0.0001f );
 #endif
             return right.LeftSplitAt( newT );
         }
 
-        public Bezier3 LeftSplitAt(float t)
+        public Bezier3 LeftSplitAt(SegmentT segmentT)
         {
-            if( Mathf.Approximately( t, 1f ) )
+            float tValue = segmentT.value;
+            if( Mathf.Approximately( tValue, 1f ) )
             {
                 return this;
             }
-            Vector3 a = Vector3.Lerp( A, B, t );
-            Vector3 b = Vector3.Lerp( B, C, t );
-            Vector3 m = Vector3.Lerp( a, b, t );
-            Vector3 p = GetPosition( t );
+            Vector3 a = Vector3.Lerp( A, B, tValue );
+            Vector3 b = Vector3.Lerp( B, C, tValue );
+            Vector3 m = Vector3.Lerp( a, b, tValue );
+            Vector3 p = GetPosition( segmentT );
 
             return new Bezier3( A, a, m, p );
         }
 
-        public Bezier3 RightSplitAt(float t)
+        public Bezier3 RightSplitAt( SegmentT segmentT )
         {
-            if( Mathf.Approximately( t, 0f ) )
+            float tValue = segmentT.value;
+            if( Mathf.Approximately( tValue, 0f ) )
             {
                 return this;
             }
-            Vector3 b = Vector3.Lerp( B, C, t );
-            Vector3 c = Vector3.Lerp( C, D, t );
-            Vector3 n = Vector3.Lerp( b, c, t );
-            Vector3 p = GetPosition( t );
+            Vector3 b = Vector3.Lerp( B, C, tValue );
+            Vector3 c = Vector3.Lerp( C, D, tValue );
+            Vector3 n = Vector3.Lerp( b, c, tValue );
+            Vector3 p = GetPosition( segmentT );
 
             return new Bezier3( p, n, c, D );
         }
@@ -368,14 +373,18 @@ namespace FantasticSplines
             }
         }
 
-        public float CalculateDistanceAt(float t)
+        public float CalculateDistanceAt(SegmentT t)
         {
             return LeftSplitAt( t ).Length;
         }
 
-        public float CalculateRadiusAt( float t )
+        public float CalculateRadiusAt( SegmentT t )
         {
-            float curvature = CalculateCurvatureAt( t );
+            return CalculateRadiusFromCurvature( CalculateCurvatureAt( t ) );
+        }
+
+        public static float CalculateRadiusFromCurvature( float curvature )
+        {
             if( Mathf.Approximately( curvature, 0 ) )
             {
                 return float.MaxValue;
@@ -383,65 +392,47 @@ namespace FantasticSplines
             return 1.0f / curvature;
         }
 
-        public float CalculateCurvatureAt( float t )
+        public float CalculateCurvatureAt( SegmentT t )
         {
-            // I found this here:
-            // https://stackoverflow.com/questions/16140281/how-to-determine-curvature-of-a-cubic-bezier-path-at-an-end-point
-            /*ax = P[1].x - P[0].x;               //  a = P1 - P0
-            ay = P[1].y - P[0].y;
-            bx = P[2].x - P[1].x - ax;          //  b = P2 - P1 - a
-            by = P[2].y - P[1].y - ay;
-            cx = P[3].x - P[2].x - bx * 2 - ax;   //  c = P3 - P2 - 2b - a
-            cy = P[3].y - P[2].y - by * 2 - ay;
-
-            bc = bx * cy - cx * by;
-            ac = ax * cy - cx * ay;
-            ab = ax * by - bx * ay;
-
-            r = ab + ac * t + bc * t * t;*/
-
-            Vector3 a = B - A;
-            Vector3 b = C - B - a;
-            Vector3 c = D - C - 2 * b - a;
-
-            float bc = Vector3.Dot( b, c );
-            float ac = Vector3.Dot( a, c );
-            float ab = Vector3.Dot( a, b );
-
-            return ab + ac * t + bc * t * t / Length;
+            throw new System.NotImplementedException();
         }
 
-        public float GetLengthInterpolated(int steps)
+        public SegmentDistance GetLengthInterpolated(int steps)
         {
-            float step = 1f / steps;
-            float distance = 0f;
-            Vector3 prev = GetPosition( 0f );
-            for( float t = step; t < 1f; t += step )
+            var step = new SegmentT( 1f / steps );
+            var distance = SegmentDistance.Zero;
+            Vector3 prev = GetPosition( SegmentT.Start );
+            for( var t = step; t <= SegmentT.End; t += step )
             {
                 Vector3 curr = GetPosition( t );
-                distance += (curr - prev).magnitude;
+                distance += new SegmentDistance( (curr - prev).magnitude );
                 prev = curr;
             }
 
             return distance;
         }
 
-        public float GetClosestT(Vector3 pos, float paramThreshold = 0.000001f)
+        public SegmentT GetClosestT(Vector3 pos, float paramThreshold)
         {
-            return GetClosestTRecursive( pos, 0.0f, 1.0f, paramThreshold );
+            return GetClosestTRecursive( pos, SegmentT.Start, SegmentT.End, paramThreshold );
         }
 
-        float GetClosestTRecursive(Vector3 pos, float beginT, float endT, float thresholdT)
+        public SegmentT GetClosestT( Vector3 pos, SegmentT beginT, SegmentT endT, float paramThreshold )
         {
-            float mid = (beginT + endT) / 2.0f;
+            return GetClosestTRecursive( pos, beginT, endT, paramThreshold );
+        }
+
+        SegmentT GetClosestTRecursive(Vector3 pos, SegmentT beginT, SegmentT endT, float thresholdT )
+        {
+            SegmentT mid = SegmentT.Lerp( beginT, endT, 0.5f);
 
             // Base case for recursion.
-            if( (endT - beginT) < thresholdT )
+            if( (endT.value - beginT.value) < thresholdT )
                 return mid;
 
             // The two halves have param range [start, mid] and [mid, end]. We decide which one to use by using a midpoint param calculation for each section.
-            float paramA = (beginT + mid) / 2.0f;
-            float paramB = (mid + endT) / 2.0f;
+            SegmentT paramA = SegmentT.Lerp( beginT, mid, 0.5f );
+            SegmentT paramB = SegmentT.Lerp( mid, endT, 0.5f );
 
             Vector3 posA = GetPosition( paramA );
             Vector3 posB = GetPosition( paramB );

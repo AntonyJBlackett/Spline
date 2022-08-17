@@ -9,8 +9,8 @@ using UnityEngine;
 [ExecuteInEditMode]
 public class MoveOnSpline : MonoBehaviour
 {
-    public float currentDistance;
-    public float speed;
+    public SplineDistance currentDistance;
+    public SplineDistance speed;
 
     public SplineComponent spline;
 
@@ -23,7 +23,7 @@ public class MoveOnSpline : MonoBehaviour
 
         if( spline != null )
         {
-            SplineResult result = spline.GetResultAtDistance( currentDistance );
+            SplineResult result = spline.GetResultAt( currentDistance );
             this.transform.position = result.position;
             this.transform.rotation = Quaternion.LookRotation( result.tangent, Vector3.up );
         }

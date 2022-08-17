@@ -9,13 +9,17 @@ using UnityEditor;
 // Spline Keyframe track that stores and blends colors along a spline
 public class SplineColor : KeyframedSplineParameter<Color>
 {
+    SplineColor() : base()
+    {
+        parameterName = "Spline Color";
+    }
+
     [Header( "Visualisation" )]
     public bool enableVisualisation = false;
 
     #region SplineDataTrack specialisation
     public override Color GetDefaultKeyframeValue()
     {
-        enableValuesGui = true;
         return Color.white;
     }
 
@@ -25,9 +29,10 @@ public class SplineColor : KeyframedSplineParameter<Color>
     #endregion
 
     #region Gizmos
+#if UNITY_EDITOR
     protected override void DrawKeyframeValueGizmo( SplineParameterKeyframe<Color> keyframe )
     {
-        float size = SplineNormalTool.GetHandleSize( keyframe.location.position ) * spline.GetGizmoScale();
+        float size = SplineNormalTool.GetHandleSize( keyframe.location.position ) * spline.gizmoScale;
         Handles.color = Color.black;
         Vector3 up = SceneView.currentDrawingSceneView.camera.transform.up;
         Handles.DrawLine( keyframe.location.position, keyframe.location.position + up * size * 2.5f, 2 );
@@ -36,21 +41,16 @@ public class SplineColor : KeyframedSplineParameter<Color>
         Handles.DrawSolidDisc( keyframe.location.position + up * size * 2.5f, SceneView.currentDrawingSceneView.camera.transform.forward, size * 0.75f );
     }
 
-    protected new void OnDrawGizmosSelected()
-    {
-        DrawInterpolatedSplineColor();
-    }
-
-    List<float> pointDistances = new List<float>();
-    void DrawInterpolatedSplineColor()
+    List<SplineDistance> pointDistances = new List<SplineDistance>();
+    protected override void DrawInterpolatedGizmos()
     {
         if( enableVisualisation )
         {
-            int nodeCount = spline.GetNodeCount();
+            int nodeCount = spline.NodeCount;
             pointDistances.Clear();
             for( int i = 0; i < nodeCount; ++i )
             {
-                if( i == 0 && !spline.IsLoop( ) )
+                if( i == 0 && !spline.IsLoop )
                 {
                     continue;
                 }
@@ -66,7 +66,7 @@ public class SplineColor : KeyframedSplineParameter<Color>
                 int segments = 10;
                 for( int s = 0; s < segments; ++s )
                 {
-                    pointDistances.Add( Mathf.Lerp( start.distance, end.distance, Mathf.InverseLerp(0, segments-1, s) ) );
+                    pointDistances.Add( SplineDistance.Lerp( start.distance, end.distance, Mathf.InverseLerp(0, segments-1, s) ) );
                 }
             }
 
@@ -80,16 +80,14 @@ public class SplineColor : KeyframedSplineParameter<Color>
 
             for( int i = 1; i < pointDistances.Count; ++i )
             {
-                SplineResult start = spline.GetResultAtDistance( pointDistances[i-1] );
-                SplineResult end = spline.GetResultAtDistance( pointDistances[i] );
+                SplineResult start = spline.GetResultAt( pointDistances[i-1] );
+                SplineResult end = spline.GetResultAt( pointDistances[i] );
 
-                Handles.color = GetValueAtDistance( (start.distance+end.distance)*0.5f, GetDefaultKeyframeValue() );
+                Handles.color = GetValueAt( (start.distance+end.distance)*0.5f, GetDefaultKeyframeValue() );
                 Handles.DrawLine( start.position, end.position, 5 );
             }
         }
-
-        // draw gizmos on top
-        base.OnDrawGizmosSelected();
     }
+#endif
     #endregion
 }

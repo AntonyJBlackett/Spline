@@ -34,47 +34,24 @@ namespace FantasticSplines
         Constant
     }
 
-    public static class KeyframedSplineParameterEditorInstance
+    public class KeyframedSplineParameterBase : MonoBehaviour
     {
-        public static Object editInstance;
     }
 
     // A collection of data points along a spline
     [System.Serializable]
     [ExecuteInEditMode]
-    public class KeyframedSplineParameter<T> : MonoBehaviour, ISplineParameter<T> where T : new()
+    [DisallowMultipleComponent]
+    public class KeyframedSplineParameter<T> : KeyframedSplineParameterBase, ISplineParameter<T> where T : new()
     {
-#if UNITY_EDITOR
-        // Button displayed in the inspector to quickly select the
-        // Correct editor tool for this KeyframedSplineParameter<T>
-        [InspectorButton( "ToggleEditor" )]
-        public bool toggleEditor = false;
-        public void ToggleEditor()
-        {
-            if( ToolActive )
-            {
-                KeyframedSplineParameterEditorInstance.editInstance = null;
-                SplineEditor.EditorActive = true;
-                ToolManager.RestorePreviousPersistentTool();
-                EditorApplication.QueuePlayerLoopUpdate();
-            }
-            else
-            {
-                if( Selection.activeObject == gameObject )
-                {
-                    KeyframedSplineParameterEditorInstance.editInstance = this;
-                    SplineEditor.EditorActive = false;
-                    ToolManager.SetActiveTool( GetToolType() );
-                    EditorApplication.QueuePlayerLoopUpdate();
-                }
-            }
-        }
 
+#if UNITY_EDITOR
         // The tool type used to edit this KeyframedSplineParameter<T>
         protected virtual System.Type GetToolType() { Debug.LogError( "You must override GetToolType() and supply the correct tool type." ); return typeof( SplineParameterKeyframe<T> ); }
 #endif
-
-        public string parameterName = "";
+        [Tooltip( "Names the tool in the scene view toolbar. Can be used to differentiate components in scripts." )]
+        public string parameterName = "Spline Parameter";
+        // Can be used to differentiate components in scripts
         public int ParameterNameHash
         {
             get; private set;
@@ -84,23 +61,28 @@ namespace FantasticSplines
         public System.Action onKeyframesChanged; // called when a key is moved or the value is changed.
 
         // Event called when the spline is moved or edited
-        public System.Action onSplineChanged; 
+        public System.Action onSplineChanged;
 
-        // Spline that keyframes are attached to. Often refered to as the 'parent spline'.
+        [Tooltip( "Spline that keyframes are attached to." )]
         public SplineComponent spline;
         // Spline reference used to detect if the spline component reference has changed
-        SplineComponent lastSimple; 
+        SplineComponent lastSpline;
 
-        // Keyframe positioning behaviour to handle when the parent spline is edited.
+        [Tooltip( "Controls how keyframes are repositioned when the spline is edited." )]
         public RepositionMode keyRepositionMode = RepositionMode.SegmentT;
 
-        // Paramters to enable and disable editor functionality and gizmos.
+        [Header( "Gizmos" )]
+        [Tooltip( "Draws gizmos even when not selected." )]
+        public bool alwaysDrawGizmos = false;
+
         [Header( "Handles" )]
-        public bool KeepEditorActive = false;
+        [Tooltip( "Enables Handles for keyframes in the scene view." )]
         public bool enableKeyframeHandles = true;
-        public bool enableValuesGui = false;
+        [Tooltip( "Enables GUI in the scene view to edit keyframe values." )]
+        public bool enableValuesGui = true;
 
         [Header( "Interpolation" )]
+        [Tooltip( "Defines how values are interpolated between keyframes." )]
         public KeyframeInterpolationModes keyframeInterpolationMode = KeyframeInterpolationModes.Linear;
 
 
@@ -217,14 +199,16 @@ namespace FantasticSplines
             return new SplineParameterKeyframe<T>( value, location, inTangent, outTangent );
         }
 
+#if UNITY_EDITOR
         // Returns true if the the editor for this KeyframedSplineParameter<T> is active.
         bool ToolActive
         {
             get
             {
-                return Selection.activeObject == gameObject && KeyframedSplineParameterEditorInstance.editInstance == this && ToolManager.activeToolType == GetToolType();
+                return Selection.activeObject == gameObject && ToolManager.activeToolType == GetToolType();
             }
         }
+#endif
 
         // Transforms a local space keyframe into world space.
         public virtual SplineParameterKeyframe<T> TransformKeyframe( SplineParameterKeyframe<T> keyframe )
@@ -244,7 +228,7 @@ namespace FantasticSplines
         }
 
         // Returns the interpolated value at distance along the spline
-        public virtual T GetValueAtDistance( float distance, T defaultValue )
+        public virtual T GetValueAt( SplineDistance distance, T defaultValue )
         {
             if( rawKeyframes.Count == 0 )
             {
@@ -256,14 +240,13 @@ namespace FantasticSplines
                 return TransformKeyframe( rawKeyframes[0] ).value;
             }
 
-            float loopDistance = spline.IsLoop() ? distance % spline.GetLength() : Mathf.Clamp( distance, 0, spline.GetLength() );
-            return InterpolateWithDistance( loopDistance );
+            return Interpolate( spline.LoopDistance( distance ) );
         }
 
         // Returns the interpolated value at t along the spline
-        public virtual T GetValueAtT( float t, T defaultValue )
+        public virtual T GetValueAt( SplinePercent t, T defaultValue )
         {
-            return GetValueAtDistance( spline.GetLength() * t, defaultValue );
+            return GetValueAt( spline.Length * t.value, defaultValue );
         }
 
         // Returns the keyframe at the given index
@@ -304,7 +287,7 @@ namespace FantasticSplines
         public void SetKeyframeTangents( int index, float inTangent, float outTangent )
         {
             var key = rawKeyframes[index];
-            SetKeyframe( index, CreateKeyframe( TransformKeyframe( key ).value, key.location, key.inTangent, key.outTangent ) );
+            SetKeyframe( index, CreateKeyframe( TransformKeyframe( key ).value, key.location, inTangent, outTangent ) );
         }
 
         // Sets the keyframe at index
@@ -322,9 +305,9 @@ namespace FantasticSplines
         }
 
         // Creates a new keyframe at the given distance along the spline
-        public int InsertAtDistance( T value, float distance )
+        public int Insert( T value, SplineDistance distance )
         {
-            SplineResult result = spline.GetResultAtDistance( distance );
+            SplineResult result = spline.GetResultAt( distance );
             return Insert( value, result );
         }
 
@@ -398,15 +381,15 @@ namespace FantasticSplines
         }
 
         // Returns an interpolated keyframe value of T at distance on the spline
-        T InterpolateWithDistance( float distance )
+        T Interpolate( SplineDistance distance )
         {
             var orderedKeys = OrderedKeyframes;
 
             SplineParameterKeyframe<T> first = GetKeyframeBeforeDistance( orderedKeys, distance );
             SplineParameterKeyframe<T> second = GetKeyframeAfterDistance( orderedKeys, distance );
 
-            float firstDistance = first.location.loopDistance;
-            float secondDistance = second.location.loopDistance;
+            var firstDistance = first.location.loopDistance;
+            var secondDistance = second.location.loopDistance;
 
             if( first.location.loopDistance > second.location.loopDistance )
             {
@@ -423,7 +406,7 @@ namespace FantasticSplines
                 distance -= first.location.length;
             }
 
-            float t = Mathf.InverseLerp( firstDistance, secondDistance, distance );
+            float t = Mathf.InverseLerp( firstDistance.value, secondDistance.value, distance.value );
             float blend = GetBlend( first, second, t );
 
             return Interpolate( first, second, blend );
@@ -436,37 +419,37 @@ namespace FantasticSplines
             {
                 return CustomInterpolator( spline, first, second, t );
             }
-            return Interpolator.Interpolate( first.value, second.value, t );
+            return (T)Interpolator.Interpolate( first.value, second.value, t );
         }
 
         // Returns the first key before the specified distance along the spline
-        SplineParameterKeyframe<T> GetKeyframeBeforeDistance( List<SplineParameterKeyframe<T>> orderedKeys, float distance )
+        SplineParameterKeyframe<T> GetKeyframeBeforeDistance( List<SplineParameterKeyframe<T>> orderedKeys, SplineDistance distance )
         {
             for( int i = orderedKeys.Count - 1; i >= 0; --i )
             {
                 if(orderedKeys[i].location.loopDistance < distance
-                    || Mathf.Approximately(orderedKeys[i].location.loopDistance, distance ) )
+                    || SplineDistance.Approximately(orderedKeys[i].location.loopDistance, distance ) )
                 {
                     return orderedKeys[i];
                 }
             }
 
-            return spline.IsLoop() ? orderedKeys[orderedKeys.Count - 1] : orderedKeys[0];
+            return spline.IsLoop ? orderedKeys[orderedKeys.Count - 1] : orderedKeys[0];
         }
 
         // Returns the first key after the specified distance along the spline
-        SplineParameterKeyframe<T> GetKeyframeAfterDistance( List<SplineParameterKeyframe<T>> orderedKeys, float distance )
+        SplineParameterKeyframe<T> GetKeyframeAfterDistance( List<SplineParameterKeyframe<T>> orderedKeys, SplineDistance distance )
         {
             for( int i = 0; i < orderedKeys.Count; ++i )
             {
                 if(orderedKeys[i].location.loopDistance >= distance
-                    || Mathf.Approximately(orderedKeys[i].location.loopDistance, distance ) )
+                    || SplineDistance.Approximately(orderedKeys[i].location.loopDistance, distance ) )
                 {
                     return orderedKeys[i];
                 }
             }
 
-            return spline.IsLoop() ? orderedKeys[0] : orderedKeys[orderedKeys.Count - 1];
+            return spline.IsLoop ? orderedKeys[0] : orderedKeys[orderedKeys.Count - 1];
         }
 
         // Registers event handlers with the parent spline
@@ -515,41 +498,15 @@ namespace FantasticSplines
                 if( spline == null )
                 {
                     spline = GetComponent<SplineComponent>();
+
+                    if( spline == null && transform.parent != null )
+                    {
+                        spline = transform.parent.GetComponent<SplineComponent>();
+                    }
                 }
-                lastSimple = spline;
+                lastSpline = spline;
                 RegisterListeners( spline );
             }
-
-
-            //SceneView.duringSceneGui -= DetectInput;            //SceneView.duringSceneGui += DetectInput;
-        }
-
-        void OnDisable()
-        {
-           // SceneView.duringSceneGui -= DetectInput;
-        }
-
-        void DetectInput( SceneView view )
-        {
-#if UNITY_EDITOR
-            List<SplineParameterKeyframe<T>> keys = rawKeyframes;
-            for( int i = 0; i < keys.Count; ++i )
-            {
-                float handleSize = KeyframedSplineParameterTool<Vector3>.GetHandleSize( keys[i].location.position ) * spline.GetGizmoScale();
-                if( HandleUtility.DistanceToCube( keys[i].location.position, Quaternion.identity, handleSize ) <= 0
-                    && Event.current.type == EventType.MouseDown && Event.current.button == 0 )
-                {
-                   if( !ToolActive 
-                        && !SplineEditor.EditorActive
-                        && Selection.activeObject == gameObject 
-                        && KeyframedSplineParameterEditorInstance.editInstance == null )
-                    {
-                        ToggleEditor();
-                    }
-                    return;
-                }
-            }
-#endif
         }
 
         // Monitors the spline set as the parent spline and handles
@@ -557,14 +514,14 @@ namespace FantasticSplines
         // Spline is changed.
         void Update()
         {
-            if( lastSimple != spline )
+            if( lastSpline != spline )
             {
-                if( lastSimple != null )
+                if( lastSpline != null )
                 {
-                    UnregisterListeners( lastSimple );
+                    UnregisterListeners( lastSpline );
                 }
                 RegisterListeners( spline );
-                lastSimple = spline;
+                lastSpline = spline;
             }
         }
 
@@ -576,7 +533,7 @@ namespace FantasticSplines
         // Updates the keyframe at index's location on the spline using the specified location reposition mode
         void UpdateKeyframeLocation( int index, SplineParameterKeyframe<T> key )
         {
-            if( key.location.updateCount != spline.GetUpdateCount() )
+            if( key.location.updateCount != spline.UpdateCount )
             {
                 SetKeyframeLocation( index, SplineChangedEventHelper.OnSplineLengthChanged( key.location, spline, keyRepositionMode ) );
             }
@@ -621,9 +578,30 @@ namespace FantasticSplines
             onSplineChanged?.Invoke();
         }
 
+#if UNITY_EDITOR
+        protected virtual void DrawInterpolatedGizmos() { }
+
         // Draws generic keyframe gizmos
         // override this to draw completely custom gizmos
         protected void OnDrawGizmosSelected()
+        {
+            DrawInterpolatedGizmos();
+
+            if( !enableKeyframeHandles )
+            {
+                return;
+            }
+
+            if( spline == null )
+            {
+                return;
+            }
+
+            Handles.zTest = spline.zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+            DrawKeyframeGizmos();
+        }
+
+        void OnDrawGizmos()
         {
             if( !enableKeyframeHandles )
             {
@@ -635,8 +613,23 @@ namespace FantasticSplines
                 return;
             }
 
-            Handles.zTest = spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-            DrawKeyframeGizmos();
+            if( !alwaysDrawGizmos )
+            {
+                return;
+            }
+
+            Handles.zTest = spline.zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+            DrawKeyframeHandles();
+        }
+
+        // Draws generic keyframe gizmos
+        protected void DrawKeyframeHandles()
+        {
+            var keys = Keyframes;
+            for( int i = 0; i < keys.Count; ++i )
+            {
+                DrawKeyframeHandle( keys[i] );
+            }
         }
 
         // Draws generic keyframe gizmos
@@ -653,16 +646,18 @@ namespace FantasticSplines
         protected void DrawKeyframeGizmo( SplineParameterKeyframe<T> key )
         {
             DrawKeyframeValueGizmo( key );
+            DrawKeyframeHandle( key );
+        }
 
-#if UNITY_EDITOR
+        void DrawKeyframeHandle( SplineParameterKeyframe<T> key )
+        {
             // default keyframe gizmos
             // keyframe colour, same as the animator window
-            float handleSize = KeyframedSplineParameterTool<Vector3>.GetHandleSize( key.location.position ) * spline.GetGizmoScale();
+            float handleSize = KeyframedSplineParameterTool<Vector3>.GetHandleSize( key.location.position ) * spline.gizmoScale;
             using( new Handles.DrawingScope( ToolActive ? KeyframedSplineParameterTool<Vector3>.ActiveColor : KeyframedSplineParameterTool<Vector3>.InactiveColor ) )
             {
                 KeyframedSplineParameterTool<Vector3>.KeyframeHandleCap( 0, key.location.position, Quaternion.identity, handleSize, EventType.Repaint );
             }
-#endif
         }
 
         // Draws custom gizmos for a keyframe
@@ -671,5 +666,6 @@ namespace FantasticSplines
         {
             // override me to draw special gizmos for data
         }
+#endif
     }
 }

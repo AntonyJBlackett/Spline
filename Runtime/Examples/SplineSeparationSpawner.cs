@@ -24,6 +24,8 @@ public class SplineSeparationSpawner : MonoBehaviour
         public SeparationMethod separationMethod;
         public bool retransformResult;
 
+        public SplineDistance separationDistance => new SplineDistance(separation);
+
         public static SpawnerParameters Default => new SpawnerParameters() { separation = 1 };
 
         public bool Equals(SpawnerParameters other)
@@ -143,7 +145,7 @@ public class SplineSeparationSpawner : MonoBehaviour
             if( warn ) Debug.LogWarning( "No prefab set.", gameObject );
         }
 
-        if( parameters.spline.GetLength() < 0.001f )
+        if( parameters.spline.Length.value < 0.001f )
         {
             escape = true;
             if( warn ) Debug.LogWarning( "Spline has no length.", gameObject );
@@ -157,9 +159,9 @@ public class SplineSeparationSpawner : MonoBehaviour
             return;
         }
 
-        SplineResult splineResult = parameters.spline.GetResultAtT( 0 );
+        SplineResult splineResult = parameters.spline.GetResultAt( SplinePercent.Start );
 
-        while( splineResult.t < 1 )
+        while( !splineResult.AtEnd )
         {
             GameObject instance = instanceBucket.GetInstance( parameters.prefab );
             instance.SetActive( true );
@@ -172,17 +174,27 @@ public class SplineSeparationSpawner : MonoBehaviour
             instance.transform.position = splineResult.position;
             instance.transform.rotation = Quaternion.LookRotation( splineResult.tangent, Vector3.up );
 
+            SplineResult newResult;
             switch( parameters.separationMethod )
             {
                 case SeparationMethod.SplineDistance:
-                    splineResult = parameters.spline.GetResultAtDistance( splineResult.distance + parameters.separation );
+                    newResult = parameters.spline.GetResultAt( splineResult.distance + parameters.separationDistance );
                     break;
                 case SeparationMethod.WorldDistance:
-                    splineResult = parameters.spline.GetResultAtWorldDistanceFrom( splineResult.distance, parameters.separation, parameters.separation * 0.33f );
+                    newResult = parameters.spline.GetResultAtWorldDistanceFrom( splineResult.distance, parameters.separation, parameters.separationDistance * 0.33f );
                     break;
                 default:
                     return;
             }
+
+            if( SplineDistance.Approximately( newResult.distance, splineResult.distance ) )
+            {
+                // we're stuck for some reason.
+                Debug.LogError( "Spline Separation Spawner could not complete spawning. For some reason we got stuck trying to step along the spline." );
+                break;
+            }
+
+            splineResult = newResult;
         }
 
         instanceBucket.CleanUpUnusedInstances();

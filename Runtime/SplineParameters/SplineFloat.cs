@@ -6,6 +6,11 @@ using FantasticSplines;
 // Spline Keyframe track that stores and blends colors along a spline
 public class SplineFloat : KeyframedSplineParameter<float>
 {
+    SplineFloat() : base()
+    {
+        parameterName = "Spline Float";
+    }
+
     [Header( "Visualisation" )]
     [Range( 1, 100 )]
     public int visualisationSamples = 50;
@@ -15,13 +20,13 @@ public class SplineFloat : KeyframedSplineParameter<float>
     {
         return 0;
     }
-
 #if UNITY_EDITOR
     protected override System.Type GetToolType() { return typeof( SplineFloatTool ); }
 #endif
     #endregion
 
     #region Gizmos
+#if UNITY_EDITOR
     protected override void DrawKeyframeValueGizmo( SplineParameterKeyframe<float> keyframe )
     {
         Gizmos.color = Color.white;
@@ -30,25 +35,21 @@ public class SplineFloat : KeyframedSplineParameter<float>
         Gizmos.DrawLine( keyframe.location.position - right * 0.5f, keyframe.location.position + right * 0.5f );
     }
 
-    private void OnDrawGizmosSelected()
+    protected override void DrawInterpolatedGizmos()
     {
-        DrawInterpolatedSplineColor();
-    }
-
-    void DrawInterpolatedSplineColor()
-    {
-        float distance = 0;
-        float length = spline.GetLength();
-        float step = length / visualisationSamples;
+        var distance = SplineDistance.Zero;
+        var length = spline.Length;
+        var step = length / visualisationSamples;
         while( distance < length )
         {
-            SplineResult location = spline.GetResultAtDistance( distance );
+            SplineResult location = spline.GetResultAt( distance );
             Gizmos.color = Color.white;
-            float radius = GetValueAtDistance( location.distance, GetDefaultKeyframeValue() );
+            float radius = GetValueAt( location.distance, GetDefaultKeyframeValue() );
             Vector3 right = Vector3.Cross( location.tangent, Vector3.up ).normalized * radius;
             Gizmos.DrawLine( location.position - right * 0.5f, location.position + right * 0.5f );
             distance += step;
         }
     }
+#endif
     #endregion
 }

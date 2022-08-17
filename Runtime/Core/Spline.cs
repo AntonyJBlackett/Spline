@@ -12,9 +12,10 @@ using UnityEditor;
 
 namespace FantasticSplines
 {
+
     public static class BezierCalculator
     {
-        public static SplineNode SplitAt(ref SplineNode node1, ref SplineNode node2, float t)
+        public static SplineNode SplitAt(ref SplineNode node1, ref SplineNode node2, SegmentT t)
         {
             Bezier3 segment = new Bezier3( node1, node2 );
             Bezier3 leftSplit = segment.LeftSplitAt( t );
@@ -48,40 +49,43 @@ namespace FantasticSplines
     [System.Serializable]
     public partial class Spline : ISerializationCallbackReceiver
     {
-        [System.NonSerialized] private bool isDirty = true;
-        [System.NonSerialized] private float splineLength;
+        const float paramAccuracyThreshold = 0.001f;
+
+        public bool isDirty { get; set; } = true;
+        [System.NonSerialized] private SplineDistance splineLength;
         [System.NonSerialized] private float inverseSplineLength;
         [System.NonSerialized] private SegmentCache[] segments;
         [System.NonSerialized] private int cacheUpdateCount = 0;
 
         [SerializeField]
-        [FormerlySerializedAs( "curvePoints" )]
-        private List<SplineNode> nodes = new List<SplineNode>();
-
-        [SerializeField]
-        private bool loop = false;
-        public bool Loop
+        [FormerlySerializedAs( "loop" )]
+        private bool isLoop = false;
+        public bool IsLoop
         {
             get
             {
-                return loop;
+                return isLoop;
             }
             set
             {
-                if( value != loop )
+                if( value != isLoop )
                 {
                     isDirty = true;
                 }
-                loop = value;
+                isLoop = value;
             }
         }
+
+        [SerializeField]
+        [FormerlySerializedAs( "curvePoints" )]
+        public List<SplineNode> nodes = new List<SplineNode>();
 
         public int NodeCount { get { return nodes.Count; } }
         public int SegmentCount
         {
             get
             {
-                if( loop )
+                if( isLoop )
                 {
                     return Mathf.Max( 0, nodes.Count );
                 }
@@ -89,7 +93,7 @@ namespace FantasticSplines
             }
         }
 
-        public float Length
+        public SplineDistance Length
         {
             get
             {
@@ -106,17 +110,17 @@ namespace FantasticSplines
             }
         }
 
-        public float GetDistance(float t)
+        public SplineDistance GetDistance(SplinePercent t)
         {
-            return t * Length;
+            return new SplineDistance( t.value * Length.value );
         }
 
-        public float GetT(float length)
+        public SplinePercent GetT(SplineDistance length)
         {
-            return length * InverseLength;
+            return new SplinePercent( length.value * InverseLength );
         }
 
-        bool IsNodeIndexInRange(int index)
+        private bool IsNodeIndexInRange(int index)
         {
             return MathsUtils.IsInArrayRange( index, NodeCount );
         }
@@ -133,17 +137,18 @@ namespace FantasticSplines
             }
         }
 
-        void UpdateCachedData()
+        private void UpdateCachedData()
         {
             cacheUpdateCount++;
 
-            if( segments == null || segments.Length != SegmentCount )
+            int segCount = SegmentCount;
+            if( segments == null || segments.Length != segCount )
             {
-                segments = new SegmentCache[SegmentCount];
+                segments = new SegmentCache[segCount];
             }
 
-            float length = 0f;
-            for( int seg = 0; seg < SegmentCount; ++seg )
+            var length = new SplineDistance( 0f );
+            for( int seg = 0; seg < segCount; ++seg )
             {
                 if( segments[seg] == null )
                 {
@@ -159,14 +164,14 @@ namespace FantasticSplines
             splineLength = length;
             inverseSplineLength = 1;
 
-            if( length > float.Epsilon )
+            if( length.value > float.Epsilon )
             {
-                inverseSplineLength = 1f / length;
+                inverseSplineLength = 1f / length.value;
             }
             isDirty = false;
         }
 
-        void EnsureCacheIsUpdated()
+        private void EnsureCacheIsUpdated()
         {
             if( isDirty )
             {
@@ -202,15 +207,22 @@ namespace FantasticSplines
             return true;
         }
 
-        public int CreateNode(float normalisedT)
+        public void ClearSpline()
         {
-            SplineResult result = GetResultAtDistance( normalisedT * Length );
-            int segment = result.segmentResult.index;
-            float segmentT = result.segmentResult.t;
+            nodes.Clear();
+            isDirty = true;
+        }
 
-            if( segment < 0 || segment > SegmentCount )
+        public int CreateNode(SplinePercent percent )
+        {
+            SplineResult result = GetResultAt( percent );
+            int segment = result.segmentResult.index;
+            var segmentT = result.segmentResult.t;
+
+            int segCount = SegmentCount;
+            if( segment < 0 || segment > segCount )
             {
-                throw new System.Exception("Error creating node at t value: " + normalisedT.ToString());
+                throw new System.Exception( "Error creating node at spline percent value: " + percent.ToString());
             }
 
             int index1 = segment;
@@ -251,103 +263,126 @@ namespace FantasticSplines
             return new Bezier3( nodes[index1], nodes[index2] );
         }
 
-        int LoopSegmentIndex(int segment)
+        private int LoopSegmentIndex(int segment)
         {
-            if( loop && SegmentCount > 0 )
+            int segCount = SegmentCount;
+            while( segment < 0 )
             {
-                return segment % SegmentCount;
+                segment += segCount;
             }
 
-            return Mathf.Clamp( segment, 0, SegmentCount - 1 );
+            if( isLoop && segCount > 0 )
+            {
+                return segment % segCount;
+            }
+
+            return Mathf.Clamp( segment, 0, segCount - 1 );
         }
 
         public int LoopNodeIndex(int index)
         {
-            return ((index %= NodeCount) < 0) ? index + NodeCount : index;
-        }
-        float LoopNormalisedT(float normalisedT)
-        {
-            if( loop )
+            int nodeCount = NodeCount;
+            while( index < 0 )
             {
-                return Mathf.Repeat( normalisedT, 1 );
+                index += nodeCount;
             }
 
-            return Mathf.Clamp01( normalisedT );
-        }
-
-        float LoopDistance(float distance)
-        {
-            if( loop )
+            if( isLoop && nodeCount > 0 )
             {
-                return Mathf.Repeat( distance, Length );
+                return index % nodeCount;
             }
-        
-            return Mathf.Clamp( distance, 0f, Length );
+
+            return Mathf.Clamp( index, 0, nodeCount - 1 );
         }
 
-        private SegmentResult GetResultAtSegmentDistanceInternal( int index, float distance )
+        public SplineDistance LoopDistance( SplineDistance distance )
         {
-            if( index < 0 || index >= SegmentCount )
+            if( isLoop )
+            {
+                return new SplineDistance(Mathf.Repeat( distance.value, Length.value ));
+            }
+
+            return new SplineDistance(Mathf.Clamp( distance.value, 0f, Length.value ) );
+        }
+
+        private SegmentResult CreateSegmentResult( int index, SegmentT t, SegmentDistance segmentDistance )
+        {
+            Vector3 localPos = segments[index].GetPositionAt( t );
+            Vector3 localTan = segments[index].GetTangentAt( t );
+            Vector3 localNormal = Vector3.Cross( Vector3.Cross( localTan, Vector3.up ).normalized, localTan ).normalized;
+
+            /*var curvature = segments[index].GetCurvatureAtT( t.value );
+            var radius = Bezier3.CalculateRadiusFromCurvature( curvature );*/
+            var curvature = 0;
+            var radius = float.MaxValue;
+
+            return new SegmentResult()
+            {
+                index = index,
+                distance = segmentDistance,
+                length = segments[index].Length,
+                percent = new SegmentPercent( segmentDistance / segments[index].Length ),
+                t = t,
+                localPosition = localPos,
+                localTangent = localTan,
+                localNormal = localNormal,
+
+                // gets transformed later
+                position = localPos,
+                tangent = localTan,
+                normal = localNormal,
+
+                curvature = curvature,
+                radius = radius,
+            };
+        }
+
+        private SegmentResult GetSegmentResultAt( int index, SegmentDistance segmentDistance )
+        {
+            int segCount = SegmentCount;
+            if( index < 0 || index >= segCount )
             {
                 Debug.LogError( "Segment index out of range." );
                 return SegmentResult.Default;
             }
 
-            return GetResultAtSegmentTInternal( index, segments[index].GetT( distance ) );
+            return CreateSegmentResult( index, segments[index].GetT( segmentDistance ), segmentDistance );
         }
 
-        private SegmentResult GetResultAtSegmentTInternal( int index, float t )
+        private SegmentResult GetSegmentResultAt(SplineDistance distance)
         {
-            Vector3 localPos = segments[index].GetPositionAtT( t );
-            Vector3 localTan = segments[index].GetTangentAtT( t );
-
-            return new SegmentResult()
+            var distanceRemaining = LoopDistance( distance );
+            int segCount = SegmentCount;
+            for( int i = 0; i < segCount; ++i )
             {
-                index = index,
-                distance = segments[index].GetDistance(t),
-                length = segments[index].Length,
-                t = t,
-                localPosition = localPos,
-                localTangent = localTan,
-
-                // gets transformed later
-                position = localPos,
-                tangent = localTan,
-            };
-        }
-
-        private SegmentResult GetSegmentResultAtDistance(float distance)
-        {
-            float distanceRemaining = LoopDistance( distance );
-            for( int i = 0; i < SegmentCount; ++i )
-            {
-                if( distanceRemaining >= segments[i].Length )
+                var length = segments[i].Length;
+                if( distanceRemaining >= length )
                 {
-                    distanceRemaining -= segments[i].Length;
+                    distanceRemaining -= length;
                 }
                 else
                 {
-                    return GetResultAtSegmentDistanceInternal( i, distanceRemaining );
+                    return GetSegmentResultAt( i, new SegmentDistance( distanceRemaining.value ) );
                 }
             }
 
-            return GetResultAtSegmentTInternal( SegmentCount - 1, 1 );
+            int finalIndex = segCount - 1;
+            return CreateSegmentResult( finalIndex, SegmentT.End, segments[finalIndex].Length );
         }
 
-        private SplineResult GetSplineResult(float distance)
+        private SplineResult CreateSplineResult(SplineDistance distance)
         {
-            float loopDistance = LoopDistance( distance );
-            SegmentResult segmentResult = GetSegmentResultAtDistance( distance );
+            var loopDistance = LoopDistance( distance );
+            SegmentResult segmentResult = GetSegmentResultAt( distance );
 
             SplineResult result = new SplineResult()
             {
                 updateCount = UpdateCount,
                 distance = distance,
                 loopDistance = loopDistance,
-                t = distance * inverseSplineLength,
-                loopT = loopDistance * inverseSplineLength,
-                lapCount = Mathf.FloorToInt( distance * inverseSplineLength ),
-                isLoop = loop,
+                percent = new SplinePercent( distance.value * inverseSplineLength ),
+                lapCount = Mathf.FloorToInt( distance.value * inverseSplineLength ),
+                isLoop = isLoop,
                 length = Length,
                 segmentResult = segmentResult
             };
@@ -360,7 +395,7 @@ namespace FantasticSplines
             return result;
         }
 
-        public SplineResult GetResultAtDistance(float distance)
+        public SplineResult GetResultAt(SplineDistance distance)
         {
             if( SegmentCount == 0 )
             {
@@ -368,10 +403,10 @@ namespace FantasticSplines
             }
 
             EnsureCacheIsUpdated();
-            return GetSplineResult( distance );
+            return CreateSplineResult( distance );
         }
 
-        public SplineResult GetResultAtT(float t)
+        public SplineResult GetResultAt(SplinePercent percent )
         {
             if( SegmentCount == 0 )
             {
@@ -379,42 +414,55 @@ namespace FantasticSplines
             }
 
             EnsureCacheIsUpdated();
-            return GetSplineResult( Length * t );
+
+            return CreateSplineResult( Length * percent.value );
         }
 
-        public SplineResult GetResultAtSegmentDistance(int segmentIndex, float segmentDistance)
+        public SplineResult GetResultAtSegment( int segmentIndex, SegmentPercent segmentPercent )
         {
-            if( SegmentCount == 0 )
+            int segCount = SegmentCount;
+            if( segCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+            EnsureCacheIsUpdated();
+
+            var loopedSegmentIndex = LoopSegmentIndex( segmentIndex );
+            return GetResultAtSegment( loopedSegmentIndex, segments[loopedSegmentIndex].Length * segmentPercent );
+        }
+
+        public SplineResult GetResultAtSegment( int segmentIndex, SegmentDistance segmentDistance )
+        {
+            int segCount = SegmentCount;
+            if( segCount == 0 )
             {
                 return SplineResult.Default;
             }
 
             EnsureCacheIsUpdated();
 
-            float segmentLength = segments[segmentIndex].Length;
             int loopedSegmentIndex = LoopSegmentIndex( segmentIndex );
-            segmentDistance = Mathf.Clamp( segmentDistance, 0, segmentLength );
+            segmentDistance = segmentDistance.Clamp( segments[segmentIndex].Length );
 
-            SegmentResult segmentResult = GetResultAtSegmentDistanceInternal( loopedSegmentIndex, segmentDistance );
+            SegmentResult segmentResult = GetSegmentResultAt( loopedSegmentIndex, segmentDistance );
 
-            int lapCount = segmentIndex / SegmentCount;
-            float splineDistance = lapCount * Length;
+            int lapCount = segmentIndex / segCount;
+            var splineDistance = lapCount * Length;
             for( int i = 0; i < loopedSegmentIndex; ++i )
             {
                 splineDistance += segments[i].Length;
             }
             splineDistance += segmentResult.distance;
-            float loopSplineDistance = LoopDistance( splineDistance );
+            var loopSplineDistance = LoopDistance( splineDistance );
 
             SplineResult result = new SplineResult()
             {
                 updateCount = UpdateCount,
                 distance = splineDistance,
                 loopDistance = loopSplineDistance,
-                t = splineDistance * inverseSplineLength,
-                loopT = loopSplineDistance * inverseSplineLength,
+                percent = new SplinePercent( splineDistance.value * inverseSplineLength ),
                 lapCount = lapCount,
-                isLoop = loop,
+                isLoop = isLoop,
                 length = Length,
                 segmentResult = segmentResult
             };
@@ -422,7 +470,7 @@ namespace FantasticSplines
             return result;
         }
 
-        public SplineResult GetResultAtSegmentT(int segmentIndex, float segmentT)
+        public SplineResult GetResultAtSegment(int segmentIndex, SegmentT segmentT )
         {
             if( SegmentCount == 0 )
             {
@@ -431,11 +479,11 @@ namespace FantasticSplines
 
             EnsureCacheIsUpdated();
             segmentIndex = LoopSegmentIndex( segmentIndex );
-            segmentT = Mathf.Clamp01( segmentT );
-            return GetResultAtSegmentDistance( segmentIndex, segments[segmentIndex].GetDistance( segmentT ) );
+            segmentT = segmentT.Clamp01();
+            return GetResultAtSegment( segmentIndex, segments[segmentIndex].GetDistance( segmentT ) );
         }
 
-        public SplineResult GetResultClosestToSegment( int segmentIndex, Vector3 point, float paramThreshold = 0.000001f )
+        public SplineResult GetResultClosestToSegment( int segmentIndex, Vector3 point, float paramThreshold = paramAccuracyThreshold )
         {
             if( SegmentCount == 0 )
             {
@@ -446,13 +494,97 @@ namespace FantasticSplines
             segmentIndex = LoopSegmentIndex( segmentIndex );
 
             Bezier3 curve = segments[segmentIndex].bezier;
-            float segmentT = curve.GetClosestT( point, paramThreshold );
-            return GetResultAtSegmentDistance( segmentIndex, segments[segmentIndex].GetDistance( segmentT ) );
+            var segmentT = curve.GetClosestT( point, paramThreshold );
+            return GetResultAtSegment( segmentIndex, segments[segmentIndex].GetDistance( segmentT ) );
         }
 
-        public SplineResult GetResultClosestTo(Vector3 point, float paramThreshold = 0.000001f)
+        public SplineResult GetResultClosestToSegmentUsingLinearApproximation( int segmentIndex, Vector3 point )
         {
             if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+            segmentIndex = LoopSegmentIndex( segmentIndex );
+
+            int nodeIndex1 = LoopNodeIndex( segmentIndex );
+            int nodeIndex2 = LoopNodeIndex( segmentIndex + 1 );
+
+            Vector3 previousNode = nodes[nodeIndex1].position;
+            Vector3 currentNode = nodes[nodeIndex2].position;
+
+            Vector3 linePointToPoint = point - previousNode;
+
+            Vector3 lineVec = currentNode - previousNode;
+            float percentAlongLine = Mathf.Clamp01( Vector3.Dot( linePointToPoint, lineVec.normalized ) / lineVec.magnitude );
+
+            return GetResultAtSegment( segmentIndex, new SegmentPercent( percentAlongLine ) );
+        }
+
+        public SplineResult GetResultClosestToSegment( int segmentIndex, Ray ray, TestDirection testDirection = TestDirection.Forward, float paramThreshold = paramAccuracyThreshold )
+        {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+            segmentIndex = LoopSegmentIndex( segmentIndex );
+
+            var originResult = GetResultClosestToSegment( segmentIndex, ray.origin, paramAccuracyThreshold );
+
+            float minDistSqWorld = (originResult.position - ray.origin).sqrMagnitude;
+            float minDistSqProjected = (MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, originResult.position ) - ray.origin).sqrMagnitude;
+            var bestSegmentDistance = originResult.segmentResult.distance;
+
+            if( ClosestRayTest( ray, segments[segmentIndex], SegmentT.Start, SegmentT.End, testDirection, paramThreshold, out var distSqProjected, out var distSqWorld, out var distance, out var segmentDistance ) )
+            {
+                if( (distSqProjected < minDistSqProjected)
+                    || (Mathf.Approximately( distSqProjected, minDistSqProjected ) && distSqWorld < minDistSqWorld)
+                )
+                {
+                    bestSegmentDistance = segmentDistance;
+                }
+            }
+
+            return GetResultAtSegment( segmentIndex, bestSegmentDistance );
+        }
+
+        public SplineResult GetResultClosestToSegmentUsingLinearApproximation( int segmentIndex, Ray ray, TestDirection testDirection = TestDirection.Forward )
+        {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+            segmentIndex = LoopSegmentIndex( segmentIndex );
+
+
+            var originResult = GetResultClosestToSegmentUsingLinearApproximation( segmentIndex, ray.origin );
+
+            float minDistSqWorld = (originResult.position - ray.origin).sqrMagnitude;
+            float minDistSqProjected = (MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, originResult.position ) - ray.origin).sqrMagnitude;
+            var bestSegmentDistance = originResult.segmentResult.distance;
+
+            if( ClosestRayTestUsingLinearApproximation( ray, segments[segmentIndex], SegmentT.Start, SegmentT.End, testDirection, out var distSqProjected, out var distSqWorld, out var distance, out var segmentDistance ) )
+            {
+                if( (distSqProjected < minDistSqProjected)
+                    || (Mathf.Approximately( distSqProjected, minDistSqProjected ) && distSqWorld < minDistSqWorld)
+                )
+                {
+                    bestSegmentDistance = segmentDistance;
+                }
+            }
+
+            return GetResultAtSegment( segmentIndex, bestSegmentDistance );
+        }
+
+        public SplineResult GetResultClosestTo(Vector3 point, float paramThreshold = 0.001f)
+        {
+            int segCount = SegmentCount;
+            if( segCount == 0 )
             {
                 return SplineResult.Default;
             }
@@ -460,25 +592,25 @@ namespace FantasticSplines
             EnsureCacheIsUpdated();
 
             float minDistSq = float.MaxValue;
-            float bestDistance = 0;
-            for( int i = 0; i < SegmentCount; i++ )
+            SplineDistance bestDistance = SplineDistance.Zero;
+            for( int i = 0; i < segCount; i++ )
             {
                 Bezier3 curve = segments[i].bezier;
-                float curveClosestParam = curve.GetClosestT( point, paramThreshold );
+                var segmentT = curve.GetClosestT( point, paramThreshold );
 
-                Vector3 curvePos = curve.GetPosition( curveClosestParam );
+                Vector3 curvePos = curve.GetPosition( segmentT );
                 float distSq = (curvePos - point).sqrMagnitude;
                 if( distSq < minDistSq )
                 {
                     minDistSq = distSq;
-                    bestDistance = segments[i].startDistanceInSpline + segments[i].GetDistance( curveClosestParam );
+                    bestDistance = segments[i].startDistanceInSpline + segments[i].GetDistance( segmentT );
                 }
             }
 
-            return GetSplineResult( bestDistance );
+            return CreateSplineResult( bestDistance );
         }
 
-        public SplineResult GetResultClosestTo(Ray ray, float paramThreshold = 0.000001f)
+        public SplineResult GetResultClosestToWithinDistanceWindow( Vector3 point, SplineDistance beginDistance, SplineDistance endDistance, float paramThreshold = paramAccuracyThreshold )
         {
             if( SegmentCount == 0 )
             {
@@ -487,52 +619,425 @@ namespace FantasticSplines
 
             EnsureCacheIsUpdated();
 
-            float minDistSqWorld = float.MaxValue;
-            float minDistSqProjected = float.MaxValue;
-            float bestDistance = 0;
-            bool foundPointInFront = false;
-            for( int i = 0; i < SegmentCount; i++ )
+            beginDistance = LoopDistance( beginDistance );
+            endDistance = LoopDistance( endDistance );
+
+            if( beginDistance > endDistance )
             {
-                int index1 = i;
-                int index2 = i + 1;
-                if( index2 >= NodeCount )
+                var beginResult = GetResultClosestToWithinDistanceWindowInternal( point, SplineDistance.Zero, endDistance, paramThreshold );
+                var endResult = GetResultClosestToWithinDistanceWindowInternal( point, beginDistance, splineLength, paramThreshold );
+
+                if( Vector3.Distance( beginResult.position, point ) < Vector3.Distance( endResult.position, point ) )
                 {
-                    index2 = 0;
+                    return beginResult;
+                }
+                else
+                {
+                    return endResult;
+                }
+            }
+            else
+            {
+                return GetResultClosestToWithinDistanceWindowInternal( point, beginDistance, endDistance, paramThreshold );
+            }
+        }
+
+        private SplineResult GetResultClosestToWithinDistanceWindowInternal( Vector3 point, SplineDistance beginDistance, SplineDistance endDistance, float paramThreshold = paramAccuracyThreshold )
+        {
+            float minDistSq = float.MaxValue;
+            SplineDistance bestDistance = SplineDistance.Zero;
+
+            int segCount = SegmentCount;
+            for( int i = 0; i < segCount; i++ )
+            {
+                if( segments[i].startDistanceInSpline + segments[i].Length <= beginDistance )
+                {
+                    continue;
                 }
 
-                Bezier3 curve = new Bezier3( GetNode( index1 ), GetNode( index2 ) );
-                Bezier3 projected = Bezier3.ProjectToPlane( curve, ray.origin, ray.direction );
-
-                float curveClosestParam = projected.GetClosestT( ray.origin, paramThreshold );
-
-                Vector3 projectedPos = projected.GetPosition( curveClosestParam );
-                Vector3 pos = curve.GetPosition( curveClosestParam );
-
-                bool infront = Vector3.Dot( ray.direction, pos - ray.origin ) >= 0;
-                if( infront || !foundPointInFront )
+                if( segments[i].startDistanceInSpline > endDistance )
                 {
-                    if( !foundPointInFront )
-                    {
-                        minDistSqWorld = float.MaxValue;
-                        minDistSqProjected = float.MaxValue;
-                        foundPointInFront = true;
-                    }
+                    break;
+                }
 
-                    float distSqProjected = (projectedPos - ray.origin).sqrMagnitude;
-                    float distSqWorld = (pos - ray.origin).sqrMagnitude;
-                    if(
-                        (distSqProjected < minDistSqProjected)
-                        || (Mathf.Abs( distSqProjected - minDistSqProjected ) < float.Epsilon && distSqWorld < minDistSqWorld)
+                SegmentT beginT = segments[i].startDistanceInSpline < beginDistance ? segments[i].GetT( new SegmentDistance( (beginDistance - segments[i].startDistanceInSpline).value ) ) : SegmentT.Start;
+                SegmentT endT = segments[i].startDistanceInSpline + segments[i].Length > endDistance ? segments[i].GetT( new SegmentDistance( (endDistance - segments[i].startDistanceInSpline).value ) ) : SegmentT.End;
+
+                Bezier3 curve = segments[i].bezier;
+
+                var segmentT = curve.GetClosestT( point, beginT, endT, paramThreshold );
+
+                Vector3 curvePos = curve.GetPosition( segmentT );
+                float distSq = (curvePos - point).sqrMagnitude;
+                if( distSq < minDistSq )
+                {
+                    minDistSq = distSq;
+                    bestDistance = segments[i].startDistanceInSpline + segments[i].GetDistance( segmentT );
+                }
+            }
+
+            return CreateSplineResult( bestDistance );
+        }
+
+        public enum TestDirection
+        {
+            Forward,
+            ForwardAndBackward,
+        }
+
+        private bool ClosestRayTest( Ray ray, SegmentCache segment, SegmentT beginT, SegmentT endT, TestDirection testDirection, float paramThreshold, out float distSqProjected, out float distSqWorld, out SplineDistance distance, out SegmentDistance segmentDistance )
+        {
+            distSqProjected = float.MaxValue;
+            distSqWorld = float.MaxValue;
+            distance = new SplineDistance( 0 );
+            segmentDistance = new SegmentDistance( 0 );
+
+            Bezier3 projected = Bezier3.ProjectToPlane( segment.bezier, ray.origin, ray.direction );
+
+            var segmentT = projected.GetClosestT( ray.origin, beginT, endT, paramThreshold );
+            Vector3 projectedPos = projected.GetPosition( segmentT );
+            Vector3 pos = segment.bezier.GetPosition( segmentT );
+
+            bool allowableDirection = testDirection == TestDirection.ForwardAndBackward || Vector3.Dot( ray.direction, pos - ray.origin ) >= 0;
+            if( allowableDirection )
+            {
+                distSqProjected = (projectedPos - ray.origin).sqrMagnitude;
+                distSqWorld = (pos - ray.origin).sqrMagnitude;
+                distance = segment.startDistanceInSpline + segment.GetDistance( segmentT );
+                segmentDistance = segment.GetDistance( segmentT );
+            }
+
+            return allowableDirection;
+        }
+
+        private bool ClosestRayTestUsingLinearApproximation( Ray ray, SegmentCache segment, SegmentT beginT, SegmentT endT, TestDirection testDirection, out float distSqProjected, out float distSqWorld, out SplineDistance distance, out SegmentDistance segmentDistance )
+        {
+            distSqProjected = float.MaxValue;
+            distSqWorld = float.MaxValue;
+            distance = new SplineDistance( 0 );
+            segmentDistance = new SegmentDistance( 0 );
+
+            Vector3 start = segment.GetPositionAt( beginT );
+            Vector3 end = segment.GetPositionAt( endT );
+
+            Vector3 projectedStart = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, start );
+            Vector3 projectedEnd = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, end );
+
+
+            Vector3 linePointToPoint = ray.origin - projectedStart;
+
+            Vector3 lineVec = end - start;
+            Vector3 lineVecProjected = projectedEnd - projectedStart;
+            float percentAlongLine = Mathf.Clamp01( Vector3.Dot( linePointToPoint, lineVec.normalized ) / lineVec.magnitude );
+
+            var pointOnLineProjected = projectedStart + lineVecProjected * percentAlongLine;
+            var pointOnLine = start + lineVec * percentAlongLine;
+
+            bool allowableDirection = testDirection == TestDirection.ForwardAndBackward || Vector3.Dot( ray.direction, pointOnLine - ray.origin ) >= 0;
+            if( allowableDirection )
+            {
+                distSqProjected = (pointOnLineProjected - ray.origin).sqrMagnitude;
+                distSqWorld = (pointOnLine - ray.origin).sqrMagnitude;
+                distance = segment.startDistanceInSpline + segment.Length * percentAlongLine;
+                segmentDistance = segment.Length * percentAlongLine;
+            }
+
+            return allowableDirection;
+        }
+
+        public SplineResult GetResultClosestTo(Ray ray, TestDirection testDirection = TestDirection.Forward, float paramThreshold = paramAccuracyThreshold )
+        {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+            return GetResultClosestToWithinDistanceWindowInternal( ray, SplineDistance.Zero, Length, testDirection, paramThreshold );
+        }
+
+        public SplineResult GetResultClosestToWithinDistanceWindow( Ray ray, SplineDistance beginDistance, SplineDistance endDistance, TestDirection testDirection = TestDirection.Forward, float paramThreshold = paramAccuracyThreshold )
+        {
+            if( SegmentCount == 0 )
+            {
+                return SplineResult.Default;
+            }
+
+            EnsureCacheIsUpdated();
+
+            beginDistance = LoopDistance( beginDistance );
+            endDistance = LoopDistance( endDistance );
+
+            if( beginDistance > endDistance )
+            {
+                var beginResult = GetResultClosestToWithinDistanceWindowInternal( ray, SplineDistance.Zero, endDistance, testDirection, paramThreshold );
+                var endResult = GetResultClosestToWithinDistanceWindowInternal( ray, beginDistance, splineLength, testDirection, paramThreshold );
+
+                Vector3 projectedBegin = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, beginResult.position );
+                Vector3 projectedEnd = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, beginResult.position );
+
+                var p1 = Vector3.Distance( projectedBegin, ray.origin );
+                var p2 = Vector3.Distance( projectedEnd, ray.origin );
+
+                if( Mathf.Approximately( p1, p2) )
+                {
+                    p1 = Vector3.Distance( beginResult.position, ray.origin );
+                    p2 = Vector3.Distance( endResult.position, ray.origin );
+                }
+
+                if( p1 <= p2 )
+                {
+                    return beginResult;
+                }
+                else
+                {
+                    return endResult;
+                }
+            }
+            else
+            {
+                return GetResultClosestToWithinDistanceWindowInternal( ray, beginDistance, endDistance, testDirection, paramThreshold );
+            }
+        }
+
+        private SplineResult GetResultClosestToWithinDistanceWindowInternal( Ray ray, SplineDistance beginDistance, SplineDistance endDistance, TestDirection testDirection, float paramThreshold = paramAccuracyThreshold )
+        {
+            var originResult = GetResultClosestToWithinDistanceWindow( ray.origin, beginDistance, endDistance, paramAccuracyThreshold );
+
+            float minDistSqWorld = (originResult.position - ray.origin).sqrMagnitude;
+            float minDistSqProjected = (MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, originResult.position ) - ray.origin).sqrMagnitude;
+            var bestDistance = originResult.distance;
+
+            int segCount = SegmentCount;
+            for( int i = 0; i < segCount; i++ )
+            {
+                if( segments[i].startDistanceInSpline + segments[i].Length <= beginDistance )
+                {
+                    continue;
+                }
+
+                if( segments[i].startDistanceInSpline > endDistance )
+                {
+                    break;
+                }
+
+                var beginT = segments[i].startDistanceInSpline < beginDistance ? segments[i].GetT( new SegmentDistance( (beginDistance - segments[i].startDistanceInSpline).value ) ) : SegmentT.Start;
+                var endT = segments[i].startDistanceInSpline + segments[i].Length > endDistance ? segments[i].GetT( new SegmentDistance( (endDistance - segments[i].startDistanceInSpline).value ) ) : SegmentT.End;
+
+                if( ClosestRayTest( ray, segments[i], beginT, endT, testDirection, paramThreshold, out var distSqProjected, out var distSqWorld, out var distance, out var segmentDistance ) )
+                {
+                    if( (distSqProjected < minDistSqProjected)
+                        || (Mathf.Approximately( distSqProjected, minDistSqProjected ) && distSqWorld < minDistSqWorld)
                     )
                     {
                         minDistSqProjected = distSqProjected;
                         minDistSqWorld = distSqWorld;
-                        bestDistance = segments[i].startDistanceInSpline + segments[i].GetDistance( curveClosestParam );
+                        bestDistance = distance;
                     }
                 }
             }
 
-            return GetSplineResult( bestDistance );
+            return CreateSplineResult( bestDistance );
+        }
+
+        public SplineResult GetResultClosestToUsingSegmentApproximation( Vector3 point )
+        {
+            EnsureCacheIsUpdated();
+
+            int closestSegment = 0;
+            float closestDistanceSq = float.MaxValue;
+
+            // find approximate segement percent
+            int nodeCount = nodes.Count;
+            for( int i = 1; i <= nodeCount; ++i )
+            {
+                if( !isLoop && i == nodeCount )
+                {
+                    break;
+                }
+
+                int previousIndex = i - 1;
+                int currentIndex = i == nodeCount ? 0 : i;
+
+                var previousNode = nodes[previousIndex];
+                var currentNode = nodes[currentIndex];
+
+                Vector3 linePointToPoint = point - previousNode.position;
+
+                Vector3 lineVec = currentNode.position - previousNode.position;
+                float percentAlongLine = Mathf.Clamp01( Vector3.Dot( linePointToPoint, lineVec.normalized ) / lineVec.magnitude );
+
+                var pointOnLine = previousNode.position + lineVec * percentAlongLine;
+
+                float distanceSq = (pointOnLine - point).sqrMagnitude;
+                if( distanceSq < closestDistanceSq )
+                {
+                    closestDistanceSq = distanceSq;
+                    closestSegment = i - 1;
+                }
+            }
+
+            return GetResultClosestToSegment( closestSegment, point );
+        }
+
+        public SplineResult GetResultClosestToUsingSegmentApproximation( Ray ray, TestDirection testDirection )
+        {
+            EnsureCacheIsUpdated();
+
+            var closestPointResult = GetResultClosestToUsingSegmentApproximation( ray.origin );
+
+            int closestSegment = closestPointResult.segmentResult.index;
+            float closestProjectedDistanceSq = (ray.origin - MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, closestPointResult.position )).sqrMagnitude;
+            float closestDistanceSq = (ray.origin - closestPointResult.position).sqrMagnitude;
+
+            // find approximate segement percent
+            int nodeCount = nodes.Count;
+            for( int i = 1; i <= nodeCount; ++i )
+            {
+                if( !isLoop && i == nodeCount )
+                {
+                    break;
+                }
+
+                int previousIndex = i - 1;
+                int currentIndex = i == nodeCount ? 0 : i;
+
+                var previousNode = nodes[previousIndex];
+                var currentNode = nodes[currentIndex];
+
+                var projectedPrevious = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, previousNode.position );
+                var projectedCurrent = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, currentNode.position );
+
+                Vector3 linePointToPoint = ray.origin - projectedPrevious;
+
+                Vector3 lineVec = currentNode.position - previousNode.position;
+                Vector3 projectedlineVec = projectedCurrent - projectedPrevious;
+                float percentAlongLine = Mathf.Clamp01( Vector3.Dot( linePointToPoint, projectedlineVec.normalized ) / projectedlineVec.magnitude );
+
+                var pointOnLine = previousNode.position + lineVec * percentAlongLine;
+
+                float dorRayDirection = Vector3.Dot( pointOnLine - ray.origin, ray.direction );
+                if( dorRayDirection < 0 && testDirection == TestDirection.Forward )
+                {
+                    continue;
+                }
+
+                var projectedPointOnLine = projectedPrevious + projectedlineVec * percentAlongLine;
+                float projectedDistance = (projectedPointOnLine - ray.origin).sqrMagnitude;
+                float distanceSq = (pointOnLine - ray.origin).sqrMagnitude;
+
+                if( projectedDistance < closestProjectedDistanceSq
+                    || Mathf.Approximately( closestProjectedDistanceSq, projectedDistance ) && distanceSq < closestDistanceSq )
+                {
+                    closestProjectedDistanceSq = projectedDistance;
+                    closestDistanceSq = distanceSq;
+                    closestSegment = i - 1;
+                }
+            }
+
+            return GetResultClosestToSegment( closestSegment, ray, testDirection );
+        }
+
+        public SplineResult GetResultClosestToUsingLinearApproximation( Vector3 point )
+        {
+            EnsureCacheIsUpdated();
+
+            int closestSegment = 0;
+            float closestDistanceSq = float.MaxValue;
+            SegmentPercent closestSegmentPercent = new SegmentPercent(0);
+
+            // find approximate segement percent
+            int nodeCount = nodes.Count;
+            for( int i = 1; i <= nodeCount; ++i )
+            {
+                if( !isLoop && i == nodeCount )
+                {
+                    break;
+                }
+
+                int previousIndex = i - 1;
+                int currentIndex = i == nodeCount ? 0 : i;
+
+                var previousNode = nodes[previousIndex];
+                var currentNode = nodes[currentIndex];
+
+                Vector3 linePointToPoint = point - previousNode.position;
+
+                Vector3 lineVec = currentNode.position - previousNode.position;
+                float percentAlongLine = Mathf.Clamp01( Vector3.Dot( linePointToPoint, lineVec.normalized ) / lineVec.magnitude );
+
+                var pointOnLine = previousNode.position + lineVec * percentAlongLine;
+
+                float distanceSq = (pointOnLine - point).sqrMagnitude;
+                if( distanceSq < closestDistanceSq )
+                {
+                    closestDistanceSq = distanceSq;
+                    closestSegment = i - 1;
+                    closestSegmentPercent = new SegmentPercent( percentAlongLine );
+                }
+            }
+
+            return GetResultAtSegment( closestSegment, closestSegmentPercent );
+        }
+
+        public SplineResult GetResultClosestToUsingLinearApproximation( Ray ray, TestDirection testDirection )
+        {
+            EnsureCacheIsUpdated();
+
+            var closestPointResult = GetResultClosestToUsingLinearApproximation( ray.origin );
+
+            int closestSegment = closestPointResult.segmentResult.index;
+            float closestProjectedDistanceSq = (ray.origin - MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, closestPointResult.position )).sqrMagnitude;
+            float closestDistanceSq = (ray.origin - closestPointResult.position).sqrMagnitude;
+            var closestSegmentPercent = new SegmentPercent( closestPointResult.segmentResult.distance / closestPointResult.segmentResult.length );
+
+            // find approximate segement percent
+            int nodeCount = nodes.Count;
+            for( int i = 1; i <= nodeCount; ++i )
+            {
+                if( !isLoop && i == nodeCount )
+                {
+                    break;
+                }
+
+                int previousIndex = i - 1;
+                int currentIndex = i == nodeCount ? 0 : i;
+
+                var previousNode = nodes[previousIndex];
+                var currentNode = nodes[currentIndex];
+
+                var projectedPrevious = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, previousNode.position );
+                var projectedCurrent = MathsUtils.ProjectPointOnPlane( ray.origin, ray.direction, currentNode.position );
+
+                Vector3 linePointToPoint = ray.origin - projectedPrevious;
+
+                Vector3 lineVec = currentNode.position - previousNode.position;
+                Vector3 projectedlineVec = projectedCurrent - projectedPrevious;
+                float percentAlongLine = Mathf.Clamp01( Vector3.Dot( linePointToPoint, projectedlineVec.normalized ) / projectedlineVec.magnitude );
+
+                var pointOnLine = previousNode.position + lineVec * percentAlongLine;
+
+                float dorRayDirection = Vector3.Dot( pointOnLine - ray.origin, ray.direction );
+                if( dorRayDirection < 0 && testDirection == TestDirection.Forward )
+                {
+                    continue;
+                }
+
+                var projectedPointOnLine = projectedPrevious + projectedlineVec * percentAlongLine;
+                float projectedDistance = (projectedPointOnLine - ray.origin).sqrMagnitude;
+                float distanceSq = (pointOnLine - ray.origin).sqrMagnitude;
+
+                if( projectedDistance < closestProjectedDistanceSq
+                    || Mathf.Approximately( closestProjectedDistanceSq, projectedDistance ) && distanceSq < closestDistanceSq )
+                {
+                    closestProjectedDistanceSq = projectedDistance;
+                    closestDistanceSq = distanceSq;
+                    closestSegment = i - 1;
+                    closestSegmentPercent = new SegmentPercent( percentAlongLine );
+                }
+            }
+
+            return GetResultAtSegment( closestSegment, closestSegmentPercent );
         }
 
         public SplineResult GetResultAtNode( int nodeIndex )
@@ -542,12 +1047,14 @@ namespace FantasticSplines
                 return new SplineResult();
             }
 
+            EnsureCacheIsUpdated();
+
             if( nodeIndex == segments.Length )
             {
-                return GetResultAtSegmentT( segments.Length-1, 1 );
+                return GetResultAtSegment( segments.Length-1, SegmentT.End );
             }
 
-            return GetResultAtSegmentT( nodeIndex, 0 );
+            return GetResultAtSegment( nodeIndex, SegmentT.Start );
         }
 
         public SplineNodeResult GetNodeResult( int nodeIndex )
@@ -557,10 +1064,13 @@ namespace FantasticSplines
                 return new SplineNodeResult();
             }
 
+            EnsureCacheIsUpdated();
+
             SplineResult result = GetResultAtNode( nodeIndex );
 
-            SplineResult beforeResult = GetResultAtDistance( result.distance - 0.01f );
-            SplineResult afterResult = GetResultAtDistance( result.distance + 0.01f );
+            var smallDistance = new SplineDistance( 0.01f );
+            SplineResult beforeResult = GetResultAt( result.distance - smallDistance );
+            SplineResult afterResult = GetResultAt( result.distance + smallDistance );
 
             Vector3 inTangent = beforeResult.tangent;
             Vector3 outTangent = afterResult.tangent;
@@ -584,6 +1094,11 @@ namespace FantasticSplines
         public void OnDrawGizmos( Color color, float gizmoScale )
         {
 #if UNITY_EDITOR
+            if( NodeCount <= 0 )
+            {
+                return;
+            }
+
             EnsureCacheIsUpdated();
             for( int i = 0; i < segments.Length; ++i )
             {
@@ -591,38 +1106,39 @@ namespace FantasticSplines
                 Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, color * .9f, null, 3f );
             }
 
+            float size = SplineHandleUtility.GetNodeHandleSize( nodes[0].position );
             // this stops selection of the spline when we're doing other things.
             if( Selection.activeObject == null )
             {
                 Gizmos.color = Color.white;
                 for( int i = 0; i < NodeCount; ++i )
                 {
-                    float size = SplineHandleUtility.GetNodeHandleSize( nodes[i].position );
-                    Gizmos.DrawSphere( nodes[i].position, size * 0.5f * gizmoScale );
+                    Gizmos.DrawSphere( nodes[i].position, size * 0.25f * gizmoScale );
                 }
             }
-
-            DrawDirecitonIndicators( color, gizmoScale );
 #endif
         }
 
         public void DrawDirecitonIndicators( Color color, float gizmoScale )
         {
 #if UNITY_EDITOR
+            if( NodeCount <= 0 )
+            {
+                return;
+            }
             using( new Handles.DrawingScope( color ) )
             {
                 Handles.color = color;
-                for( int i = 0; i < SegmentCount; ++i )
+
+                float arrowSize = SplineHandleUtility.GetNodeHandleSize( nodes[0].position );
+                var result = GetResultAtSegment( 0, new SegmentPercent(0.5f) );
+
+                Handles.ConeHandleCap( 0, result.position + result.tangent.normalized * arrowSize, Quaternion.LookRotation( result.tangent, Vector3.up ), arrowSize * gizmoScale, EventType.Repaint );
+
+                if( SegmentCount >= 2 )
                 {
-                    if( loop && i == SegmentCount - 1 )
-                    {
-                        // differentiate the looped section
-                        break;
-                    }
-                    // direction indicators
-                    SplineResult result = GetResultAtSegmentT( i, 0.5f );
-                    float arrowSize = SplineHandleUtility.GetNodeHandleSize( result.position ) * 0.3f;
-                    Handles.ConeHandleCap( 0, result.position + result.localTangent.normalized * arrowSize, Quaternion.LookRotation( result.localTangent.normalized, Vector3.up ), arrowSize * gizmoScale, EventType.Repaint );
+                    result = GetResultAtSegment( SegmentCount / 2, new SegmentPercent( 0.5f ) );
+                    Handles.ConeHandleCap( 0, result.position + result.tangent.normalized * arrowSize, Quaternion.LookRotation( result.tangent, Vector3.up ), arrowSize * gizmoScale, EventType.Repaint );
                 }
             }
 #endif

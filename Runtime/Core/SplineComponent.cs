@@ -19,50 +19,66 @@ namespace FantasticSplines
         public System.Action onUpdated;
         public System.Action<List<Object>> onGetUndoObjects;
 
-        [HideInInspector]
         [SerializeField]
         [FormerlySerializedAs( "curve" )]
-        Spline localSpline = new Spline(); // spline in local space
+        private Spline localSpline = new Spline(); // spline in local space
 
-        public float GetLength() { return localSpline.Length; }
-
-        public bool IsLoop() { return localSpline.Loop; }
-        public void SetLoop(bool loop)
+        SplineNormal customNormals;
+        public bool hasCustomNormals => customNormals != null;
+        void Start()
         {
-            if( localSpline.Loop != loop )
+            customNormals = GetComponentInChildren<SplineNormal>();
+        }
+
+        public SplineDistance Length => localSpline.Length;
+
+        public bool IsLoop
+        {
+            get
             {
-                // looping and unlooping ads and removes a segment
-                if( loop )
-                {
-                    onNodeAdded?.Invoke( GetNodeCount()+1 );
-                }
-                else
-                {
-                    onNodeRemoved?.Invoke( GetNodeCount() );
-                }
+                return localSpline.IsLoop;
             }
+            set
+            {
+                if( localSpline.IsLoop != value )
+                {
+                    // looping and unlooping ads and removes a segment
+                    if( value )
+                    {
+                        onNodeAdded?.Invoke( NodeCount + 1 );
+                    }
+                    else
+                    {
+                        onNodeRemoved?.Invoke( NodeCount );
+                    }
+                }
 
-            localSpline.Loop = loop;
+                localSpline.IsLoop = value;
 
-            onUpdated?.Invoke();
+                onUpdated?.Invoke();
+            }
+        }
+        public int NodeCount => localSpline.NodeCount;
+        public int SegmentCount => localSpline.SegmentCount;
+
+        void OnValidate()
+        {
+            localSpline.isDirty = true;
+        }
+
+        public SplineDistance LoopDistance( SplineDistance distance )
+        {
+            return localSpline.LoopDistance( distance );
         }
 
         public int LoopIndex( int index )
         {
            return localSpline.LoopNodeIndex( index );
         }
-        public int GetNodeCount()
-        {
-            return localSpline.NodeCount;
-        }
-        public int GetSegmentCount()
-        {
-            return localSpline.SegmentCount;
-        }
 
         bool IsNodeIndexInRange(int index)
         {
-            return MathsUtils.IsInArrayRange( index, GetNodeCount() );
+            return MathsUtils.IsInArrayRange( index, NodeCount );
         }
 
         public Vector3 InverseTransformPoint(Vector3 point)
@@ -132,17 +148,26 @@ namespace FantasticSplines
             return ray;
         }
 
+        public SplineResult UpdateRoadResultWithCustomNormals( SplineResult result )
+        {
+            if( hasCustomNormals ) result.segmentResult.normal = customNormals.GetNormalAtSplineResult( result );
+            return result;
+        }
+
         SplineResult TransformResult(SplineResult toTransform)
         {
             toTransform.segmentResult.position = TransformPoint( toTransform.segmentResult.position );
             toTransform.segmentResult.tangent = TransformVector( toTransform.segmentResult.tangent );
+            toTransform.segmentResult.normal = TransformVector( toTransform.segmentResult.normal );
+
+            UpdateRoadResultWithCustomNormals( toTransform );
+
             return toTransform;
         }
 
         SplineNodeResult TransformNodeResult( SplineNodeResult toTransform )
         {
-            toTransform.splineResult.segmentResult.position = TransformPoint( toTransform.splineResult.segmentResult.position );
-            toTransform.splineResult.segmentResult.tangent = TransformVector( toTransform.splineResult.segmentResult.tangent );
+            toTransform.splineResult = TransformResult( toTransform.splineResult );
 
             toTransform.inTangent = TransformVector( toTransform.inTangent );
             toTransform.outTangent = TransformVector( toTransform.outTangent );
@@ -154,7 +179,7 @@ namespace FantasticSplines
         {
             localSpline.AddNode( node.InverseTransform( transform ) );
 
-            onNodeAdded?.Invoke( GetNodeCount() );
+            onNodeAdded?.Invoke( NodeCount );
             onUpdated?.Invoke();
         }
         public void PrependNode(SplineNode node)
@@ -172,9 +197,9 @@ namespace FantasticSplines
             onNodeAdded?.Invoke( index );
             onUpdated?.Invoke();
         }
-        public int InsertNode(float t)
+        public int InsertNode(SplinePercent percent)
         {
-            int index = localSpline.CreateNode( t );
+            int index = localSpline.CreateNode( percent );
 
             onNodeAdded?.Invoke( index );
             onUpdated?.Invoke();
@@ -204,57 +229,66 @@ namespace FantasticSplines
             onUpdated?.Invoke();
         }
 
-        public int GetUpdateCount()
+        public int UpdateCount => localSpline.UpdateCount;
+
+        public SplineSnapshot GetSnapshot()
         {
-            return localSpline.UpdateCount;
+            return new SplineSnapshot(this);
         }
 
-        public SplineResult GetResultAtT(float t)
+        public SplineResult GetResultAt( SplinePercent percent )
         {
-            return TransformResult( localSpline.GetResultAtT( t ) );
+            return TransformResult( localSpline.GetResultAt( percent ) );
         }
 
-        public SplineResult GetResultAtDistance(float distance)
+        public SplineResult GetResultAt(SplineDistance distance)
         {
-            return TransformResult( localSpline.GetResultAtDistance( distance ) );
+            return TransformResult( localSpline.GetResultAt( distance ) );
         }
 
-        public SplineResult GetResultAtSegmentT(int segentIndex, float segmentT)
+        public SplineResult GetResultAtSegment(int segentIndex, SegmentT segmentT )
         {
-            return TransformResult( localSpline.GetResultAtSegmentT( segentIndex, segmentT ) );
+            return TransformResult( localSpline.GetResultAtSegment( segentIndex, segmentT ) );
         }
 
-        public SplineResult GetResultAtSegmentDistance(int segentIndex, float segmentDistance)
+        public SplineResult GetResultAtSegment(int segentIndex, SegmentDistance segmentDistance)
         {
-            return TransformResult( localSpline.GetResultAtSegmentDistance( segentIndex, segmentDistance ) );
+            return TransformResult( localSpline.GetResultAtSegment( segentIndex, segmentDistance ) );
         }
 
-        public SplineResult GetResultAtWorldDistanceFrom(float startDistance, float worldDistance, float stepDistance)
+        public SplineResult GetResultAtSegment( int segentIndex, SegmentPercent segmentPercent )
         {
-            if( Mathf.Approximately( stepDistance, 0 ) )
+            return TransformResult( localSpline.GetResultAtSegment( segentIndex, segmentPercent ) );
+        }
+
+        public SplineResult GetResultAtWorldDistanceFrom(SplineDistance startDistance, float worldDistance, SplineDistance stepDistance )
+        {
+            if( SplineDistance.Approximately( stepDistance, SplineDistance.Zero ) )
             {
                 Debug.LogWarning( "Step is too small." );
-                return GetResultAtDistance( startDistance );
+                return GetResultAt( startDistance );
             }
-            if( GetLength() < worldDistance )
+
+            var splineLength = Length;
+            if( splineLength.value < worldDistance )
             {
                 // early out for short splines
-                if( stepDistance > 0 )
+                if( stepDistance > SplineDistance.Zero )
                 {
-                    return GetResultAtDistance( 1 );
+                    return GetResultAt( splineLength );
                 }
                 else
                 {
-                    return GetResultAtDistance( 0 );
+                    return GetResultAt( SplineDistance.Zero );
                 }
             }
 
-            int maxIterations = Mathf.CeilToInt( worldDistance * 5f / stepDistance );
+            int maxIterations = Mathf.CeilToInt( worldDistance * 5f / stepDistance.value );
             int iterationsLeft = maxIterations;
 
-            SplineResult currentPosition = GetResultAtDistance( startDistance );
+            SplineResult currentPosition = GetResultAt( startDistance );
             int startLapCount = currentPosition.lapCount;
-            float startLoopDistance = currentPosition.loopDistance;
+            var startLoopDistance = currentPosition.loopDistance;
 
             Vector3 origin = currentPosition.position;
 
@@ -262,24 +296,24 @@ namespace FantasticSplines
             SplineResult previousPosition;
             do
             {
-                if(!IsLoop() && currentPosition.t >= 1 && stepDistance >= 0 || currentPosition.t <= 0 && stepDistance < 0)
+                if(currentPosition.AtEnd && stepDistance >= SplineDistance.Zero || currentPosition.AtStart && stepDistance < SplineDistance.Zero )
                 {
                     return currentPosition;
                 }
                 else if( startLapCount != currentPosition.lapCount )
                 {
-                    if( startLoopDistance < currentPosition.loopDistance && stepDistance >= 0 )
+                    if( startLoopDistance < currentPosition.loopDistance && stepDistance >= SplineDistance.Zero )
                     {
                         return currentPosition;
                     }
-                    else if( startLoopDistance > currentPosition.loopDistance && stepDistance < 0 )
+                    else if( startLoopDistance > currentPosition.loopDistance && stepDistance < SplineDistance.Zero )
                     {
                         return currentPosition;
                     }
                 }
 
                 previousPosition = currentPosition;
-                currentPosition = GetResultAtDistance( currentPosition.distance + stepDistance );
+                currentPosition = GetResultAt( currentPosition.distance + stepDistance );
                 currentWorldDistance = Vector3.Distance( currentPosition.position, origin );
 
                 --iterationsLeft;
@@ -298,12 +332,17 @@ namespace FantasticSplines
             float previousWorldDistance = Vector3.Distance( previousPosition.position, origin );
             float lerpT = Mathf.InverseLerp( previousWorldDistance, currentWorldDistance, worldDistance );
 
-            return GetResultAtDistance( currentPosition.distance - stepDistance + (stepDistance * lerpT) );
+            return GetResultAt( currentPosition.distance - stepDistance + (stepDistance * lerpT) );
         }
 
-        public SplineResult GetResultClosestTo(Vector3 point)
+        public SplineResult GetResultClosestTo(Vector3 point )
         {
             return TransformResult( localSpline.GetResultClosestTo( InverseTransformPoint( point ) ) );
+        }
+
+        public SplineResult GetResultClosestToWithinDistanceWindow( Vector3 point, SplineDistance minDistance, SplineDistance maxDistance )
+        {
+            return TransformResult( localSpline.GetResultClosestToWithinDistanceWindow( InverseTransformPoint( point ), minDistance, maxDistance ) );
         }
 
         public SplineResult GetResultClosestToSegment( int segementIndex, Vector3 point )
@@ -311,9 +350,34 @@ namespace FantasticSplines
             return TransformResult( localSpline.GetResultClosestToSegment( segementIndex, InverseTransformPoint( point ) ) );
         }
 
-        public SplineResult GetResultClosestTo(Ray ray)
+        public SplineResult GetResultClosestToSegmentUsingLinearApproximation( int segementIndex, Vector3 point )
         {
-            return TransformResult( localSpline.GetResultClosestTo( InverseTransformRay( ray ) ) );
+            return TransformResult( localSpline.GetResultClosestToSegmentUsingLinearApproximation( segementIndex, InverseTransformPoint( point ) ) );
+        }
+
+        public SplineResult GetResultClosestToSegment( int segementIndex, Ray ray, Spline.TestDirection testDirection = Spline.TestDirection.Forward )
+        {
+            return TransformResult( localSpline.GetResultClosestToSegment( segementIndex, InverseTransformRay( ray ), testDirection ) );
+        }
+
+        public SplineResult GetResultClosestToSegmentUsingLinearApproximation( int segementIndex, Ray ray, Spline.TestDirection testDirection = Spline.TestDirection.Forward )
+        {
+            return TransformResult( localSpline.GetResultClosestToSegmentUsingLinearApproximation( segementIndex, InverseTransformRay( ray ), testDirection ) );
+        }
+
+        public SplineResult GetResultClosestToWithinDistanceWindow( Ray ray, SplineDistance minDistance, SplineDistance maxDistance, Spline.TestDirection testDirection = Spline.TestDirection.Forward )
+        {
+            return TransformResult( localSpline.GetResultClosestToWithinDistanceWindow( InverseTransformRay( ray ), minDistance, maxDistance, testDirection ) );
+        }
+
+        public SplineResult GetResultClosestTo( Ray ray )
+        {
+            return TransformResult( localSpline.GetResultClosestTo( InverseTransformRay( ray ), Spline.TestDirection.Forward ) );
+        }
+
+        public SplineResult GetResultClosestTo(Ray ray, Spline.TestDirection testDirection )
+        {
+            return TransformResult( localSpline.GetResultClosestTo( InverseTransformRay( ray ), testDirection ) );
         }
 
         public SplineResult GetResultAtNode( int nodeIndex )
@@ -328,9 +392,39 @@ namespace FantasticSplines
             return TransformNodeResult( localSpline.GetNodeResult( nodeIndex ) );
         }
 
+        public SplineResult GetResultClosestToUsingSegmentApproximation( Vector3 point )
+        {
+            return TransformResult( localSpline.GetResultClosestToUsingSegmentApproximation( InverseTransformPoint( point ) ) );
+        }
+
+        public SplineResult GetResultClosestToUsingSegmentApproximation( Ray ray )
+        {
+            return GetResultClosestToUsingSegmentApproximation( ray, Spline.TestDirection.Forward );
+        }
+
+        public SplineResult GetResultClosestToUsingSegmentApproximation( Ray ray, Spline.TestDirection testDirection )
+        {
+            return TransformResult( localSpline.GetResultClosestToUsingSegmentApproximation( InverseTransformRay( ray ), testDirection ) );
+        }
+
+        public SplineResult GetResultClosestToUsingLinearApproximation( Vector3 point )
+        {
+            return TransformResult( localSpline.GetResultClosestToUsingLinearApproximation( InverseTransformPoint( point ) ) );
+        }
+
+        public SplineResult GetResultClosestToUsingLinearApproximation( Ray ray )
+        {
+            return GetResultClosestToUsingLinearApproximation( ray, Spline.TestDirection.Forward );
+        }
+
+        public SplineResult GetResultClosestToUsingLinearApproximation( Ray ray, Spline.TestDirection testDirection )
+        {
+            return TransformResult( localSpline.GetResultClosestToUsingLinearApproximation( InverseTransformRay( ray ), testDirection ) );
+        }
+
         // Editor related things
-        public Transform GetTransform() => transform;
-        public Component GetComponent() => this;
+        public Transform Transform => transform;
+        public Component Component => this;
 
         public IEditableSpline GetEditableSpline() { return this; }
         public Object[] GetUndoObjects( )
@@ -341,44 +435,69 @@ namespace FantasticSplines
             return inOutUndoObjects.ToArray();
         }
 
-        [SerializeField] [HideInInspector] Color color = Color.white;
-        public Color GetColor() { return color; }
-        public void SetColor(Color newColor) { color = newColor; }
-        [SerializeField] [HideInInspector] bool zTest = false;
-        public bool GetZTest() { return zTest; }
-        public void SetZTest(bool test) { zTest = test; }
-        [SerializeField] [HideInInspector] float gizmoScale = 1;
-        public float GetGizmoScale() { return gizmoScale; }
-        public void SetGizmoScale(float newscale) { gizmoScale = newscale; }
+        public Color color { get; set; } = Color.white;
+        public bool zTest { get; set; } = false;
+        public float gizmoScale { get; set; } = 1;
+        public bool alwaysDraw { get; set; } = true;
+        public bool showDefaultNormals { get; set; } = false;
 
 #if UNITY_EDITOR
         void OnDrawGizmos()
         {
-            Handles.zTest = GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+            Handles.zTest = zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
             Gizmos.matrix = transform.localToWorldMatrix;
             Handles.matrix = transform.localToWorldMatrix;
             if( Selection.activeObject != gameObject )
             {
-                localSpline.OnDrawGizmos( GetColor(), gizmoScale );
+                if( alwaysDraw )
+                {
+                    localSpline.OnDrawGizmos( color, gizmoScale );
+                }
             }
-            else
+            else if( Selection.activeObject == gameObject )
             {
-                localSpline.DrawDirecitonIndicators( GetColor(), gizmoScale );
+                localSpline.DrawDirecitonIndicators( color, gizmoScale );
+                DrawNormals();
             }
+
             Gizmos.matrix = Matrix4x4.identity;
             Handles.matrix = Matrix4x4.identity;
             Handles.zTest = UnityEngine.Rendering.CompareFunction.Always;
         }
 #endif
 
+        private void DrawNormals()
+        {
+            if( showDefaultNormals )
+            {
+                Gizmos.color = Color.green;
+                for( int i = 0; i < localSpline.SegmentCount; ++i )
+                {
+                    if( i == 0 )
+                    {
+                        var result = localSpline.GetResultAtSegment( 0, new SegmentT( 0 ) );
+                        Gizmos.DrawLine( result.position, result.position + result.normal * 3 );
+                    }
+
+                    int samples = 3;
+                    for( int s = 1; s <= samples; ++s )
+                    {
+                        var t = new SegmentT( (float)s / samples);
+                        var result = localSpline.GetResultAtSegment( i, t );
+                        Gizmos.DrawLine( result.position, result.position + result.normal * 3 );
+                    }
+                }
+            }
+        }
+
         public void DrawSegmentLengths()
         {
 #if UNITY_EDITOR
-            for( int i = 0; i < localSpline.SegmentCount; ++i )
+            int segCount = localSpline.SegmentCount;
+            for( int i = 0; i < segCount; ++i )
             {
-                Bezier3 bezier = Bezier3.Transform( localSpline.CalculateSegment( i ), transform );
-                Vector3 pos = bezier.GetPosition( 0.5f );
-                Handles.Label( pos, bezier.Length.ToString( "N2" ) );
+                var result = GetResultAtSegment( i, new SegmentPercent( 0.5f ) );
+                Handles.Label( result.position, result.segmentResult.length.ToString( "N2" ) );
             }
 #endif
         }

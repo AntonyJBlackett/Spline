@@ -38,7 +38,7 @@ namespace FantasticSplines
         }
 
         //This function returns a point which is a projection from a point to a line.
-         //The line is regarded infinite. If the line is finite, use ProjectPointOnLineSegment() instead.
+        //The line is regarded infinite. If the line is finite, use ProjectPointOnLineSegment() instead.
         public static Vector3 ProjectPointOnLine( Vector3 linePoint, Vector3 lineVec, Vector3 point )
         {
             //get vector from point on line to point in space
@@ -47,6 +47,18 @@ namespace FantasticSplines
             float t = Vector3.Dot( linePointToPoint, lineVec );
 
             return linePoint + lineVec * t;
+        }
+
+        // This function returns a point which is a projection from a point to a line.
+        // The line is considered finite and the result will always be on or between lineStart and lineEnd.
+        public static Vector3 GetClosestPointOnLine( Vector3 lineStart, Vector3 lineEnd, Vector3 point )
+        {
+            Vector3 linePointToPoint = point - lineStart;
+
+            Vector3 lineVec = lineEnd - lineStart;
+            float t = Mathf.Clamp01( Vector3.Dot( linePointToPoint.normalized, lineVec ) );
+
+            return lineStart + lineVec * t;
         }
 
         public static Vector3 LinePlaneIntersection(Ray ray, Vector3 planePoint, Vector3 planeNormal)
@@ -72,8 +84,8 @@ namespace FantasticSplines
             float planarFactor = Vector3.Dot( lineVec3, crossVec1and2 );
 
             //is coplanar, and not parallel
-            if( Mathf.Abs( planarFactor ) < 0.0001f
-                    && crossVec1and2.sqrMagnitude > 0.0001f )
+            if( Mathf.Abs( planarFactor ) < 0.001f
+                    && crossVec1and2.sqrMagnitude > 0.001f )
             {
                 float s = Vector3.Dot( crossVec3and2, crossVec1and2 ) / crossVec1and2.sqrMagnitude;
                 intersection = linePoint1 + (lineVec1 * s);

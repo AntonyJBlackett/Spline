@@ -14,9 +14,10 @@ namespace FantasticSplines
 
         private struct TD
         {
-            public float t, d;
+            public SegmentT t;
+            public SegmentDistance d;
 
-            public TD(float t, float d)
+            public TD( SegmentT t, SegmentDistance d )
             {
                 this.t = t;
                 this.d = d;
@@ -24,7 +25,7 @@ namespace FantasticSplines
         }
 
         private TD[] tdMapping;
-        public float Length => tdMapping[tdMapping.Length - 1].d;
+        public SegmentDistance Length { get; private set; }
 
         public bool IsValid()
         {
@@ -34,6 +35,7 @@ namespace FantasticSplines
         public TDMap(Bezier3 bez)
         {
             tdMapping = null;
+            Length = new SegmentDistance( 0 );
             Initialise( bez );
         }
 
@@ -47,9 +49,14 @@ namespace FantasticSplines
             float invAccuracy = 1f / (ACCURACY - 1);
             for( int i = 0; i < ACCURACY; ++i )
             {
-                float t = i * invAccuracy;
-                float d = bez.CalculateDistanceAt( t );
+                SegmentT t = new SegmentT( i * invAccuracy );
+                SegmentDistance d = new SegmentDistance( bez.CalculateDistanceAt( t ) );
                 tdMapping[i] = new TD( t, d );
+
+                if( i == ACCURACY - 1 )
+                {
+                    Length = d;
+                }
             }
         }
 
@@ -67,8 +74,13 @@ namespace FantasticSplines
             return (low + high) / 2;
         }
 
-        public float GetT(float d)
+        public SegmentT GetT(SegmentDistance d)
         {
+
+#if DEBUG
+            Debug.Assert( d.value >= 0 );
+#endif
+
             int low = 0;
             int high = ACCURACY - 1;
             int mid = (low + high) / 2;
@@ -92,10 +104,10 @@ namespace FantasticSplines
                 Debug.Break();
             }
 
-            return MathsUtils.Remap( d, tdMapping[low].d, tdMapping[high].d, tdMapping[low].t, tdMapping[high].t );
+            return new SegmentT( MathsUtils.Remap( d.value, tdMapping[low].d.value, tdMapping[high].d.value, tdMapping[low].t.value, tdMapping[high].t.value ) );
         }
 
-        public float GetDistance(float t)
+        public SegmentDistance GetDistance(SegmentT t)
         {
             int low = 0;
             int high = ACCURACY - 1;
@@ -111,45 +123,53 @@ namespace FantasticSplines
             Debug.Assert( low + 1 == high );
 #endif
 
-            return MathsUtils.Remap( t, tdMapping[low].t, tdMapping[high].t, tdMapping[low].d, tdMapping[high].d );
+            return new SegmentDistance( MathsUtils.Remap( t.value, tdMapping[low].t.value, tdMapping[high].t.value, tdMapping[low].d.value, tdMapping[high].d.value ) );
         }
     }
 
     public partial class Spline
     {
-        public const int DEFAULT_SEGMENT_LUT_ACCURACY = 8;
-
         private class SegmentCache
         {
             public Bezier3 bezier;
             private TDMap tdMapping;
 
-            public float startDistanceInSpline;
-            public float Length => tdMapping.Length;
-            public float GetT(float d) => tdMapping.GetT( d );
-            public float GetDistance(float t) => tdMapping.GetDistance( t );
+            public SplineDistance startDistanceInSpline;
+            public SegmentDistance Length { get; private set; }
+            public SegmentT GetT(SegmentDistance d) => tdMapping.GetT( d );
+            public SegmentT GetT(SegmentPercent p) => tdMapping.GetT( GetDistance(p) );
+            public SegmentDistance GetDistance(SegmentT t) => tdMapping.GetDistance( t );
+            public SegmentDistance GetDistance( SegmentPercent p ) => Length * p;
+            public SegmentPercent GetPercent( SegmentDistance d ) => new SegmentPercent( d / Length );
+            public SegmentPercent GetPercent( SegmentT t ) => new SegmentPercent( GetDistance(t) / Length );
 
-            public SegmentCache(Bezier3 bez, float distanceOnSpline, int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
+            public SegmentCache(Bezier3 bez, SplineDistance distanceOnSpline )
             {
-                Initialise( bez, distanceOnSpline, accuracy );
+                Initialise( bez, distanceOnSpline );
             }
 
-            public void Initialise(Bezier3 bez, float distanceOnSpline,
-                int accuracy = DEFAULT_SEGMENT_LUT_ACCURACY)
+            public void Initialise(Bezier3 bez, SplineDistance distanceOnSpline )
             {
                 bezier = bez;
                 startDistanceInSpline = distanceOnSpline;
                 tdMapping.Initialise( bez );
+                Length = tdMapping.Length;
             }
 
-            public Vector3 GetPositionAtT(float t) => bezier.GetPosition( t );
-            public Vector3 GetTangentAtT(float t) => bezier.GetTangent( t );
-            public Vector3 GetPositionAtDistance(float distance) => GetPositionAtT( tdMapping.GetT( distance ) );
-            public Vector3 GetTangentAtDistance(float distance) => GetTangentAtT( tdMapping.GetT( distance ) );
-            public float GetCurvatureAtT( float t ) => bezier.CalculateRadiusAt( t);
-            public float GetRadiusAtT( float t ) => bezier.CalculateCurvatureAt( t);
-            public float GetCurvatureAtDistance(float distance) => GetCurvatureAtT( tdMapping.GetT( distance ) );
-            public float GetRadiusAtDistance(float distance) => GetRadiusAtT( tdMapping.GetT( distance ) );
+            public Vector3 GetPositionAt( SegmentT t ) => bezier.GetPosition( t );
+            public Vector3 GetTangentAt( SegmentT t ) => bezier.GetTangent( t );
+            public float GetCurvatureAt( SegmentT t ) => bezier.CalculateCurvatureAt( t );
+            public float GetRadiusAt( SegmentT t ) => bezier.CalculateRadiusAt( t );
+
+            public Vector3 GetPositionAt( SegmentDistance distance ) => GetPositionAt( tdMapping.GetT( distance ) );
+            public Vector3 GetTangentAt( SegmentDistance distance ) => GetTangentAt( tdMapping.GetT( distance ) );
+            public float GetCurvatureAt( SegmentDistance distance ) => GetCurvatureAt( tdMapping.GetT( distance ) );
+            public float GetRadiusAt( SegmentDistance distance ) => GetRadiusAt( tdMapping.GetT( distance ) );
+
+            public Vector3 GetPositionAt( SegmentPercent percent ) => GetPositionAt( GetT( percent ) );
+            public Vector3 GetTangentAt( SegmentPercent percent ) => GetTangentAt( GetT( percent ) );
+            public float GetCurvatureAt( SegmentPercent percent ) => GetCurvatureAt( GetT( percent ) );
+            public float GetRadiusAt( SegmentPercent percent ) => GetRadiusAt( GetT( percent ) );
 
         }
     }

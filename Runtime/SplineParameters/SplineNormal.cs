@@ -30,7 +30,7 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
     public bool automaticNormals = false;
     [Range( 0, 1 )]
     public float bankingStrength;
-    public float bankingBlendStep = 1.0f;
+    public SplineDistance bankingBlendStep = new SplineDistance(1.0f);
 
     #region SplineDataTrack specialisation
 #if UNITY_EDITOR
@@ -40,6 +40,7 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
     public SplineNormal()
     {
         CustomInterpolator = SlerpNormals;
+        parameterName = "Spline Normal";
     }
 
     Normal SlerpNormals( ISpline spline, SplineParameterKeyframe<Normal> first, SplineParameterKeyframe<Normal> second, float t )
@@ -61,7 +62,7 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
                 Vector3 n1 = GetNormal( first.location.tangent, angle1 );
                 Vector3 n2 = GetNormal( second.location.tangent, angle2 );
                 Vector3 slerpedNormal = Vector3.Slerp( n1, n2, t );
-                Vector3 tangentAtT = spline.GetResultAtDistance( Mathf.Lerp( first.location.distance, second.location.distance, t ) ).tangent;
+                Vector3 tangentAtT = spline.GetResultAt( SplineDistance.Lerp( first.location.distance, second.location.distance, t ) ).tangent;
                 Vector3 right = Vector3.Cross( tangentAtT.normalized, slerpedNormal.normalized );
                 Vector3 trueNormal = Vector3.Cross( right, tangentAtT.normalized );
                 angle = GetAngleFromNormal( tangentAtT, trueNormal );
@@ -75,7 +76,6 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
     {
         return new Normal() { blendType = NormalBlendType.FloatLerp, angle = 0 };
     }
-    #endregion
 
     public float GetAngleFromNormal( Vector3 tangent, Vector3 normal )
     {
@@ -83,7 +83,7 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
         return Vector3.SignedAngle( defaultNormal, normal, tangent );
     }
 
-    public Vector3 GetNormal( Vector3 tangent, float angle )
+    private Vector3 GetNormal( Vector3 tangent, float angle )
     {
         return Quaternion.LookRotation( tangent.normalized, transform.up ) * Quaternion.AngleAxis( angle, Vector3.forward ) * Vector3.up;
     }
@@ -95,12 +95,12 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
 
     public Vector3 GetNormalAtSplineResult( SplineResult splineResult )
     {
-        return GetNormal( splineResult.tangent, GetValueAtDistance( splineResult.distance, GetDefaultKeyframeValue() ).angle );
+        return GetNormal( splineResult.tangent, GetValueAt( splineResult.distance, GetDefaultKeyframeValue() ).angle );
     }
 
-    public Vector3 GetNormalAtDistance( float distance )
+    public Vector3 GetNormalAtDistance( SplineDistance distance )
     {
-        return GetNormalAtSplineResult( spline.GetResultAtDistance( distance ) );
+        return GetNormalAtSplineResult( spline.GetResultAt( distance ) );
     }
 
     public Vector3 CalculateAutomaticNormal( SplineResult splineResult )
@@ -110,7 +110,7 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
 
         if( bankingStrength > 0.01f )
         {
-            SplineResult bankingResult = spline.GetResultAtDistance( splineResult.distance + bankingBlendStep );
+            SplineResult bankingResult = spline.GetResultAt( splineResult.distance + bankingBlendStep );
             Vector3 bankingTangentDirection = bankingResult.tangent.normalized;
 
             Vector3 tangentDirection = splineResult.tangent.normalized;
@@ -126,11 +126,12 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
         return normal;
     }
 
+    #endregion
     #region Gizmos
 
     public float GetNormalGizmoScale()
     {
-        return spline.GetGizmoScale() * 0.5f;
+        return spline.gizmoScale * 0.5f;
     }
 
 #if UNITY_EDITOR
@@ -141,22 +142,14 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
 
         Handles.color = Color.green;
         float gizmosScale = GetNormalGizmoScale();
-        Handles.DrawLine( worldPosition, worldPosition + normal * gizmosScale, 3* gizmosScale );
-        Handles.ConeHandleCap( 0, worldPosition + normal * gizmosScale, Quaternion.LookRotation( normal ), SplineNormalTool.GetHandleSize( worldPosition ) * gizmosScale * 3f, EventType.Repaint );
+
+        float lineLength = 13 * SplineNormalTool.GetHandleSize( worldPosition );
+        float lineThickness = 2;
+        Handles.DrawLine( worldPosition, worldPosition + normal * gizmosScale * lineLength, lineThickness * gizmosScale );
+        Handles.ConeHandleCap( 0, worldPosition + normal * gizmosScale * lineLength, Quaternion.LookRotation( normal ), SplineNormalTool.GetHandleSize( worldPosition ) * gizmosScale * lineThickness, EventType.Repaint );
     }
 
-    protected new void OnDrawGizmosSelected()
-    {
-        if( spline == null )
-        {
-            return;
-        }
-
-        base.OnDrawGizmosSelected();
-        DrawInterpolatedNormals();
-    }
-
-    void DrawInterpolatedNormals()
+    protected override void DrawInterpolatedGizmos()
     {
         if( !enableVisualisation )
         {
@@ -166,19 +159,19 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
         Gizmos.color = Color.green;
 
         float gizmosScale = GetNormalGizmoScale();
-        float distance = 0;
-        float length = spline.GetLength();
-        float step = length / 50f;
+        var distance = SplineDistance.Zero;
+        var length = spline.Length;
+        var step = length / 50f;
         while( distance < length )
         {
-            SplineResult location = spline.GetResultAtDistance( distance );
+            SplineResult location = spline.GetResultAt( distance );
             Vector3 normal = GetNormalAtSplineResult( location );
             Gizmos.DrawLine( location.position, location.position + normal* gizmosScale );
             distance += step;
         }
 
-        SplineResult locationEnd = spline.GetResultAtDistance( length );
-        Vector3 normalEnd = GetNormalAtSplineResult( locationEnd ) * spline.GetGizmoScale();
+        SplineResult locationEnd = spline.GetResultAt( length );
+        Vector3 normalEnd = GetNormalAtSplineResult( locationEnd ) * spline.gizmoScale;
         Gizmos.DrawLine( locationEnd.position, locationEnd.position + normalEnd* gizmosScale );
     }
 #endif

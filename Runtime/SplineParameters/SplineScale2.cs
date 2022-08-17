@@ -5,6 +5,11 @@ using FantasticSplines;
 // Spline Keyframe track that stores and blends colors along a spline
 public class SplineScale2 : KeyframedSplineParameter<Vector2>
 {
+    SplineScale2() : base()
+    {
+        parameterName = "Spline Scale";
+    }
+
     [Header( "Visualisation" )]
     public bool enableVisualisation = false;
 
@@ -20,6 +25,7 @@ public class SplineScale2 : KeyframedSplineParameter<Vector2>
     #endregion
 
     #region Gizmos
+#if UNITY_EDITOR
     protected override void DrawKeyframeValueGizmo( SplineParameterKeyframe<Vector2> keyframe )
     {
         Gizmos.color = Color.white;
@@ -36,13 +42,7 @@ public class SplineScale2 : KeyframedSplineParameter<Vector2>
 
     }
 
-    private new void OnDrawGizmosSelected()
-    {
-        base.OnDrawGizmosSelected();
-        DrawInterpolatedValue();
-    }
-
-    void DrawInterpolatedValue()
+    protected override void DrawInterpolatedGizmos()
     {
         if( !enableVisualisation )
         {
@@ -51,23 +51,24 @@ public class SplineScale2 : KeyframedSplineParameter<Vector2>
 
         Gizmos.color = Color.white;
 
-        float distance = 0;
-        float length = spline.GetLength();
-        float step = length / 50f;
+        var distance = SplineDistance.Zero;
+        var length = spline.Length;
+        var step = length / 50f;
         while( distance < length )
         {
-            SplineResult location = spline.GetResultAtDistance( distance );
+            SplineResult location = spline.GetResultAt( distance );
             Gizmos.color = Color.white;
 
-            Vector2 scale = GetValueAtDistance( location.distance, GetDefaultKeyframeValue() );
+            Vector2 scale = GetValueAt( location.distance, GetDefaultKeyframeValue() );
             DrawGizmos( location.position, Quaternion.LookRotation( location.tangent, transform.up ), scale );
 
             distance += step;
         }
 
-        SplineResult locationEnd = spline.GetResultAtDistance( length );
-        Vector2 scaleEnd = GetValueAtDistance( locationEnd.distance, GetDefaultKeyframeValue() );
+        SplineResult locationEnd = spline.GetResultAt( length );
+        Vector2 scaleEnd = GetValueAt( locationEnd.distance, GetDefaultKeyframeValue() );
         DrawGizmos( locationEnd.position, Quaternion.LookRotation( locationEnd.tangent, transform.up ), scaleEnd );
     }
+#endif
     #endregion
 }

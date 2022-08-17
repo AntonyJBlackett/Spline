@@ -17,8 +17,8 @@ public struct SplineSnapshot
     {
         this.spline = spline;
         wasNotNull = spline != null;
-        updateCount = spline != null ? spline.GetUpdateCount() : 0;
-        matrix = spline != null ? spline.GetTransform().localToWorldMatrix : Matrix4x4.identity;
+        updateCount = spline != null ? spline.UpdateCount : 0;
+        matrix = spline != null ? spline.Transform.localToWorldMatrix : Matrix4x4.identity;
     }
 
     public bool EqualsSnapshot(ISpline compare)
@@ -33,7 +33,7 @@ public struct SplineSnapshot
             return true;
         }
 
-        return updateCount == compare.GetUpdateCount() && matrix == compare.GetTransform().localToWorldMatrix;
+        return updateCount == compare.UpdateCount && matrix == compare.Transform.localToWorldMatrix;
     }
 
     public bool IsOutOfDate()

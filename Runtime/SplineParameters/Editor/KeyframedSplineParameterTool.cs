@@ -1,19 +1,49 @@
 using System;
 using UnityEngine;
+
+#if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.EditorTools;
+#endif
 
+#if UNITY_EDITOR
 namespace FantasticSplines
 {
-    // extend this class to make your own spline data editors for you
-    class KeyframedSplineParameterTool<T> : EditorTool
+    class SplineKeyFrameTool : EditorTool
+    {
+    }
+
+    class KeyframedSplineParameterTool<T> : SplineKeyFrameTool
         where T : new()
     {
+        #region Tool properties and initialisation
+        // Serialize this value to set a default value in the Inspector.
+        [SerializeField]
+        Texture2D m_ToolIcon;
+
+        GUIContent m_IconContent;
+
+        void OnEnable()
+        {
+            m_IconContent = new GUIContent()
+            {
+                image = m_ToolIcon,
+                text = Target.parameterName + " Tool",
+                tooltip = Target.parameterName + " Tool",
+            };
+        }
+
+        public override GUIContent toolbarIcon
+        {
+            get { return m_IconContent; }
+        }
+        #endregion
+
         protected KeyframedSplineParameter<T> Target
         {
             get
             {
-                return KeyframedSplineParameterEditorInstance.editInstance as KeyframedSplineParameter<T>;
+                return target as KeyframedSplineParameter<T>;
             }
         }
 
@@ -33,6 +63,11 @@ namespace FantasticSplines
 #else
             return guiEvent.control && guiEvent.shift;
 #endif
+        }
+
+        public override bool IsAvailable()
+        {
+            return Target != null && Target.spline != null;
         }
 
         protected bool DoKeyframeToolHandles()
@@ -109,16 +144,16 @@ namespace FantasticSplines
                 Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
                 SplineResult result = Target.spline.GetResultClosestTo( ray );
 
-                float size = GetHandleSize( result.position ) * Target.spline.GetGizmoScale();
+                float size = GetHandleSize( result.position ) * Target.spline.gizmoScale;
                 bool click = Handles.Button( result.position, Quaternion.identity, size, size, KeyframeHandleCap );
-                click = click || Handles.Button( ray.origin, Quaternion.identity, 0, GetHandleSize( ray.origin ) * Target.spline.GetGizmoScale(), KeyframeHandleCap );
+                click = click || Handles.Button( ray.origin, Quaternion.identity, 0, GetHandleSize( ray.origin ) * Target.spline.gizmoScale, KeyframeHandleCap );
 
                 if( click )
                 {
                     Undo.RecordObject( Target, "Add Spline Keyframe" );
 
-                    T interpolatedValue = Target.GetValueAtDistance( result.distance, Target.GetDefaultKeyframeValue() );
-                    Target.InsertAtDistance( interpolatedValue, result.distance );
+                    T interpolatedValue = Target.GetValueAt( result.distance, Target.GetDefaultKeyframeValue() );
+                    Target.Insert( interpolatedValue, result.distance );
                 }
             }
         }
@@ -130,7 +165,7 @@ namespace FantasticSplines
                 var keys = Target.Keyframes;
                 for( int i = 0; i < keys.Count; ++i )
                 {
-                    float size = GetHandleSize( keys[i].location.position ) * Target.spline.GetGizmoScale();
+                    float size = GetHandleSize( keys[i].location.position ) * Target.spline.gizmoScale;
                     bool click = Handles.Button( keys[i].location.position, Quaternion.identity, size, size, KeyframeHandleCap );
                     if( click )
                     {
@@ -201,11 +236,11 @@ namespace FantasticSplines
 
             Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
 
-            float handleSize = GetHandleSize( key.location.position ) * Target.spline.GetGizmoScale();
-            float handleOffset = 0;
-            SplineResult resultAfter = Target.spline.GetResultAtDistance( Target.GetKeyframe( keyFrameIndex ).location.distance + handleOffset );
+            float handleSize = GetHandleSize( key.location.position ) * Target.spline.gizmoScale;
+            var handleOffset = SplineDistance.Zero;
+            SplineResult resultAfter = Target.spline.GetResultAt( Target.GetKeyframe( keyFrameIndex ).location.distance + handleOffset );
 
-            float minHandleLength = handleSize * 1.5f * Target.spline.GetGizmoScale();
+            float minHandleLength = handleSize * 1.5f * Target.spline.gizmoScale;
             Vector3 outHandleOrigin = resultAfter.position + resultAfter.tangent.normalized * minHandleLength;
             Vector3 inHandleOrigin = resultAfter.position - resultAfter.tangent.normalized * minHandleLength;
             Vector3 outHandlePosition = outHandleOrigin + resultAfter.tangent.normalized * key.outTangent;
@@ -221,12 +256,12 @@ namespace FantasticSplines
 
             EditorGUI.BeginChangeCheck();
             // free move handle is used to check drag input. We'll recalculate the position ourselves with the mouse position
-            Handles.FreeMoveHandle( resultAfter.position, Quaternion.LookRotation( resultAfter.tangent ), handleSize, Vector3.zero, KeyframeHandleCap );
+            var fmh_228_59_637860627013150770 = Quaternion.LookRotation( resultAfter.tangent ); Handles.FreeMoveHandle( resultAfter.position, Quaternion.identity, handleSize, Vector3.zero, KeyframeHandleCap );
             if( EditorGUI.EndChangeCheck() )
             {
                 interacted = true;
                 Undo.RecordObject( Target, "Move Spline Keyframe" );
-                Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAtDistance( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
+                Target.SetKeyframeLocation( keyFrameIndex, Target.spline.GetResultAt( Target.spline.GetResultClosestTo( ray ).distance - handleOffset ) );
             }
 
             if( Target.EnableKeyframeTangents )
@@ -262,7 +297,7 @@ namespace FantasticSplines
         // This is called for each window that your tool is active in. Put the functionality of your tool here.
         public override void OnToolGUI( EditorWindow window )
         {
-            Handles.zTest = Target.spline.GetZTest() ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
+            Handles.zTest = Target.spline.zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
 
             bool keepActive = false;
             if( Target.enableKeyframeHandles )
@@ -280,10 +315,9 @@ namespace FantasticSplines
                 }
             }
 
-            Selection.activeObject = Target.gameObject;
-            if( !keepActive && Event.current.button == 0 && Event.current.type == EventType.MouseDown )
+            if( keepActive )
             {
-                Target.ToggleEditor();
+                Selection.activeObject = Target.gameObject;
             }
         }
 
@@ -302,37 +336,43 @@ namespace FantasticSplines
             SerializedObject so = new SerializedObject( Target );
             var rawKeysSP = so.FindProperty( "rawKeyframes" );
             var keys = Target.Keyframes;
-            for( int i = 0; i < keys.Count; ++i )
+
+            if( keys.Count > 0 )
             {
-                SerializedProperty keySP = rawKeysSP.GetArrayElementAtIndex( i );
-                SerializedProperty keyValue = keySP.FindPropertyRelative( "value" );
-                float propertyHeight = EditorGUI.GetPropertyHeight( keyValue, new GUIContent( "" ), true );
+                float handleSize = SplineHandleUtility.GetNodeHandleSize( keys[0].location.position );
 
-                Vector2 guiPosition = HandleUtility.WorldToGUIPoint( keys[i].location.position ) + new Vector2( 0.5f, 0.5f ) * SplineHandleUtility.GetNodeHandleSize( keys[i].location.position );
-                Vector2 rectSize = new Vector2( GetGUIPropertyWidth(), propertyHeight );
-                guiPosition.y += propertyHeight * 0.5f;
-                Vector2 border = new Vector2( 2, 2 );
-                Rect guiRect = new Rect( guiPosition, rectSize + border * 2 );
-
-                Handles.BeginGUI();
-                GUILayout.BeginArea( guiRect );
-
-                GUISkin skin = EditorGUIUtility.GetBuiltinSkin( EditorSkin.Inspector );
-                EditorGUI.DrawRect( new Rect( Vector2.zero, rectSize + border * 2 ), EditorColor );
-
-                GUILayout.BeginArea( new Rect( border, rectSize ) );
-
-                EditorGUILayout.PropertyField( keyValue, new GUIContent(), true );
-                GUILayout.EndArea();
-
-                GUILayout.EndArea();
-                Handles.EndGUI();
-
-                // hacks: intercept unity scene view controls
-                if( guiRect.Contains( Event.current.mousePosition ) )
+                for( int i = 0; i < keys.Count; ++i )
                 {
-                    Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
-                    Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, HandleUtility.GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
+                    SerializedProperty keySP = rawKeysSP.GetArrayElementAtIndex( i );
+                    SerializedProperty keyValue = keySP.FindPropertyRelative( "value" );
+                    float propertyHeight = EditorGUI.GetPropertyHeight( keyValue, new GUIContent( "" ), true );
+
+                    Vector2 guiPosition = HandleUtility.WorldToGUIPoint( keys[i].location.position ) + new Vector2( 0.5f, 0.5f ) * handleSize;
+                    Vector2 rectSize = new Vector2( GetGUIPropertyWidth(), propertyHeight );
+                    guiPosition.y += propertyHeight * 0.5f;
+                    Vector2 border = new Vector2( 2, 2 );
+                    Rect guiRect = new Rect( guiPosition, rectSize + border * 2 );
+
+                    Handles.BeginGUI();
+                    GUILayout.BeginArea( guiRect );
+
+                    GUISkin skin = EditorGUIUtility.GetBuiltinSkin( EditorSkin.Inspector );
+                    EditorGUI.DrawRect( new Rect( Vector2.zero, rectSize + border * 2 ), EditorColor );
+
+                    GUILayout.BeginArea( new Rect( border, rectSize ) );
+
+                    EditorGUILayout.PropertyField( keyValue, new GUIContent(), true );
+                    GUILayout.EndArea();
+
+                    GUILayout.EndArea();
+                    Handles.EndGUI();
+
+                    // hacks: intercept unity scene view controls
+                    if( guiRect.Contains( Event.current.mousePosition ) )
+                    {
+                        Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
+                        Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, HandleUtility.GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
+                    }
                 }
             }
 
@@ -347,3 +387,4 @@ namespace FantasticSplines
         }
     }
 }
+#endif

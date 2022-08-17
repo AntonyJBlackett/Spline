@@ -271,13 +271,13 @@ namespace FantasticSplines
         }
 
         // Constructs a spline node from another spline node
-        public SplineNode(SplineNode other, float automaticTangentLength = 0.3f )
+        public SplineNode(SplineNode other )
         {
             position = other.position;
             nodeType = other.nodeType;
             localInControlPoint = other.localInControlPoint;
             localOutControlPoint = other.localOutControlPoint;
-            this.automaticTangentLength = automaticTangentLength;
+            automaticTangentLength = other.automaticTangentLength;
             lastChangedControl = other.lastChangedControl;
         }
 

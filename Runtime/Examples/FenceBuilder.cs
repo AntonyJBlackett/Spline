@@ -158,7 +158,7 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
             return;
         }
 
-        SplineResult post1Position = parameters.spline.GetResultAtDistance( 0 );
+        SplineResult post1Position = parameters.spline.GetResultAt( SplineDistance.Zero );
         float segmentLength = parameters.segment.transform.localScale.z;
         Quaternion axisRotation = Quaternion.identity;
         Bounds segmentBounds = new Bounds( Vector3.zero, parameters.segment.transform.localScale );
@@ -219,14 +219,14 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
         segmentBounds.center *= parameters.Scale;
         segmentLength *= parameters.Scale;
 
-        float worldDistance = segmentLength + parameters.padding;
-        if( worldDistance < parameters.spline.GetLength() * 0.001f )
+        var worldDistance = segmentLength + parameters.padding;
+        if( worldDistance < parameters.spline.Length.value * 0.001f )
         {
             Debug.LogWarning( "worldDistance is too small we may loop forever!" );
             return;
         }
 
-        float step = worldDistance * 0.5f;
+        var step = new SplineDistance( worldDistance * 0.5f );
         SplineResult post2Position =
             parameters.spline.GetResultAtWorldDistanceFrom( post1Position.distance, worldDistance, step );
 
@@ -237,13 +237,12 @@ public class FenceBuilder : MonoBehaviour, IEditorSplineProxy
                 Quaternion.LookRotation( post2Position.tangent, Vector3.up ), parameters.Scale );
         }
 
-        float splineLength = parameters.spline.GetLength();
+        var splineLength = parameters.spline.Length;
 
-        if( splineLength > 0 )
+        if( splineLength > SplineDistance.Zero )
         {
-            int limit = Mathf.CeilToInt( 1 + splineLength /
-                worldDistance ); // we should never need more segments than a dead straight spline needs
-            while( post1Position.loopT < post2Position.loopT )
+            int limit = Mathf.CeilToInt( 1 + splineLength.value / worldDistance ); // we should never need more segments than a dead straight spline needs
+            while( post1Position.percent.Looped < post2Position.percent.Looped )
             {
                 Vector3 segmentDirection = (post2Position.position - post1Position.position).normalized;
                 Vector3 segmentPosition = post1Position.position + segmentDirection * worldDistance * 0.5f;
