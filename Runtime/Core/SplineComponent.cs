@@ -14,6 +14,8 @@ namespace FantasticSplines
 {
     public class SplineComponent : MonoBehaviour, ISpline, IEditableSpline
     {
+        public bool repositioningKeyframe { get; set; } // hack in case you need to stop endle
+
         public System.Action<int> onNodeAdded;
         public System.Action<int> onNodeRemoved;
         public System.Action onUpdated;
@@ -150,7 +152,7 @@ namespace FantasticSplines
 
         public SplineResult UpdateRoadResultWithCustomNormals( SplineResult result )
         {
-            if( hasCustomNormals ) result.segmentResult.normal = customNormals.GetNormalAtSplineResult( result );
+            if( !repositioningKeyframe && hasCustomNormals ) result.segmentResult.normal = customNormals.GetNormalAtSplineResult( result );
             return result;
         }
 

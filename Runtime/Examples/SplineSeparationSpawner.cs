@@ -161,7 +161,7 @@ public class SplineSeparationSpawner : MonoBehaviour
 
         SplineResult splineResult = parameters.spline.GetResultAt( SplinePercent.Start );
 
-        while( !splineResult.AtEnd )
+        while( !splineResult.AtEnd && splineResult.lapCount == 0 )
         {
             GameObject instance = instanceBucket.GetInstance( parameters.prefab );
             instance.SetActive( true );

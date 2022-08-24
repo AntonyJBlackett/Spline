@@ -957,6 +957,9 @@ namespace FantasticSplines
         {
             SplineResult result;
 
+            // stop endless loop created by custom normals on SplineResults.
+            spline.repositioningKeyframe = true;
+
             // internally the spline uses distance lookup for almost everything which means using t values can be a little inaccurate.
             // to compensate we set the t values back to what they were on input for t lookup modes.
             switch( mode )
@@ -989,6 +992,7 @@ namespace FantasticSplines
                     break;
             }
 
+            spline.repositioningKeyframe = false;
             return result;
         }
     }
@@ -1057,6 +1061,7 @@ namespace FantasticSplines
         SplineResult GetResultAtNode( int nodeIndex );
         SplineNodeResult GetNodeResult( int nodeIndex );
         int LoopIndex(int index);
+        bool repositioningKeyframe { get; set; }
     }
 
     // Interface for added additional data to a place
