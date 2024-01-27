@@ -4,6 +4,8 @@ using MacFsWatcher;
 using System.Numerics;
 using UnityEngine.UIElements;
 using UnityEditor.PackageManager.UI;
+using Codice.Client.Common;
+
 
 
 
@@ -40,6 +42,7 @@ namespace FantasticSplines
         public override void OnActivated()
         {
             base.OnActivated();
+            SplineEditor.ResetEditMode();
             SceneView.lastActiveSceneView.ShowNotification(new GUIContent("Spline Tool Activated"), .3f);
         }
 
@@ -47,6 +50,7 @@ namespace FantasticSplines
         // destroyed this tool (ex, calling `Destroy(this)` will skip the OnWillBeDeactivated invocation).
         public override void OnWillBeDeactivated()
         {
+            SplineEditor.ResetEditMode();
             SceneView.lastActiveSceneView.ShowNotification(new GUIContent("Spline Tool Deactivated"), .3f);
         }
 
@@ -69,22 +73,68 @@ namespace FantasticSplines
         // Equivalent to Editor.OnSceneGUI.
         public override void OnToolGUI(EditorWindow window)
         {
-            if (EditorWindow.focusedWindow != window && EditorWindow.mouseOverWindow == window)
+            if(EditorWindow.focusedWindow != window && EditorWindow.mouseOverWindow == window)
             {
                 window.Focus();
             }
 
-            SplineEditor.DoSceneViewDraw(target as SplineComponent, Event.current);
+            OnGui(window);
+            OnTools(window);
 
-            if (SplineEditor.ShouldDisableTool(target as SplineComponent, Event.current))
+            window.Repaint();
+        }
+
+        bool m_AnimatePlatforms = false;
+        void OnGui(EditorWindow window)
+        {
+            if(!(window is SceneView sceneView))
+                return;
+
+            Handles.BeginGUI();
+            using(new GUILayout.HorizontalScope())
+            {
+                GUILayout.FlexibleSpace();
+                using(new GUILayout.VerticalScope())
+                {
+                    GUILayout.FlexibleSpace();
+
+                    OnSplineGui();
+
+                }
+                GUILayout.FlexibleSpace();
+            }
+            Handles.EndGUI();
+        }
+
+        void OnSplineGui()
+        {
+            using(new GUILayout.HorizontalScope(EditorStyles.helpBox))
+            {
+                if(GUILayout.Button("Prepend"))
+                {
+                    SplineEditor.StartAddPointMode(target as SplineComponent, SplineAddNodeMode.Prepend);
+                }
+                if(GUILayout.Button("Insert"))
+                {
+                    SplineEditor.StartAddPointMode(target as SplineComponent, SplineAddNodeMode.Insert);
+                }
+                if(GUILayout.Button("Append"))
+                {
+                    SplineEditor.StartAddPointMode(target as SplineComponent, SplineAddNodeMode.Append);
+                }
+            }
+        }
+
+        void OnTools(EditorWindow window)
+        {
+            SplineEditor.DoSceneViewDraw(target as SplineComponent, Event.current);
+            if(SplineEditor.ShouldDisableTool(target as SplineComponent, Event.current))
             {
                 Event.current.Use();
                 ToolManager.RestorePreviousTool();
                 return;
             }
             SplineEditor.DoSceneViewInput(target as SplineComponent, Event.current);
-
-            window.Repaint();
         }
     }
 }
