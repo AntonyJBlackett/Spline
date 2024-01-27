@@ -1103,17 +1103,17 @@ namespace FantasticSplines
             for( int i = 0; i < segments.Length; ++i )
             {
                 Bezier3 bezier = segments[i].bezier;
-                Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, color * .9f, null, 3f );
+                Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, color, null, 3f );
             }
 
             float size = SplineHandleUtility.GetNodeHandleSize( nodes[0].position );
             // this stops selection of the spline when we're doing other things.
-            if( Selection.activeObject == null )
+            //if( Selection.activeObject == null )
             {
                 Gizmos.color = Color.white;
                 for( int i = 0; i < NodeCount; ++i )
                 {
-                    Gizmos.DrawSphere( nodes[i].position, size * 0.25f * gizmoScale );
+                    Gizmos.DrawSphere( nodes[i].position, size * 0.5f * gizmoScale );
                 }
             }
 #endif

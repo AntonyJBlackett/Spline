@@ -256,7 +256,7 @@ namespace FantasticSplines
 
             EditorGUI.BeginChangeCheck();
             // free move handle is used to check drag input. We'll recalculate the position ourselves with the mouse position
-            var fmh_228_59_637860627013150770 = Quaternion.LookRotation( resultAfter.tangent ); Handles.FreeMoveHandle( resultAfter.position, Quaternion.identity, handleSize, Vector3.zero, KeyframeHandleCap );
+            var fmh_228_59_637860627013150770 = Quaternion.LookRotation( resultAfter.tangent ); var fmh_259_143_638419121573599779 = Quaternion.identity; Handles.FreeMoveHandle( resultAfter.position, handleSize, Vector3.zero, KeyframeHandleCap );
             if( EditorGUI.EndChangeCheck() )
             {
                 interacted = true;

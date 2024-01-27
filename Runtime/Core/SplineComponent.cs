@@ -1,6 +1,9 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.Serialization;
+using UnityEditor.EditorTools;
+
+
 #if UNITY_EDITOR
 using UnityEditor;
 #endif
@@ -427,6 +430,7 @@ namespace FantasticSplines
         // Editor related things
         public Transform Transform => transform;
         public Component Component => this;
+        public GameObject GameObject => gameObject;
 
         public IEditableSpline GetEditableSpline() { return this; }
         public Object[] GetUndoObjects( )
@@ -437,6 +441,7 @@ namespace FantasticSplines
             return inOutUndoObjects.ToArray();
         }
 
+        // instance specific debug draw options
         public Color color { get; set; } = Color.white;
         public bool zTest { get; set; } = false;
         public float gizmoScale { get; set; } = 1;
@@ -444,7 +449,7 @@ namespace FantasticSplines
         public bool showDefaultNormals { get; set; } = false;
 
 #if UNITY_EDITOR
-        void OnDrawGizmos()
+        public void OnDrawGizmos()
         {
             Handles.zTest = zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
             Gizmos.matrix = transform.localToWorldMatrix;
@@ -453,11 +458,12 @@ namespace FantasticSplines
             {
                 if( alwaysDraw )
                 {
-                    localSpline.OnDrawGizmos( color, gizmoScale );
+                    localSpline.OnDrawGizmos( color * 0.75f, gizmoScale );
                 }
             }
             else if( Selection.activeObject == gameObject )
             {
+                localSpline.OnDrawGizmos(color, gizmoScale);
                 localSpline.DrawDirecitonIndicators( color, gizmoScale );
                 DrawNormals();
             }

@@ -1009,6 +1009,7 @@ namespace FantasticSplines
     {
         Transform Transform { get; }
         Component Component { get; }
+        GameObject GameObject { get; }
         bool IsLoop { get; set; }
         int NodeCount { get; }
         SplineDistance Length { get; }
@@ -1029,8 +1030,6 @@ namespace FantasticSplines
         SplineResult GetResultClosestTo(Ray ray);
 
         // gizmo options
-        void DrawSegmentLengths();
-        void DrawNodeCoordinates( Space space );
         public Color color { get; set; }
         public bool zTest { get; set; }
         public float gizmoScale { get; set; }
