@@ -59,7 +59,7 @@ namespace FantasticSplines
         public void OnDrawHandles()
         {
             // enable tool when selecting a gizmo
-            if(!IsActive && Event.current.type == EventType.MouseDown)
+            if(!IsActive && Tools.current != Tool.Custom && Event.current.type == EventType.MouseDown)
             {
                 if (SplineEditor.DetectClickSelection(target as IEditableSpline, Event.current).Detected)
                 {
@@ -79,10 +79,20 @@ namespace FantasticSplines
             }
 
             OnGui(window);
-            OnTools(window);
+
+            SplineEditor.DoSceneViewDraw(target as SplineComponent, Event.current);
+            if(SplineEditor.ShouldDisableTool(target as SplineComponent, Event.current))
+            {
+                Event.current.Use();
+                ToolManager.RestorePreviousTool();
+                return;
+            }
+            SplineEditor.DoSceneViewInput(target as SplineComponent, Event.current);
 
             window.Repaint();
         }
+
+
 
         bool m_AnimatePlatforms = false;
         void OnGui(EditorWindow window)
@@ -123,18 +133,6 @@ namespace FantasticSplines
                     SplineEditor.StartAddPointMode(target as SplineComponent, SplineAddNodeMode.Append);
                 }
             }
-        }
-
-        void OnTools(EditorWindow window)
-        {
-            SplineEditor.DoSceneViewDraw(target as SplineComponent, Event.current);
-            if(SplineEditor.ShouldDisableTool(target as SplineComponent, Event.current))
-            {
-                Event.current.Use();
-                ToolManager.RestorePreviousTool();
-                return;
-            }
-            SplineEditor.DoSceneViewInput(target as SplineComponent, Event.current);
         }
     }
 }

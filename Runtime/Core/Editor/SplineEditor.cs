@@ -340,7 +340,7 @@ namespace FantasticSplines
                     "\n" +
                     "Multi Select: Hold Shift/" + CrossPlatformControlCommandKey() + " and select individually\n" +
                     "Drag Select: Hold Shift and drag\n" +
-                    "Deselect: Escape or right click\n" +
+                    "Deselect: Escape\n" +
                     "\n" +
                     "Vertical Move: Hold Shift\n" +
                     "Snap to Physics: Hold " + CrossPlatformControlCommandKey() + " + Shift\n" +
