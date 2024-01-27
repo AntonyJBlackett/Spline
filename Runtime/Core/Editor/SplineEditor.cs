@@ -1913,24 +1913,18 @@ namespace FantasticSplines
                     }
                     newNode.LocalOutControlPoint = relativeControlPoint; // this sets control 1 as well as it's mirrored
 
-                    // addNodeMode == SplineAddNodeMode.Append
                     SplineNode node1 = spline.GetNode( nodeCount - 1 );
-                    Vector3 newNodeDirection = newNode.position - node1.position;
-                    node1.LocalOutControlPoint = newNodeDirection.normalized * 0.1f * newNodeDirection.magnitude;
                     SplineNode node2 = newNode;
                     if( addNodeMode == SplineAddNodeMode.Prepend )
                     {
                         node1 = newNode;
                         node2 = spline.GetNode( 0 );
-                        newNodeDirection = newNode.position - node2.position;
-                        node2.LocalInControlPoint = newNodeDirection.normalized * 0.1f * newNodeDirection.magnitude;
                         newNode.automaticTangentLength = node2.automaticTangentLength;
                     }
                     Bezier3 addSegment = new Bezier3( node1, node2 );
                     Bezier3 projectedAddSegment = Bezier3.ProjectToPlane( addSegment, planePosition, gridUp );
                     Handles.DrawBezier( projectedAddSegment.A, projectedAddSegment.D, projectedAddSegment.B, projectedAddSegment.C, Color.grey, null, 1 );
                     Handles.DrawBezier( addSegment.A, addSegment.D, addSegment.B, addSegment.C, Color.yellow, null, 1 );
-
 
                     if( spline.IsLoop )
                     {
