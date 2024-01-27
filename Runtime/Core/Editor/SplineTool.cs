@@ -43,7 +43,6 @@ namespace FantasticSplines
         {
             base.OnActivated();
             SplineEditor.ResetEditMode();
-            SceneView.lastActiveSceneView.ShowNotification(new GUIContent("Spline Tool Activated"), .3f);
         }
 
         // Called before the active tool is changed, or destroyed. The exception to this rule is if you have manually
@@ -51,7 +50,6 @@ namespace FantasticSplines
         public override void OnWillBeDeactivated()
         {
             SplineEditor.ResetEditMode();
-            SceneView.lastActiveSceneView.ShowNotification(new GUIContent("Spline Tool Deactivated"), .3f);
         }
 
         bool IsActive => ToolManager.IsActiveTool(this);
@@ -120,17 +118,28 @@ namespace FantasticSplines
         {
             using(new GUILayout.HorizontalScope(EditorStyles.helpBox))
             {
+                var spline = target as SplineComponent;
+
                 if(GUILayout.Button("Prepend"))
                 {
-                    SplineEditor.StartAddPointMode(target as SplineComponent, SplineAddNodeMode.Prepend);
+                    SplineEditor.StartAddPointMode(spline, SplineAddNodeMode.Prepend);
                 }
                 if(GUILayout.Button("Insert"))
                 {
-                    SplineEditor.StartAddPointMode(target as SplineComponent, SplineAddNodeMode.Insert);
+                    SplineEditor.StartAddPointMode(spline, SplineAddNodeMode.Insert);
                 }
                 if(GUILayout.Button("Append"))
                 {
-                    SplineEditor.StartAddPointMode(target as SplineComponent, SplineAddNodeMode.Append);
+                    SplineEditor.StartAddPointMode(spline, SplineAddNodeMode.Append);
+                }
+                GUILayout.Space(10);
+                if(GUILayout.Button(spline.IsLoop ? "Looped" : "Unlooped"))
+                {
+                    spline.IsLoop = !spline.IsLoop;
+                }
+                if(GUILayout.Button("Reverse"))
+                {
+                    SplineEditorTools.Reverse(spline);
                 }
             }
         }
