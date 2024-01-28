@@ -44,11 +44,6 @@ namespace FantasticSplines
     [DisallowMultipleComponent]
     public class KeyframedSplineParameter<T> : KeyframedSplineParameterBase, ISplineParameter<T> where T : new()
     {
-
-#if UNITY_EDITOR
-        // The tool type used to edit this KeyframedSplineParameter<T>
-        protected virtual System.Type GetToolType() { Debug.LogError( "You must override GetToolType() and supply the correct tool type." ); return typeof( SplineParameterKeyframe<T> ); }
-#endif
         [Tooltip( "Names the tool in the scene view toolbar. Can be used to differentiate components in scripts." )]
         public string parameterName = "Spline Parameter";
         // Can be used to differentiate components in scripts
@@ -84,6 +79,9 @@ namespace FantasticSplines
         [Header( "Interpolation" )]
         [Tooltip( "Defines how values are interpolated between keyframes." )]
         public KeyframeInterpolationModes keyframeInterpolationMode = KeyframeInterpolationModes.Linear;
+
+        [Header("Visualisation")]
+        public bool enableVisualisation = true;
 
 
         // A function that when set is used to override the default interpolator.
@@ -198,17 +196,6 @@ namespace FantasticSplines
         {
             return new SplineParameterKeyframe<T>( value, location, inTangent, outTangent );
         }
-
-#if UNITY_EDITOR
-        // Returns true if the the editor for this KeyframedSplineParameter<T> is active.
-        bool ToolActive
-        {
-            get
-            {
-                return Selection.activeObject == gameObject && ToolManager.activeToolType == GetToolType();
-            }
-        }
-#endif
 
         // Transforms a local space keyframe into world space.
         public virtual SplineParameterKeyframe<T> TransformKeyframe( SplineParameterKeyframe<T> keyframe )
@@ -577,95 +564,5 @@ namespace FantasticSplines
             }
             onSplineChanged?.Invoke();
         }
-
-#if UNITY_EDITOR
-        protected virtual void DrawInterpolatedGizmos() { }
-
-        // Draws generic keyframe gizmos
-        // override this to draw completely custom gizmos
-        protected void OnDrawGizmosSelected()
-        {
-            DrawInterpolatedGizmos();
-
-            if( !enableKeyframeHandles )
-            {
-                return;
-            }
-
-            if( spline == null )
-            {
-                return;
-            }
-
-            Handles.zTest = spline.zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-            DrawKeyframeGizmos();
-        }
-
-        void OnDrawGizmos()
-        {
-            if( !enableKeyframeHandles )
-            {
-                return;
-            }
-
-            if( spline == null )
-            {
-                return;
-            }
-
-            if( !alwaysDrawGizmos )
-            {
-                return;
-            }
-
-            Handles.zTest = spline.zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
-            DrawKeyframeHandles();
-        }
-
-        // Draws generic keyframe gizmos
-        protected void DrawKeyframeHandles()
-        {
-            var keys = Keyframes;
-            for( int i = 0; i < keys.Count; ++i )
-            {
-                DrawKeyframeHandle( keys[i] );
-            }
-        }
-
-        // Draws generic keyframe gizmos
-        protected void DrawKeyframeGizmos( )
-        {
-            var keys = Keyframes;
-            for( int i = 0; i < keys.Count; ++i )
-            {
-                DrawKeyframeGizmo( keys[i] );
-            }
-        }
-
-        // Draws a generic keyframe gizmo
-        protected void DrawKeyframeGizmo( SplineParameterKeyframe<T> key )
-        {
-            DrawKeyframeValueGizmo( key );
-            DrawKeyframeHandle( key );
-        }
-
-        void DrawKeyframeHandle( SplineParameterKeyframe<T> key )
-        {
-            // default keyframe gizmos
-            // keyframe colour, same as the animator window
-            float handleSize = KeyframedSplineParameterTool<Vector3>.GetHandleSize( key.location.position ) * spline.gizmoScale;
-            using( new Handles.DrawingScope( ToolActive ? KeyframedSplineParameterTool<Vector3>.ActiveColor : KeyframedSplineParameterTool<Vector3>.InactiveColor ) )
-            {
-                KeyframedSplineParameterTool<Vector3>.KeyframeHandleCap( 0, key.location.position, Quaternion.identity, handleSize, EventType.Repaint );
-            }
-        }
-
-        // Draws custom gizmos for a keyframe
-        // override this to draw completely custom gizmos for data on keys while still using default key gizmos
-        protected virtual void DrawKeyframeValueGizmo( SplineParameterKeyframe<T> key )
-        {
-            // override me to draw special gizmos for data
-        }
-#endif
     }
 }

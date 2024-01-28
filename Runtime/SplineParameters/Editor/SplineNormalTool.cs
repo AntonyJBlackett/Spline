@@ -1,5 +1,10 @@
 using System;
 using UnityEngine;
+using System.Collections.Generic;
+using static UnityEditor.FilePathAttribute;
+
+
+
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.EditorTools;
@@ -9,12 +14,6 @@ namespace FantasticSplines
 {
     // Tagging a class with the EditorTool attribute and no target type registers a global tool. Global tools are valid for any selection, and are accessible through the top left toolbar in the editor.
 #if UNITY_EDITOR
-
-    [CustomEditor( typeof( SplineNormal ) )]
-    public class SplineNormalEditor : KeyframedSplineParameterEditor
-    {
-    }
-
 
     [EditorTool( "Spline Normal Tool", typeof( SplineNormal ) )]
     class SplineNormalTool : KeyframedSplineParameterTool<Normal>
@@ -48,7 +47,7 @@ namespace FantasticSplines
                         Vector3 normal = SplineNormal.GetNormal( keys[i] );
 
                         Vector3 discNormal = tangent.normalized;
-                        float discRadius = SplineNormal.GetNormalGizmoScale() * GetHandleSize( position ) * 10;
+                        float discRadius = NORMAL_GIZMO_SCALE * GetHandleSize( position ) * 10;
 
                         Quaternion normalRotation = Quaternion.LookRotation( normal, tangent.normalized );
                         Quaternion changedRotation = Handles.Disc( normalRotation, position, discNormal, discRadius, false, 0 );
@@ -79,7 +78,7 @@ namespace FantasticSplines
 
             if( keys.Count > 0 )
             {
-                float handleSize = SplineHandleUtility.GetNodeHandleSize( keys[0].location.position );
+                float handleSize = SplineHandleUtility.GetHandleSize( keys[0].location.position );
 
                 for( int i = 0; i < keys.Count; ++i )
                 {
@@ -115,7 +114,7 @@ namespace FantasticSplines
                     if( guiRect.Contains( Event.current.mousePosition ) )
                     {
                         Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
-                        Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, HandleUtility.GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
+                        Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
                     }
                 }
             }
@@ -130,6 +129,48 @@ namespace FantasticSplines
             return keepActive;
         }
         #endregion
+
+        const float NORMAL_GIZMO_SCALE = 0.5f;
+
+        protected override void DrawKeyframeValueGizmo(SplineParameterKeyframe<Normal> keyframe)
+        {
+            Vector3 worldPosition = keyframe.location.position;
+            Vector3 normal = SplineNormal.GetNormalAtSplineResult(keyframe.location);
+
+            Handles.color = Color.green;
+            float gizmosScale = NORMAL_GIZMO_SCALE;
+
+            float lineLength = 13 * GetHandleSize(worldPosition);
+            float lineThickness = 2;
+            Handles.DrawLine(worldPosition, worldPosition + normal * NORMAL_GIZMO_SCALE * lineLength, lineThickness * gizmosScale);
+            Handles.ConeHandleCap(0, worldPosition + normal * NORMAL_GIZMO_SCALE * lineLength, Quaternion.LookRotation(normal), GetHandleSize(worldPosition) * gizmosScale * lineThickness, EventType.Repaint);
+        }
+
+        protected override void DrawInterpolatedGizmos()
+        {
+            Handles.color = Color.green;
+
+            var spline = Target.spline;
+            var distance = SplineDistance.Zero;
+            var length = spline.Length;
+            var step = 1;
+            List<Vector3> points = new List<Vector3>();
+            while(distance < length)
+            {
+                SplineResult location = spline.GetResultAt(distance);
+                Vector3 normal = SplineNormal.GetNormalAtSplineResult(location);
+
+                points.Add(location.position);
+                points.Add(location.position + normal * NORMAL_GIZMO_SCALE);
+
+                distance += step;
+            }
+
+            Handles.DrawLines(points.ToArray());
+            SplineResult locationEnd = spline.GetResultAt(length);
+            Vector3 normalEnd = SplineNormal.GetNormalAtSplineResult(locationEnd);
+            Handles.DrawLine(locationEnd.position, locationEnd.position + normalEnd * NORMAL_GIZMO_SCALE);
+        }
     }
 #endif
 }

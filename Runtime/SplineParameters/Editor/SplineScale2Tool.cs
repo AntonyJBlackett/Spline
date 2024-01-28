@@ -1,5 +1,6 @@
 ﻿using System;
 using UnityEngine;
+
 #if UNITY_EDITOR
 using UnityEditor;
 using UnityEditor.EditorTools;
@@ -9,11 +10,6 @@ namespace FantasticSplines
 {
     // Tagging a class with the EditorTool attribute and no target type registers a global tool. Global tools are valid for any selection, and are accessible through the top left toolbar in the editor.
 #if UNITY_EDITOR
-
-    [CustomEditor( typeof( SplineScale2 ) )]
-    public class SplineScale2Editor : KeyframedSplineParameterEditor
-    {
-    }
 
     [EditorTool("Spline Scale2 Tool", typeof( SplineScale2 ) )]
     class SplineScale2Tool : KeyframedSplineParameterTool<Vector2>
@@ -66,11 +62,11 @@ namespace FantasticSplines
 
                         Vector3 xDirection = rotation * Vector3.right * scale.x * 0.5f;
                         Vector3 xScaleHandle = position + xDirection;
-                        Vector3 newxScaleHandle = Handles.Slider( xScaleHandle, xDirection, SplineScale2.spline.gizmoScale * 0.1f, ScaleCubeCap, 0 );
+                        Vector3 newxScaleHandle = Handles.Slider( xScaleHandle, xDirection, 0.1f, ScaleCubeCap, 0 );
 
                         Vector3 yDirection = rotation * Vector3.up * scale.y * 0.5f;
                         Vector3 yScaleHandle = position + yDirection;
-                        Vector3 newyScaleHandle = Handles.Slider( yScaleHandle, yDirection, SplineScale2.spline.gizmoScale * 0.1f, ScaleCubeCap, 0 );
+                        Vector3 newyScaleHandle = Handles.Slider( yScaleHandle, yDirection, 0.1f, ScaleCubeCap, 0 );
 
 
                         if( EditorGUI.EndChangeCheck() )
@@ -86,6 +82,38 @@ namespace FantasticSplines
                 }
             }
             return keepActive;
+        }
+
+        private void DrawGizmos(Vector3 position, Quaternion rotation, Vector2 scale)
+        {
+            Vector3 size = scale;
+            Matrix4x4 visualMatrix = Matrix4x4.TRS(position, rotation, Vector3.one);
+            Gizmos.matrix = visualMatrix;
+            Gizmos.DrawWireCube(Vector3.zero, size);
+
+        }
+
+        protected override void DrawInterpolatedGizmos()
+        {
+            Gizmos.color = Color.white;
+            var spline = Target.spline;
+
+            var distance = SplineDistance.Zero;
+            var length = spline.Length;
+            var step = length / 50f;
+            while(distance < length)
+            {
+                SplineResult location = spline.GetResultAt(distance);
+                Gizmos.color = Color.white;
+
+                Vector2 scale = Target.GetValueAt(location.distance, Target.GetDefaultKeyframeValue());
+                DrawGizmos(location.position, Quaternion.LookRotation(location.tangent, spline.transform.up), scale);
+                distance += step;
+            }
+
+            SplineResult locationEnd = spline.GetResultAt(length);
+            Vector2 scaleEnd = Target.GetValueAt(locationEnd.distance, Target.GetDefaultKeyframeValue());
+            DrawGizmos(locationEnd.position, Quaternion.LookRotation(locationEnd.tangent, spline.transform.up), scaleEnd);
         }
 
         #endregion

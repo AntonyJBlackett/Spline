@@ -254,19 +254,19 @@ namespace FantasticSplines
     {
         public float value;
 
-        public SplineDistance( float t )
+        public SplineDistance( float d )
         {
-            value = t;
+            value = d;
         }
 
-        public static explicit operator float( SplineDistance t )
+        public static explicit operator float( SplineDistance d )
         {
-            return t.value;
+            return d.value;
         }
 
-        public static explicit operator SplineDistance( float t )
+        public static explicit operator SplineDistance( float d )
         {
-            return new SplineDistance( t );
+            return new SplineDistance( d );
         }
 
         public override string ToString()
@@ -1012,6 +1012,7 @@ namespace FantasticSplines
         GameObject GameObject { get; }
         bool IsLoop { get; set; }
         int NodeCount { get; }
+        int SegmentCount { get; }
         SplineDistance Length { get; }
 
         int LoopIndex( int index );
@@ -1032,7 +1033,6 @@ namespace FantasticSplines
         // gizmo options
         public Color color { get; set; }
         public bool zTest { get; set; }
-        public float gizmoScale { get; set; }
         public bool alwaysDraw { get; set; }
         public bool showDefaultNormals { get; set; }
     }

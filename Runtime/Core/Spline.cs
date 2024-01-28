@@ -1091,7 +1091,7 @@ namespace FantasticSplines
             return nodeResult;
         }
 
-        public void OnDrawGizmos( Color color, float gizmoScale )
+        public void OnDrawGizmos( Color color )
         {
 #if UNITY_EDITOR
             if( NodeCount <= 0 )
@@ -1106,39 +1106,13 @@ namespace FantasticSplines
                 Handles.DrawBezier( bezier.start, bezier.end, bezier.B, bezier.C, color, null, 3f );
             }
 
-            float size = SplineHandleUtility.GetNodeHandleSize( nodes[0].position );
             // this stops selection of the spline when we're doing other things.
             //if( Selection.activeObject == null )
             {
                 Gizmos.color = Color.white;
                 for( int i = 0; i < NodeCount; ++i )
                 {
-                    Gizmos.DrawSphere( nodes[i].position, size * 0.5f * gizmoScale );
-                }
-            }
-#endif
-        }
-
-        public void DrawDirecitonIndicators( Color color, float gizmoScale )
-        {
-#if UNITY_EDITOR
-            if( NodeCount <= 0 )
-            {
-                return;
-            }
-            using( new Handles.DrawingScope( color ) )
-            {
-                Handles.color = color;
-
-                float arrowSize = SplineHandleUtility.GetNodeHandleSize( nodes[0].position );
-                var result = GetResultAtSegment( 0, new SegmentPercent(0.5f) );
-
-                Handles.ConeHandleCap( 0, result.position + result.tangent.normalized * arrowSize, Quaternion.LookRotation( result.tangent, Vector3.up ), arrowSize * gizmoScale, EventType.Repaint );
-
-                if( SegmentCount >= 2 )
-                {
-                    result = GetResultAtSegment( SegmentCount / 2, new SegmentPercent( 0.5f ) );
-                    Handles.ConeHandleCap( 0, result.position + result.tangent.normalized * arrowSize, Quaternion.LookRotation( result.tangent, Vector3.up ), arrowSize * gizmoScale, EventType.Repaint );
+                    Gizmos.DrawSphere( nodes[i].position, SplineHandleUtility.GetGizmoSize(nodes[i].position));
                 }
             }
 #endif

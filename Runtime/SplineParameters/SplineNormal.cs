@@ -23,9 +23,6 @@ public struct Normal
 // Spline Keyframe track that stores local spline space directions that represent the normal (up direction) of the spline
 public class SplineNormal : KeyframedSplineParameter<Normal>
 {
-    [Header( "Gizmos" )]
-    public bool enableVisualisation = true;
-
     [Header("Normal Generation")]
     public bool automaticNormals = false;
     [Range( 0, 1 )]
@@ -33,10 +30,6 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
     public SplineDistance bankingBlendStep = new SplineDistance(1.0f);
 
     #region SplineDataTrack specialisation
-#if UNITY_EDITOR
-    protected override System.Type GetToolType() { return typeof( SplineNormalTool ); }
-#endif
-
     public SplineNormal()
     {
         CustomInterpolator = SlerpNormals;
@@ -125,55 +118,5 @@ public class SplineNormal : KeyframedSplineParameter<Normal>
 
         return normal;
     }
-
-    #endregion
-    #region Gizmos
-
-    public float GetNormalGizmoScale()
-    {
-        return spline.gizmoScale * 0.5f;
-    }
-
-#if UNITY_EDITOR
-    protected override void DrawKeyframeValueGizmo( SplineParameterKeyframe<Normal> keyframe )
-    {
-        Vector3 worldPosition = keyframe.location.position;
-        Vector3 normal = GetNormalAtSplineResult( keyframe.location );
-
-        Handles.color = Color.green;
-        float gizmosScale = GetNormalGizmoScale();
-
-        float lineLength = 13 * SplineNormalTool.GetHandleSize( worldPosition );
-        float lineThickness = 2;
-        Handles.DrawLine( worldPosition, worldPosition + normal * gizmosScale * lineLength, lineThickness * gizmosScale );
-        Handles.ConeHandleCap( 0, worldPosition + normal * gizmosScale * lineLength, Quaternion.LookRotation( normal ), SplineNormalTool.GetHandleSize( worldPosition ) * gizmosScale * lineThickness, EventType.Repaint );
-    }
-
-    protected override void DrawInterpolatedGizmos()
-    {
-        if( !enableVisualisation )
-        {
-            return;
-        }
-
-        Gizmos.color = Color.green;
-
-        float gizmosScale = GetNormalGizmoScale();
-        var distance = SplineDistance.Zero;
-        var length = spline.Length;
-        var step = length / 50f;
-        while( distance < length )
-        {
-            SplineResult location = spline.GetResultAt( distance );
-            Vector3 normal = GetNormalAtSplineResult( location );
-            Gizmos.DrawLine( location.position, location.position + normal* gizmosScale );
-            distance += step;
-        }
-
-        SplineResult locationEnd = spline.GetResultAt( length );
-        Vector3 normalEnd = GetNormalAtSplineResult( locationEnd ) * spline.gizmoScale;
-        Gizmos.DrawLine( locationEnd.position, locationEnd.position + normalEnd* gizmosScale );
-    }
-#endif
     #endregion
 }

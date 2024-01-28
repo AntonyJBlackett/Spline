@@ -13,7 +13,7 @@ namespace FantasticSplines
     {
     }
 
-    class KeyframedSplineParameterTool<T> : SplineKeyFrameTool
+    class KeyframedSplineParameterTool<T> : SplineKeyFrameTool, IDrawSelectedHandles
         where T : new()
     {
         #region Tool properties and initialisation
@@ -134,7 +134,7 @@ namespace FantasticSplines
 
         public static float GetHandleSize( Vector3 position )
         {
-            return HandleUtility.GetHandleSize( position ) * 0.1f;
+            return SplineHandleUtility.GetHandleSize( position );
         }
 
         void DoAddKeyframe()
@@ -144,9 +144,9 @@ namespace FantasticSplines
                 Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
                 SplineResult result = Target.spline.GetResultClosestTo( ray );
 
-                float size = GetHandleSize( result.position ) * Target.spline.gizmoScale;
+                float size = GetHandleSize( result.position );
                 bool click = Handles.Button( result.position, Quaternion.identity, size, size, KeyframeHandleCap );
-                click = click || Handles.Button( ray.origin, Quaternion.identity, 0, GetHandleSize( ray.origin ) * Target.spline.gizmoScale, KeyframeHandleCap );
+                click = click || Handles.Button( ray.origin, Quaternion.identity, 0, GetHandleSize( ray.origin ) , KeyframeHandleCap );
 
                 if( click )
                 {
@@ -165,7 +165,7 @@ namespace FantasticSplines
                 var keys = Target.Keyframes;
                 for( int i = 0; i < keys.Count; ++i )
                 {
-                    float size = GetHandleSize( keys[i].location.position ) * Target.spline.gizmoScale;
+                    float size = GetHandleSize( keys[i].location.position );
                     bool click = Handles.Button( keys[i].location.position, Quaternion.identity, size, size, KeyframeHandleCap );
                     if( click )
                     {
@@ -225,9 +225,20 @@ namespace FantasticSplines
                     {
                         mouseOverKeyframe = true;
                     }
+                    DrawKeyframeValueGizmo(keys[i]);
                 }
             }
             return mouseOverKeyframe;
+        }
+
+        protected virtual void DrawKeyframeValueGizmo(SplineParameterKeyframe<T> key)
+        {
+            // override me to draw special gizmos for visualising data
+        }
+
+        protected virtual void DrawInterpolatedGizmos()
+        {
+            // override me to draw special gizmos for visualising data
         }
 
         bool DoKeyframeMoveHandle( int keyFrameIndex, SplineParameterKeyframe<T> key )
@@ -236,11 +247,11 @@ namespace FantasticSplines
 
             Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
 
-            float handleSize = GetHandleSize( key.location.position ) * Target.spline.gizmoScale;
+            float handleSize = GetHandleSize( key.location.position );
             var handleOffset = SplineDistance.Zero;
             SplineResult resultAfter = Target.spline.GetResultAt( Target.GetKeyframe( keyFrameIndex ).location.distance + handleOffset );
 
-            float minHandleLength = handleSize * 1.5f * Target.spline.gizmoScale;
+            float minHandleLength = handleSize * 1.5f;
             Vector3 outHandleOrigin = resultAfter.position + resultAfter.tangent.normalized * minHandleLength;
             Vector3 inHandleOrigin = resultAfter.position - resultAfter.tangent.normalized * minHandleLength;
             Vector3 outHandlePosition = outHandleOrigin + resultAfter.tangent.normalized * key.outTangent;
@@ -256,7 +267,7 @@ namespace FantasticSplines
 
             EditorGUI.BeginChangeCheck();
             // free move handle is used to check drag input. We'll recalculate the position ourselves with the mouse position
-            var fmh_228_59_637860627013150770 = Quaternion.LookRotation( resultAfter.tangent ); var fmh_259_143_638419121573599779 = Quaternion.identity; Handles.FreeMoveHandle( resultAfter.position, handleSize, Vector3.zero, KeyframeHandleCap );
+            Handles.FreeMoveHandle( resultAfter.position, handleSize, Vector3.zero, KeyframeHandleCap );
             if( EditorGUI.EndChangeCheck() )
             {
                 interacted = true;
@@ -292,6 +303,33 @@ namespace FantasticSplines
             }
 
             return interacted;
+        }
+
+        bool IsActive => ToolManager.IsActiveTool(this);
+
+        public void OnDrawHandles()
+        {
+            var keys = Target.Keyframes;
+            foreach(var key in keys)
+            {
+                float handleSize = GetHandleSize(key.location.position);
+                using(new Handles.DrawingScope(KeyframedSplineParameterTool<Vector3>.InactiveColor))
+                {
+                    KeyframedSplineParameterTool<Vector3>.KeyframeHandleCap(0, key.location.position, Quaternion.identity, handleSize, EventType.Repaint);
+                }
+            }
+
+            // enable tool when selecting a gizmo
+            if(DoSplineKeyframeHandle())
+            {
+                ToolManager.SetActiveTool(this);
+                Event.current.Use();
+            }
+
+            if( Target.enableVisualisation )
+            {
+                DrawInterpolatedGizmos();
+            }
         }
 
         // This is called for each window that your tool is active in. Put the functionality of your tool here.
@@ -339,7 +377,7 @@ namespace FantasticSplines
 
             if( keys.Count > 0 )
             {
-                float handleSize = SplineHandleUtility.GetNodeHandleSize( keys[0].location.position );
+                float handleSize = GetHandleSize( keys[0].location.position );
 
                 for( int i = 0; i < keys.Count; ++i )
                 {
@@ -371,7 +409,7 @@ namespace FantasticSplines
                     if( guiRect.Contains( Event.current.mousePosition ) )
                     {
                         Ray ray = HandleUtility.GUIPointToWorldRay( Event.current.mousePosition );
-                        Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, HandleUtility.GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
+                        Handles.Button( ray.origin + ray.direction, Camera.current.transform.rotation, 0, GetHandleSize( ray.origin + ray.direction ), Handles.DotHandleCap );
                     }
                 }
             }

@@ -444,7 +444,6 @@ namespace FantasticSplines
         // instance specific debug draw options
         public Color color { get; set; } = Color.white;
         public bool zTest { get; set; } = false;
-        public float gizmoScale { get; set; } = 1;
         public bool alwaysDraw { get; set; } = true;
         public bool showDefaultNormals { get; set; } = false;
 
@@ -454,17 +453,17 @@ namespace FantasticSplines
             Handles.zTest = zTest ? UnityEngine.Rendering.CompareFunction.LessEqual : UnityEngine.Rendering.CompareFunction.Always;
             Gizmos.matrix = transform.localToWorldMatrix;
             Handles.matrix = transform.localToWorldMatrix;
+
             if( Selection.activeObject != gameObject )
             {
                 if( alwaysDraw )
                 {
-                    localSpline.OnDrawGizmos( color * 0.75f, gizmoScale );
+                    localSpline.OnDrawGizmos( color * 0.75f );
                 }
             }
             else if( Selection.activeObject == gameObject )
             {
-                localSpline.OnDrawGizmos(color, gizmoScale);
-                localSpline.DrawDirecitonIndicators( color, gizmoScale );
+                localSpline.OnDrawGizmos(color);
                 DrawNormals();
             }
 
@@ -518,7 +517,7 @@ namespace FantasticSplines
                 SplineNode node = localSpline.GetNode(i);
                 Vector3 displayPosition = space == Space.World ? TransformPoint( node.position ) : node.position;
                 Vector3 guiPosition = TransformPoint( node.position );
-                Vector3 offset = Vector3.right * SplineHandleUtility.GetNodeHandleSize( guiPosition ) * 0.5f;
+                Vector3 offset = Vector3.right * SplineHandleUtility.GetHandleSize( guiPosition ) * 0.5f;
                 Handles.Label( guiPosition + offset, string.Format( "{0}{1}", space == Space.World ? "world" : "local", displayPosition.ToString( "N1" ) ) );
             }
 #endif

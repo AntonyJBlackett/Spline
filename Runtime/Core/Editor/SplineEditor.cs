@@ -1,6 +1,8 @@
 ﻿using System.Collections.Generic;
 using UnityEngine;
 using System;
+using UnityEngine.UIElements;
+
 
 
 #if UNITY_EDITOR
@@ -13,7 +15,6 @@ using UnityEditor;
 
 namespace FantasticSplines
 {
-
 
 #if UNITY_EDITOR
     public enum SplineEditMode
@@ -30,7 +31,7 @@ namespace FantasticSplines
         Insert
     }
 
-    public enum HandleCapSizeMode
+    public enum GizmoSizeMode
     {
         WorldSpace,
         ScreenSpace
@@ -61,24 +62,49 @@ namespace FantasticSplines
             set => EditorPrefs.SetFloat( "FantasticSplinesHandleCapScale", value );
         }
 
-        public static HandleCapSizeMode HandleCapSizeMode
+        public static GizmoSizeMode HandleCapSizeMode
         {
-            get => (HandleCapSizeMode)EditorPrefs.GetInt( "FantasticSplinesHandleCapSizeMode", (int)HandleCapSizeMode.ScreenSpace );
+            get => (GizmoSizeMode)EditorPrefs.GetInt( "FantasticSplinesHandleCapSizeMode", (int)GizmoSizeMode.ScreenSpace );
             set => EditorPrefs.SetInt( "FantasticSplinesHandleCapSizeMode", (int)value );
         }
 
-        public const float WorldSpaceHandleCapSize = 0.15f;
-        public const float ScreenSpaceHandleCapSize = 0.15f;
-        public static float GetNodeHandleSize( Vector3 position )
+        public const float WORLD_SPACE_SCALE = 0.3f;
+        public const float SCREEN_SPACE_SCALE = 0.125f;
+
+        public static float GetGizmoSize(Vector3 position)
+        {
+            switch(HandleCapSizeMode)
+            {
+                case GizmoSizeMode.WorldSpace:
+                return WORLD_SPACE_SCALE * HandleCapScale * 0.5f;
+                case GizmoSizeMode.ScreenSpace:
+                return HandleUtility.GetHandleSize(position) * SCREEN_SPACE_SCALE * HandleCapScale * 0.5f;
+            }
+            return SCREEN_SPACE_SCALE * HandleCapScale * 0.5f;
+        }
+
+        public static float GetHandleSize( Vector3 position )
         {
             switch( HandleCapSizeMode )
             {
-                case HandleCapSizeMode.WorldSpace:
-                    return WorldSpaceHandleCapSize * HandleCapScale;
-                case HandleCapSizeMode.ScreenSpace:
-                    return HandleUtility.GetHandleSize( position ) * ScreenSpaceHandleCapSize * HandleCapScale;
+                case GizmoSizeMode.WorldSpace:
+                    return WORLD_SPACE_SCALE * HandleCapScale;
+                case GizmoSizeMode.ScreenSpace:
+                    return HandleUtility.GetHandleSize( position ) * SCREEN_SPACE_SCALE * HandleCapScale;
             }
-            return ScreenSpaceHandleCapSize * HandleCapScale;
+            return SCREEN_SPACE_SCALE * HandleCapScale;
+        }
+
+        public static float GetDiscSize(Vector3 position)
+        {
+            switch(HandleCapSizeMode)
+            {
+                case GizmoSizeMode.WorldSpace:
+                return WORLD_SPACE_SCALE * HandleCapScale * 0.5f;
+                case GizmoSizeMode.ScreenSpace:
+                return SCREEN_SPACE_SCALE * HandleUtility.GetHandleSize(position) * HandleCapScale * 0.5f;
+            }
+            return SCREEN_SPACE_SCALE * HandleCapScale * 0.5f;
         }
     }
 
@@ -99,27 +125,8 @@ namespace FantasticSplines
         static Vector3 controlPlanePosition;
         static Vector3 controlPlaneOffset;
 
-        const float diskRadiusScalar = 0.5f;
-        const float controlPointRadiusScalar = 0.75f;
-        static float GetNodeHandleSize( Vector3 position )
-        {
-            return SplineHandleUtility.GetNodeHandleSize( position );
-        }
-
-        static float GetNodeDiscSize( Vector3 position )
-        {
-            return SplineHandleUtility.GetNodeHandleSize( position ) * 0.5f * diskRadiusScalar;
-        }
-
-        static float GetControlPointHandleSize( Vector3 position )
-        {
-            return SplineHandleUtility.GetNodeHandleSize( position ) * controlPointRadiusScalar;
-        }
-
-        static float GetControlDiscSize( Vector3 position )
-        {
-            return SplineHandleUtility.GetNodeHandleSize( position ) * 0.5f * controlPointRadiusScalar * diskRadiusScalar;
-        }
+        const float CONTROL_HANDLE_SCALE = 0.75f;
+        const float DIRECTION_GIZMOL_SCALE = 0.1f;
 
         static Bounds GetSelectionBounds(IEditableSpline spline)
         {
@@ -566,8 +573,7 @@ namespace FantasticSplines
 
                     GUILayout.BeginHorizontal();
                     SplineHandleUtility.HandleCapScale = EditorGUILayout.Slider( "Node Gizmo Size", SplineHandleUtility.HandleCapScale, 0.1f, 10 );
-                    spline.gizmoScale = SplineHandleUtility.HandleCapScale;
-                    SplineHandleUtility.HandleCapSizeMode = (HandleCapSizeMode)EditorGUILayout.EnumPopup( SplineHandleUtility.HandleCapSizeMode, GUILayout.Width(100) );
+                    SplineHandleUtility.HandleCapSizeMode = (GizmoSizeMode)EditorGUILayout.EnumPopup( SplineHandleUtility.HandleCapSizeMode, GUILayout.Width(100) );
                     GUILayout.EndHorizontal();
 
 
@@ -1005,6 +1011,8 @@ namespace FantasticSplines
             addNodeState = AddNodeState.NodePosition;
         }
 
+        static Vector3 HandelUp2D => -Camera.current.transform.forward;
+
         static void DrawSplineNodes(IEditableSpline spline)
         {
             List<int> sortedNodeIndicies = GetNodeIndiciesSelectedFirst( spline );
@@ -1015,8 +1023,10 @@ namespace FantasticSplines
                 return;
             }
 
+            var up = -Camera.current.transform.forward;
             SplineNode node = spline.GetNode( 0 );
-            float handleSize = SplineHandleUtility.GetNodeHandleSize( node.position );
+            float handleSize = SplineHandleUtility.GetHandleSize( node.position );
+            float diskSize = SplineHandleUtility.GetDiscSize(node.position);
 
             for( int sortedI = 0; sortedI < sortedNodeIndicies.Count; ++sortedI )
             {
@@ -1025,9 +1035,10 @@ namespace FantasticSplines
                 node = spline.GetNode( i );
                 Vector3 point = node.position;
 
-                if( SplineHandleUtility.HandleCapSizeMode == HandleCapSizeMode.ScreenSpace )
+                if( SplineHandleUtility.HandleCapSizeMode == GizmoSizeMode.ScreenSpace )
                 {
-                    handleSize = SplineHandleUtility.GetNodeHandleSize( node.position );
+                    handleSize = SplineHandleUtility.GetHandleSize(point);
+                    diskSize = SplineHandleUtility.GetDiscSize(point);
                 }
 
                 if (nodeSelection.Contains(i))
@@ -1038,31 +1049,7 @@ namespace FantasticSplines
                 {
                     Handles.color = Color.white;
                 }
-                Handles.SphereHandleCap( 0, point, spline.Transform.rotation, handleSize, EventType.Repaint );
-
-                SplineResult result = spline.GetResultAtNode( i );
-                Vector3 tangent = result.tangent;
-                if( tangent.sqrMagnitude == 0 )
-                {
-                    tangent = spline.Transform.forward;
-                }
-
-                if( i == 0 )
-                {
-                    // start node.
-                    using( new Handles.DrawingScope( Color.green ) )
-                    {
-                        Handles.ConeHandleCap( 0, point, Quaternion.LookRotation( tangent ), handleSize * 0.5f, EventType.Repaint );
-                    }
-                }
-                if( i == spline.NodeCount-1 )
-                {
-                    // start node.
-                    using( new Handles.DrawingScope( Color.grey ) )
-                    {
-                        Handles.ConeHandleCap( 0, point, Quaternion.LookRotation( tangent ), handleSize * 0.5f, EventType.Repaint );
-                    }
-                }
+                Handles.DrawSolidDisc(point, HandelUp2D, diskSize);
             }
             Handles.color = Color.white;
         }
@@ -1074,14 +1061,17 @@ namespace FantasticSplines
                 return;
             }
 
-            Matrix4x4 gridMatrix = GetSnapGridLocalToWorldMatrix( spline );
-            for( int i = 0; i < spline.NodeCount; ++i )
+            using( new Handles.DrawingScope( Color.gray ) )
             {
-                Vector3 point = spline.GetNode( i ).position;
+                Matrix4x4 gridMatrix = GetSnapGridLocalToWorldMatrix( spline );
+                for( int i = 0; i < spline.NodeCount; ++i )
+                {
+                    Vector3 point = spline.GetNode( i ).position;
 
-                Vector3 planePoint = MathsUtils.ProjectPointOnPlane( gridMatrix.MultiplyPoint( Vector3.zero ), gridMatrix.MultiplyVector( Vector3.up ).normalized, point );
+                    Vector3 planePoint = MathsUtils.ProjectPointOnPlane( gridMatrix.MultiplyPoint( Vector3.zero ), gridMatrix.MultiplyVector( Vector3.up ).normalized, point );
 
-                Handles.DrawDottedLine( planePoint, point, 2 );
+                    Handles.DrawDottedLine( planePoint, point, 2 );
+                }
             }
         }
 
@@ -1173,28 +1163,30 @@ namespace FantasticSplines
             }
 
             ValidateNodeSelection( spline );
-            Handles.color = Color.grey;
             Matrix4x4 gridMatrix = GetSnapGridLocalToWorldMatrix( spline );
             Vector3 gridUp = GetSnapGridUp( spline );
-            for( int i = 0; i < nodeSelection.Count; ++i )
+
+            using( new Handles.DrawingScope(Color.gray) )
             {
-                int index = nodeSelection[i];
-
-                Vector3 point = spline.GetNode( index ).position;
-
-                Vector3 planePoint = MathsUtils.ProjectPointOnPlane( gridMatrix.MultiplyPoint( Vector3.zero ), gridUp, point );
-                DrawWireDisk(spline, point, gridUp, GetNodeDiscSize( point ) * spline.gizmoScale, Camera.current.transform.position );
-                DrawWireDisk(spline, planePoint, gridUp, GetNodeDiscSize( planePoint ) * spline.gizmoScale, Camera.current.transform.position );
-
-                RaycastHit hitDown;
-                Ray down = new Ray( point, -gridUp );
-                if( Physics.Raycast( down, out hitDown ) )
+                for( int i = 0; i < nodeSelection.Count; ++i )
                 {
-                    DrawWireDisk(spline, hitDown.point, hitDown.normal, GetNodeDiscSize( hitDown.point ) * spline.gizmoScale, Camera.current.transform.position );
-                    Handles.DrawDottedLine( planePoint, hitDown.point, 2 );
+                    int index = nodeSelection[i];
+
+                    Vector3 point = spline.GetNode( index ).position;
+
+                    Vector3 planePoint = MathsUtils.ProjectPointOnPlane( gridMatrix.MultiplyPoint( Vector3.zero ), gridUp, point );
+                    DrawWireDisc(point, gridUp );
+                    DrawWireDisc(planePoint, gridUp );
+
+                    RaycastHit hitDown;
+                    Ray down = new Ray( point, -gridUp );
+                    if( Physics.Raycast( down, out hitDown ) )
+                    {
+                        DrawWireDisc(hitDown.point, hitDown.normal );
+                        Handles.DrawDottedLine( planePoint, hitDown.point, 2 );
+                    }
                 }
             }
-            Handles.color = Color.white;
         }
 
         static Color ControlPointEditColor => (Color.cyan + Color.grey + Color.grey) * 0.33f;
@@ -1211,23 +1203,44 @@ namespace FantasticSplines
                 return;
             }
 
-             Handles.color = nodeSelection.Contains(index) ? ControlPointEditColor : Color.grey;
-
-            Vector3 control1 = node.position + node.LocalInControlPoint;
-            Vector3 control2 = node.position + node.LocalOutControlPoint;
-
-            if( index > 0 || spline.IsLoop )
+            var color = nodeSelection.Contains(index) ? ControlPointEditColor : Color.grey;
+            using(new Handles.DrawingScope(color))
             {
-                Handles.SphereHandleCap( 0, control1, Quaternion.identity, GetControlPointHandleSize( control1 ), EventType.Repaint );
-                Handles.DrawLine( node.position, control1 );
-            }
+                Vector3 control1 = node.position + node.LocalInControlPoint;
+                Vector3 control2 = node.position + node.LocalOutControlPoint;
 
-            if( index < spline.NodeCount - 1 || spline.IsLoop )
-            {
-                Handles.SphereHandleCap( 0, control2, Quaternion.identity, GetControlPointHandleSize( control2 ), EventType.Repaint );
-                Handles.DrawLine( node.position, control2 );
+                if( index > 0 || spline.IsLoop )
+                {
+                    Handles.SphereHandleCap( 0, control1, Quaternion.identity, SplineHandleUtility.GetHandleSize( control1 ) * CONTROL_HANDLE_SCALE, EventType.Repaint );
+                    Handles.DrawLine( node.position, control1 );
+                }
+
+                if( index < spline.NodeCount - 1 || spline.IsLoop )
+                {
+                    Handles.SphereHandleCap( 0, control2, Quaternion.identity, SplineHandleUtility.GetHandleSize( control2 ) * CONTROL_HANDLE_SCALE, EventType.Repaint );
+                    Handles.DrawLine( node.position, control2 );
+                }
             }
-            Handles.color = Color.white;
+        }
+
+        public static void DrawDirecitonIndicators(IEditableSpline spline)
+        {
+            using(new Handles.DrawingScope(Color.gray))
+            {
+                float length = spline.Length.value;
+                int dots = 2 + (int)length / 3;
+                float inverseDots = 1f / dots;
+                float inverseLength = 1f / length;
+                Vector3 up = -Camera.current.transform.forward;
+                for(int i = 0; i < dots; ++i)
+                {
+                    float speed = Mathf.Min(1, length / 5 );
+                    var result = spline.GetResultAt(new SplineDistance((float)EditorApplication.timeSinceStartup * speed + length * inverseDots * i));
+                    float gizmoSize = SplineHandleUtility.GetHandleSize(result.position) * DIRECTION_GIZMOL_SCALE;
+                    Handles.DrawSolidDisc(result.position, up, gizmoSize);
+                }
+
+            }
         }
 
         static void DrawSplineSelectionNodeControlPoints( IEditableSpline spline, List<int> nodeIndicies )
@@ -1250,18 +1263,18 @@ namespace FantasticSplines
 
         static void DrawSpline(IEditableSpline spline)
         {
-            if( EditorActive ) DrawBezierPlaneProjectedSplineLines( spline );
-            if( EditorActive ) DrawSplinePlaneProjectionLines( spline );
+            DrawBezierPlaneProjectedSplineLines( spline );
+            DrawSplinePlaneProjectionLines( spline );
 
-            if( EditorActive ) DrawSplineSelectionDisks( spline );
+            DrawSplineSelectionDisks( spline );
             DrawBezierSplineLines( spline );
+            DrawDirecitonIndicators( spline );
 
-            if( EditorActive ) DrawSegmentLengths( spline );
-            if( EditorActive ) DrawNodeCoordinates( spline );
+            DrawSegmentLengths( spline );
+            DrawNodeCoordinates( spline );
             DrawSplineNodes( spline );
             
-            if( EditorActive ) DrawSplineSelectionNodeControlPoints( spline);
-            else DrawSplineSelectionNodeControlPoints(spline);
+            DrawSplineSelectionNodeControlPoints( spline );
         }
 
         static void DrawSegmentLengths(IEditableSpline spline)
@@ -1395,8 +1408,8 @@ namespace FantasticSplines
 
                 SplineNode node = spline.GetNode( index );
 
-                bool overControl1 = IsMouseOverPoint( node.InControlPoint, guiEvent.mousePosition, GetControlPointHandleSize( node.InControlPoint) );
-                bool overControl2 = IsMouseOverPoint( node.OutControlPoint, guiEvent.mousePosition, GetControlPointHandleSize( node.OutControlPoint ) );
+                bool overControl1 = IsMouseOverPoint( node.InControlPoint, guiEvent.mousePosition, SplineHandleUtility.GetHandleSize( node.InControlPoint) * CONTROL_HANDLE_SCALE );
+                bool overControl2 = IsMouseOverPoint( node.OutControlPoint, guiEvent.mousePosition, SplineHandleUtility.GetHandleSize( node.OutControlPoint) * CONTROL_HANDLE_SCALE);
 
                 bool control1Interactable = spline.IsLoop || index > 0;
                 bool control2Interactable = spline.IsLoop || index < spline.NodeCount - 1;
@@ -1419,7 +1432,7 @@ namespace FantasticSplines
                         return new DetectClickSelectionResult( index, MoveControlPointId.Control2 );
                     }
                 }
-                else if( IsMouseOverPoint( node.position, guiEvent.mousePosition, GetControlPointHandleSize( node.position ) ) )
+                else if( IsMouseOverPoint( node.position, guiEvent.mousePosition, SplineHandleUtility.GetHandleSize( node.position ) ) )
                 {
                     return new DetectClickSelectionResult( index, MoveControlPointId.None );
                 }
@@ -1540,17 +1553,17 @@ namespace FantasticSplines
                 for( int i = 0; i < spline.NodeCount; ++i )
                 {
                     SplineNode node = spline.GetNode( i );
-                    if( IsMouseOverPoint( node.position + node.LocalInControlPoint, guiEvent.mousePosition, GetControlPointHandleSize( node.position ) ) )
+                    if( IsMouseOverPoint( node.position + node.LocalInControlPoint, guiEvent.mousePosition, SplineHandleUtility.GetHandleSize( node.position ) * CONTROL_HANDLE_SCALE ) )
                     {
                         dragSelectActive = false;
                         break;
                     }
-                    if( IsMouseOverPoint( node.position + node.LocalOutControlPoint, guiEvent.mousePosition, GetControlPointHandleSize( node.position ) ) )
+                    if( IsMouseOverPoint( node.position + node.LocalOutControlPoint, guiEvent.mousePosition, SplineHandleUtility.GetHandleSize( node.position ) * CONTROL_HANDLE_SCALE) )
                     {
                         dragSelectActive = false;
                         break;
                     }
-                    if( IsMouseOverPoint( node.position, guiEvent.mousePosition, GetControlPointHandleSize( node.position ) ) )
+                    if( IsMouseOverPoint( node.position, guiEvent.mousePosition, SplineHandleUtility.GetHandleSize( node.position ) ) )
                     {
                         dragSelectActive = false;
                         break;
@@ -1712,39 +1725,48 @@ namespace FantasticSplines
 
         static void DrawNodeControlPointMovementGuides(IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2)
         {
-            DrawNodeControlPointMovementGuides( spline, point, control1, control2, ControlPointEditColor, Color.white );
+            DrawNodeControlPointMovementGuides( spline, point, control1, control2, ControlPointEditColor, Color.gray);
         }
 
         static void DrawNodeControlPointMovementGuides(IEditableSpline spline, Vector3 point, Vector3 control1, Vector3 control2, Color controlColour, Color controlPlaneColour)
         {
-            Camera camera = Camera.current;
             Vector3 gridUp = GetSnapGridUp( spline );
 
-            Vector3 controlPlane1 = MathsUtils.ProjectPointOnPlane( point, gridUp, control1 );
-            Vector3 controlPlane2 = MathsUtils.ProjectPointOnPlane( point, gridUp, control2 );
+            using( new Handles.DrawingScope(controlColour) )
+            {
+                using(new Handles.DrawingScope(controlColour * 0.7f))
+                {
+                    DrawSolidDisc(control1, HandelUp2D, CONTROL_HANDLE_SCALE);
+                    DrawSolidDisc(control2, HandelUp2D, CONTROL_HANDLE_SCALE);
+                }
+                DrawWireDisc(control1, HandelUp2D, CONTROL_HANDLE_SCALE);
+                DrawWireDisc(control2, HandelUp2D, CONTROL_HANDLE_SCALE);
+                //Handles.SphereHandleCap( 0, control1, Quaternion.identity, SplineHandleUtility.GetHandleSize( control1 ) * CONTROL_HANDLE_SCALE, EventType.Repaint );
+                //Handles.SphereHandleCap( 0, control2, Quaternion.identity, SplineHandleUtility.GetHandleSize( control2) * CONTROL_HANDLE_SCALE, EventType.Repaint );
 
-            Handles.color = controlColour;
-            // draw control placement GUI
-            Handles.SphereHandleCap( 0, control1, Quaternion.identity, GetControlPointHandleSize( control1 ), EventType.Repaint );
-            Handles.SphereHandleCap( 0, control2, Quaternion.identity, GetControlPointHandleSize( control2 ), EventType.Repaint );
+                //DrawWireDisc(control1, gridUp, CONTROL_HANDLE_SCALE );
+                //DrawWireDisc(control2, gridUp, CONTROL_HANDLE_SCALE);
 
-            DrawWireDisk(spline, control1, gridUp, GetControlDiscSize( control1 ), camera.transform.position );
-            DrawWireDisk(spline, control2, gridUp, GetControlDiscSize( control2 ), camera.transform.position );
+                Handles.DrawDottedLine( point, control1, 2 );
+                Handles.DrawDottedLine( point, control2, 2 );
+            }
 
-            Handles.DrawDottedLine( point, control1, 2 );
-            Handles.DrawDottedLine( point, control2, 2 );
+            using(new Handles.DrawingScope(controlPlaneColour))
+            {
+                Matrix4x4 gridMatrix = GetSnapGridLocalToWorldMatrix(spline);
+                Vector3 controlPlane1 = MathsUtils.ProjectPointOnPlane(gridMatrix.MultiplyPoint(Vector3.zero), gridUp, control1);
+                Vector3 controlPlane2 = MathsUtils.ProjectPointOnPlane(gridMatrix.MultiplyPoint(Vector3.zero), gridUp, control2);
+                Vector3 pointPlane = MathsUtils.ProjectPointOnPlane(gridMatrix.MultiplyPoint(Vector3.zero), gridUp, point);
 
-            Handles.color = controlPlaneColour;
-            DrawWireDisk(spline, controlPlane1, gridUp, GetControlDiscSize( controlPlane1 ), camera.transform.position );
-            DrawWireDisk(spline, controlPlane2, gridUp, GetControlDiscSize( controlPlane2 ), camera.transform.position );
+                DrawWireDisc(controlPlane1, gridUp, CONTROL_HANDLE_SCALE);
+                DrawWireDisc(controlPlane2, gridUp, CONTROL_HANDLE_SCALE);
 
-            Handles.DrawDottedLine( point, controlPlane1, 2 );
-            Handles.DrawDottedLine( point, controlPlane2, 2 );
+                Handles.DrawDottedLine(pointPlane, controlPlane1, 2 );
+                Handles.DrawDottedLine(pointPlane, controlPlane2, 2 );
 
-            Handles.DrawDottedLine( control1, controlPlane1, 2 );
-            Handles.DrawDottedLine( control2, controlPlane2, 2 );
-
-            Handles.color = Color.white;
+                Handles.DrawDottedLine( control1, controlPlane1, 2 );
+                Handles.DrawDottedLine( control2, controlPlane2, 2 );
+            }
         }
 
         static Vector3 SnapWorldPointToGrid(Vector3 worldSpacePoint, Matrix4x4 gridMatrix, bool forceAllAxis = false, float scale = 1)
@@ -1800,12 +1822,12 @@ namespace FantasticSplines
                 Ray down = new Ray( addNodePosition, -gridUp );
                 if( Physics.Raycast( down, out RaycastHit hitDown ) )
                 {
-                    DrawWireDisk(spline, hitDown.point, hitDown.normal, GetNodeDiscSize( hitDown.point ) * spline.gizmoScale, camera.transform.position );
+                    DrawWireDisc( hitDown.point, hitDown.normal );
                     Handles.DrawDottedLine( planePosition, hitDown.point, 2 );
                 }
 
-                DrawWireDisk(spline, addNodePosition, gridUp, GetNodeDiscSize( addNodePosition ) * spline.gizmoScale, camera.transform.position );
-                DrawWireDisk(spline, planePosition, gridUp, GetNodeDiscSize( planePosition ) * spline.gizmoScale, camera.transform.position );
+                DrawWireDisc( addNodePosition, gridUp );
+                DrawWireDisc( planePosition, gridUp );
                 Handles.DrawDottedLine( planePosition, addNodePosition, 2 );
                 Handles.color = Color.white;
 
@@ -1947,7 +1969,7 @@ namespace FantasticSplines
             }
 
             // draw new point being added
-            Handles.SphereHandleCap( 0, addNodePosition, Quaternion.identity, GetNodeHandleSize( addNodePosition ), guiEvent.type );
+            Handles.SphereHandleCap( 0, addNodePosition, Quaternion.identity, SplineHandleUtility.GetHandleSize( addNodePosition ), guiEvent.type );
             Handles.color = Color.white;
         }
 
@@ -1968,9 +1990,9 @@ namespace FantasticSplines
 
             // new point
             Handles.color = Color.yellow;
-            Handles.SphereHandleCap( 0, newNodePosition, transform.rotation, GetNodeHandleSize( newNodePosition ), guiEvent.type );
-            DrawWireDisk(spline, newNodePosition, gridUp, GetNodeDiscSize( newNodePosition ) * spline.gizmoScale, camera.transform.position );
-            DrawWireDisk(spline, planePosition, gridUp, GetNodeDiscSize( planePosition ) * spline.gizmoScale, camera.transform.position );
+            Handles.SphereHandleCap( 0, newNodePosition, transform.rotation, SplineHandleUtility.GetHandleSize( newNodePosition ), guiEvent.type );
+            DrawWireDisc( newNodePosition, gridUp );
+            DrawWireDisc( planePosition, gridUp );
             Handles.DrawLine( planePosition, newNodePosition );
             Handles.color = Color.white;
 
@@ -1978,7 +2000,7 @@ namespace FantasticSplines
             Ray down = new Ray( newNodePosition, -gridUp );
             if( Physics.Raycast( down, out hitDown ) )
             {
-                DrawWireDisk(spline, hitDown.point, hitDown.normal, GetNodeDiscSize( hitDown.point ) * spline.gizmoScale, camera.transform.position );
+                DrawWireDisc( hitDown.point, hitDown.normal );
                 Handles.DrawDottedLine( planePosition, hitDown.point, 2 );
             }
 
@@ -2379,14 +2401,14 @@ namespace FantasticSplines
             return Vector3.Dot( camera.transform.up, up ) < 0.95f;
         }
 
-        static float DepthScale(IEditableSpline spline, Vector3 point, Vector3 cameraPosition)
+        static void DrawWireDisc(Vector3 point, Vector3 normal, float radiusScale = 1)
         {
-            return Vector3.Distance( spline.Transform.position, cameraPosition ) / Vector3.Distance( point, cameraPosition );
+            Handles.DrawWireDisc( point, normal, SplineHandleUtility.GetDiscSize(point) * radiusScale);
         }
 
-        static void DrawWireDisk(IEditableSpline spline, Vector3 point, Vector3 normal, float radius, Vector3 cameraPosition)
+        static void DrawSolidDisc(Vector3 point, Vector3 normal, float radiusScale = 1)
         {
-            Handles.DrawWireDisc( point, normal, radius * DepthScale(spline, point, cameraPosition ) );
+            Handles.DrawSolidDisc(point, normal, SplineHandleUtility.GetDiscSize(point) * radiusScale);
         }
 
         static void DebugLogEvent(Event guiEvent)
