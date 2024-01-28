@@ -148,28 +148,29 @@ namespace FantasticSplines
 
         protected override void DrawInterpolatedGizmos()
         {
-            Handles.color = Color.green;
-
-            var spline = Target.spline;
-            var distance = SplineDistance.Zero;
-            var length = spline.Length;
-            var step = 1;
-            List<Vector3> points = new List<Vector3>();
-            while(distance < length)
+            using( new Handles.DrawingScope( Color.green ) )
             {
-                SplineResult location = spline.GetResultAt(distance);
-                Vector3 normal = SplineNormal.GetNormalAtSplineResult(location);
+                var spline = Target.spline;
+                var distance = SplineDistance.Zero;
+                var length = spline.Length;
+                var step = 1;
+                List<Vector3> points = new List<Vector3>();
+                while(distance < length)
+                {
+                    SplineResult location = spline.GetResultAt(distance);
+                    Vector3 normal = SplineNormal.GetNormalAtSplineResult(location);
 
-                points.Add(location.position);
-                points.Add(location.position + normal * NORMAL_GIZMO_SCALE);
+                    points.Add(location.position);
+                    points.Add(location.position + normal * NORMAL_GIZMO_SCALE);
 
-                distance += step;
+                    distance += step;
+                }
+
+                Handles.DrawLines(points.ToArray());
+                SplineResult locationEnd = spline.GetResultAt(length);
+                Vector3 normalEnd = SplineNormal.GetNormalAtSplineResult(locationEnd);
+                Handles.DrawLine(locationEnd.position, locationEnd.position + normalEnd * NORMAL_GIZMO_SCALE);
             }
-
-            Handles.DrawLines(points.ToArray());
-            SplineResult locationEnd = spline.GetResultAt(length);
-            Vector3 normalEnd = SplineNormal.GetNormalAtSplineResult(locationEnd);
-            Handles.DrawLine(locationEnd.position, locationEnd.position + normalEnd * NORMAL_GIZMO_SCALE);
         }
     }
 #endif

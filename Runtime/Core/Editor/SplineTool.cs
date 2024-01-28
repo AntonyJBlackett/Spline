@@ -90,9 +90,6 @@ namespace FantasticSplines
             window.Repaint();
         }
 
-
-
-        bool m_AnimatePlatforms = false;
         void OnGui(EditorWindow window)
         {
             if(!(window is SceneView sceneView))
