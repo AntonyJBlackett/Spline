@@ -1091,7 +1091,7 @@ namespace FantasticSplines
 
         static void DrawBezierSegment(SplineNode node1, SplineNode node2, Color color)
         {
-            Handles.DrawBezier( node1.position, node2.position, node1.position + node1.LocalOutControlPoint, node2.position + node2.LocalInControlPoint, color, null, 3 );
+            Handles.DrawBezier( node1.position, node2.position, node1.OutControlPoint, node2.InControlPoint, color, null, 3 );
         }
 
         static void DrawBezierSegmentOnPlane(Vector3 planeOrigin, Vector3 planeNormal, SplineNode node1, SplineNode node2)
@@ -1206,26 +1206,36 @@ namespace FantasticSplines
             var color = nodeSelection.Contains(index) ? ControlPointEditColor : Color.grey;
             using(new Handles.DrawingScope(color))
             {
-                Vector3 control1 = node.position + node.LocalInControlPoint;
-                Vector3 control2 = node.position + node.LocalOutControlPoint;
+                Vector3 control1 = node.InControlPoint;
+                Vector3 control2 = node.OutControlPoint;
 
-                if( index > 0 || spline.IsLoop )
+                using(new Handles.DrawingScope(color * 0.7f))
                 {
-                    Handles.SphereHandleCap( 0, control1, Quaternion.identity, SplineHandleUtility.GetHandleSize( control1 ) * CONTROL_HANDLE_SCALE, EventType.Repaint );
-                    Handles.DrawLine( node.position, control1 );
+                    if(index > 0 || spline.IsLoop)
+                    {
+                        DrawSolidDisc(control1, HandelUp2D, CONTROL_HANDLE_SCALE);
+                    } 
+                    if(index < spline.NodeCount - 1 || spline.IsLoop)
+                    {
+                        DrawSolidDisc(control2, HandelUp2D, CONTROL_HANDLE_SCALE);
+                    }
                 }
-
-                if( index < spline.NodeCount - 1 || spline.IsLoop )
+                if(index > 0 || spline.IsLoop)
                 {
-                    Handles.SphereHandleCap( 0, control2, Quaternion.identity, SplineHandleUtility.GetHandleSize( control2 ) * CONTROL_HANDLE_SCALE, EventType.Repaint );
-                    Handles.DrawLine( node.position, control2 );
+                    DrawWireDisc(control1, HandelUp2D, CONTROL_HANDLE_SCALE);
+                    Handles.DrawLine(node.position, control1);
+                }
+                if(index < spline.NodeCount - 1 || spline.IsLoop)
+                {
+                    DrawWireDisc(control2, HandelUp2D, CONTROL_HANDLE_SCALE);
+                    Handles.DrawLine(node.position, control2);
                 }
             }
         }
 
         public static void DrawDirecitonIndicators(IEditableSpline spline)
         {
-            using(new Handles.DrawingScope(Color.gray))
+            using(new Handles.DrawingScope(spline.color))
             {
                 float length = spline.Length.value;
                 int dots = 2 + (int)length / 3;

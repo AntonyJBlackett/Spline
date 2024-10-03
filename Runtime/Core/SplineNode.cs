@@ -82,6 +82,10 @@ namespace FantasticSplines
         {
             get
             {
+                if(nodeType == NodeType.Point)
+                {
+                    return position;
+                }
                 return localInControlPoint + position;
             }
             set
@@ -94,6 +98,10 @@ namespace FantasticSplines
         {
             get
             {
+                if(nodeType == NodeType.Point)
+                {
+                    return position;
+                }
                 return localOutControlPoint + position;
             }
             set
