@@ -582,7 +582,8 @@ namespace FantasticSplines
                     ShowSplineInfo = DoToggleButton( ShowSplineInfo, "Spline Info" );
                     ShowProjectionLines = DoToggleButton( ShowProjectionLines, "Projection Lines" );
                     ShowProjectedSpline = DoToggleButton( ShowProjectedSpline, "Projected Spline" );
-                    ShowSelectionDisks = DoToggleButton( ShowSelectionDisks, "Selection Disks" );
+                    ShowSelectionDiscs = DoToggleButton( ShowSelectionDiscs, "Selection Discs" );
+                    ShowDirectionAnimation = DoToggleButton(ShowDirectionAnimation, "Direction Animation");
                     spline.showDefaultNormals = DoToggleButton( spline.showDefaultNormals, "Draw Default Normals" );
 
                     if( EditorGUI.EndChangeCheck() )
@@ -635,10 +636,16 @@ namespace FantasticSplines
             set => EditorPrefs.SetBool( "FantasticSplinesShowProjectedSpline", value );
         }
 
-        public static bool ShowSelectionDisks
+        public static bool ShowSelectionDiscs
         {
-            get => EditorPrefs.GetBool( "FantasticSplinesShowSelectionDisks", true );
-            set => EditorPrefs.SetBool( "FantasticSplinesShowSelectionDisks", value );
+            get => EditorPrefs.GetBool( "FantasticSplinesShowSelectionDiscs", true );
+            set => EditorPrefs.SetBool( "FantasticSplinesShowSelectionDiscs", value );
+        }
+
+        public static bool ShowDirectionAnimation
+        {
+            get => EditorPrefs.GetBool("FantasticSplinesShowShowDirectionAnimation", true);
+            set => EditorPrefs.SetBool("FantasticSplinesShowShowDirectionAnimation", value);
         }
 
         public static GridSpace GridSpace
@@ -1026,7 +1033,7 @@ namespace FantasticSplines
             var up = -Camera.current.transform.forward;
             SplineNode node = spline.GetNode( 0 );
             float handleSize = SplineHandleUtility.GetHandleSize( node.position );
-            float diskSize = SplineHandleUtility.GetDiscSize(node.position);
+            float discSize = SplineHandleUtility.GetDiscSize(node.position);
 
             for( int sortedI = 0; sortedI < sortedNodeIndicies.Count; ++sortedI )
             {
@@ -1038,7 +1045,7 @@ namespace FantasticSplines
                 if( SplineHandleUtility.HandleCapSizeMode == GizmoSizeMode.ScreenSpace )
                 {
                     handleSize = SplineHandleUtility.GetHandleSize(point);
-                    diskSize = SplineHandleUtility.GetDiscSize(point);
+                    discSize = SplineHandleUtility.GetDiscSize(point);
                 }
 
                 if (nodeSelection.Contains(i))
@@ -1049,7 +1056,7 @@ namespace FantasticSplines
                 {
                     Handles.color = Color.white;
                 }
-                Handles.DrawSolidDisc(point, HandelUp2D, diskSize);
+                Handles.DrawSolidDisc(point, HandelUp2D, discSize);
             }
             Handles.color = Color.white;
         }
@@ -1155,9 +1162,9 @@ namespace FantasticSplines
             }
         }
 
-        static void DrawSplineSelectionDisks(IEditableSpline spline)
+        static void DrawSplineSelectionDiscs(IEditableSpline spline)
         {
-            if( !ShowSelectionDisks )
+            if( !ShowSelectionDiscs )
             {
                 return;
             }
@@ -1235,6 +1242,11 @@ namespace FantasticSplines
 
         public static void DrawDirecitonIndicators(IEditableSpline spline)
         {
+            if(!ShowDirectionAnimation)
+            {
+                return;
+            }
+
             using(new Handles.DrawingScope(spline.color))
             {
                 float length = spline.Length.value;
@@ -1276,7 +1288,7 @@ namespace FantasticSplines
             DrawBezierPlaneProjectedSplineLines( spline );
             DrawSplinePlaneProjectionLines( spline );
 
-            DrawSplineSelectionDisks( spline );
+            DrawSplineSelectionDiscs( spline );
             DrawBezierSplineLines( spline );
             DrawDirecitonIndicators( spline );
 
